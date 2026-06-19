@@ -49,12 +49,28 @@ export async function findProductByCode(
   return (byName ?? null) as Product | null;
 }
 
+export type PaymentMethod =
+  | "dinheiro"
+  | "pix"
+  | "debito"
+  | "credito"
+  | "vale";
+
+const VALID_METHODS: ReadonlySet<PaymentMethod> = new Set([
+  "dinheiro",
+  "pix",
+  "debito",
+  "credito",
+  "vale",
+]);
+
 export type RegisterSaleResult =
   | { ok: true; saleId: string }
   | { ok: false; error: string };
 
 export async function registerSale(
   items: SaleItemInput[],
+  paymentMethod: PaymentMethod,
 ): Promise<RegisterSaleResult> {
   if (items.length === 0) {
     return { ok: false, error: "Adicione ao menos um item à venda." };
@@ -63,6 +79,9 @@ export async function registerSale(
     if (!item.name || item.quantity <= 0 || item.unit_price < 0) {
       return { ok: false, error: "Há itens inválidos na venda." };
     }
+  }
+  if (!VALID_METHODS.has(paymentMethod)) {
+    return { ok: false, error: "Forma de pagamento inválida." };
   }
 
   const supabase = await createClient();
@@ -75,6 +94,7 @@ export async function registerSale(
 
   const { data, error } = await supabase.rpc("register_sale", {
     items: payload,
+    payment_method: paymentMethod,
   });
 
   if (error) {

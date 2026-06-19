@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 
 import {
   findProductByCode,
+  type PaymentMethod,
   registerSale,
   searchProductsByName,
 } from "./actions";
@@ -41,8 +42,6 @@ type Feedback =
   | { kind: "success"; message: string }
   | { kind: "error"; message: string }
   | null;
-
-type PaymentMethod = "dinheiro" | "pix" | "debito" | "credito" | "vale";
 
 const PAYMENT_METHODS: ReadonlyArray<{ value: PaymentMethod; label: string }> = [
   { value: "dinheiro", label: "Dinheiro" },
@@ -248,7 +247,7 @@ export function PosClient() {
         ? ` Troco: ${formatBRL(changeAmount)}.`
         : "";
     startRegister(async () => {
-      const result = await registerSale(items);
+      const result = await registerSale(items, paymentMethod);
       if (result.ok) {
         setCart([]);
         setQuery("");
