@@ -124,6 +124,18 @@ Fase 0 (você) → Fases 1–4 (Claude Code). Ao fim da Fase 4 já há um sistem
 - Usar variáveis de ambiente padrão e `@supabase/ssr` (portável).
 - Documentar no README o passo de migração. Detalhes na nota do [README](../README.md) e no guia de deploy.
 
+## Evoluções pós-MVP (fora do escopo das 9 fases)
+
+- **Preferências do usuário — taxas por forma de pagamento.** Criar uma seção
+  "Preferências" onde o lojista cadastra as taxas que paga em cada método
+  (ex.: Pix 0%, débito 1,5%, crédito 3,5%, vale 5%). Persistir em uma tabela
+  `payment_fees` por `user_id` × `payment_method`. Os relatórios financeiros
+  da Fase 5 ganham um filtro/coluna **"Faturamento líquido"** que aplica as
+  taxas vigentes às vendas do período. A migração `0002_payment_method.sql`
+  já grava `sales.payment_method`, então quando isso entrar bastará uma
+  migração nova para `payment_fees` + ajuste do dashboard. Não implementar
+  agora.
+
 ## Pendências pré-deploy (evolução futura)
 
 Itens conscientemente adiados. Fazer **na véspera do deploy de produção**, não antes.
