@@ -58,24 +58,22 @@ export default function PrivacidadePage() {
           </li>
           <li>
             <strong>Dados que você cadastra no uso:</strong> seus produtos,
-            vendas e valores. Esses dados são seus e ficam isolados da conta
-            de qualquer outro usuário.
+            vendas e valores. Esses dados são seus e ficam isolados da conta de
+            qualquer outro usuário.
           </li>
           <li>
             <strong>Data do aceite</strong> desta política.
           </li>
         </ul>
         <p className="text-lg leading-relaxed">
-          Não coletamos dados sensíveis (saúde, biometria, origem racial,
-          etc.) nem dados de pagamento.
+          Não coletamos dados sensíveis (saúde, biometria, origem racial, etc.)
+          nem dados de pagamento.
         </p>
 
         <h2 className="mt-8 text-2xl font-semibold">3. Para que usamos</h2>
         <ul className="ml-6 list-disc space-y-2 text-lg leading-relaxed">
           <li>Autenticar seu acesso e manter sua conta.</li>
-          <li>
-            Armazenar e exibir os produtos e vendas que você registra.
-          </li>
+          <li>Armazenar e exibir os produtos e vendas que você registra.</li>
           <li>Gerar seus relatórios de faturamento.</li>
         </ul>
         <p className="text-lg leading-relaxed">
@@ -83,29 +81,27 @@ export default function PrivacidadePage() {
           marketing.
         </p>
 
-        <h2 className="mt-8 text-2xl font-semibold">
-          4. Onde os dados ficam
-        </h2>
+        <h2 className="mt-8 text-2xl font-semibold">4. Onde os dados ficam</h2>
         <p className="text-lg leading-relaxed">
           Os dados são armazenados em servidores do <strong>Supabase</strong>{" "}
-          (infraestrutura em nuvem), com criptografia em trânsito (HTTPS) e
-          em repouso. O acesso é protegido por isolamento no nível do banco
-          de dados (Row Level Security):{" "}
+          (infraestrutura em nuvem), com criptografia em trânsito (HTTPS) e em
+          repouso. O acesso é protegido por isolamento no nível do banco de
+          dados (Row Level Security):{" "}
           <strong>cada usuário só acessa os próprios dados</strong>.
         </p>
 
-        <h2 className="mt-8 text-2xl font-semibold">
-          5. Seus direitos (LGPD)
-        </h2>
-        <p className="text-lg leading-relaxed">Você pode, a qualquer momento:</p>
+        <h2 className="mt-8 text-2xl font-semibold">5. Seus direitos (LGPD)</h2>
+        <p className="text-lg leading-relaxed">
+          Você pode, a qualquer momento:
+        </p>
         <ul className="ml-6 list-disc space-y-2 text-lg leading-relaxed">
           <li>
-            <strong>Acessar</strong> e <strong>corrigir</strong> seus dados
-            pela própria interface.
+            <strong>Acessar</strong> e <strong>corrigir</strong> seus dados pela
+            própria interface.
           </li>
           <li>
-            <strong>Excluir sua conta</strong> e todos os dados associados,
-            de forma permanente.
+            <strong>Excluir sua conta</strong> e todos os dados associados, de
+            forma permanente.
           </li>
           <li>
             Solicitar informações sobre o tratamento pelo e-mail de contato.
@@ -114,8 +110,8 @@ export default function PrivacidadePage() {
 
         <h2 className="mt-8 text-2xl font-semibold">6. Retenção</h2>
         <p className="text-lg leading-relaxed">
-          Mantemos seus dados enquanto sua conta existir. Ao excluir a conta,
-          os dados são apagados de forma permanente e em cascata.
+          Mantemos seus dados enquanto sua conta existir. Ao excluir a conta, os
+          dados são apagados de forma permanente e em cascata.
         </p>
 
         <h2 className="mt-8 text-2xl font-semibold">7. Cookies</h2>

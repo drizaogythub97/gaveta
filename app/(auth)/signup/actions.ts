@@ -70,8 +70,7 @@ export async function signup(
 
   if (data.session) {
     return {
-      success:
-        "Conta criada com sucesso! Você já pode entrar.",
+      success: "Conta criada com sucesso! Você já pode entrar.",
     };
   }
 

@@ -74,7 +74,9 @@ export function SignupForm() {
           required
           defaultValue={state.values?.email ?? ""}
           aria-invalid={Boolean(state.fieldErrors?.email)}
-          aria-describedby={state.fieldErrors?.email ? "email-error" : undefined}
+          aria-describedby={
+            state.fieldErrors?.email ? "email-error" : undefined
+          }
           className="h-14 text-lg"
         />
         {state.fieldErrors?.email ? (
@@ -115,7 +117,7 @@ export function SignupForm() {
       <div className="flex flex-col gap-2">
         <Label
           htmlFor="privacyAccepted"
-          className="text-foreground items-start gap-3 text-base font-normal leading-snug"
+          className="text-foreground items-start gap-3 text-base leading-snug font-normal"
         >
           <Checkbox
             id="privacyAccepted"
@@ -124,9 +126,7 @@ export function SignupForm() {
             required
             aria-invalid={Boolean(state.fieldErrors?.privacyAccepted)}
             aria-describedby={
-              state.fieldErrors?.privacyAccepted
-                ? "privacy-error"
-                : undefined
+              state.fieldErrors?.privacyAccepted ? "privacy-error" : undefined
             }
             className="mt-1 size-6"
           />

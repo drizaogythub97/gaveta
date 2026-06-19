@@ -31,7 +31,9 @@ export function LoginForm() {
           required
           defaultValue={state.email ?? ""}
           aria-invalid={Boolean(state.fieldErrors?.email)}
-          aria-describedby={state.fieldErrors?.email ? "email-error" : undefined}
+          aria-describedby={
+            state.fieldErrors?.email ? "email-error" : undefined
+          }
           className="h-14 text-lg"
         />
         {state.fieldErrors?.email ? (
