@@ -1,12 +1,13 @@
 "use client";
 
+import { Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import { ErrorAlert } from "@/components/auth/form-feedback";
 import { SubmitButton } from "@/components/auth/submit-button";
 import { CurrencyInput } from "@/components/app/currency-input";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -20,7 +21,7 @@ type Props = {
   ) => Promise<ProductFormState>;
   initialValues?: {
     name?: string;
-    barcode?: string;
+    barcodes?: string[];
     price?: number;
     trackStock?: "true" | "false";
     stockQuantity?: string;
@@ -40,13 +41,28 @@ export function ProductForm({
   const [state, formAction] = useActionState(action, initialState);
 
   const [name, setName] = useState(initialValues?.name ?? "");
-  const [barcode, setBarcode] = useState(initialValues?.barcode ?? "");
+  const initialBarcodes = initialValues?.barcodes ?? [];
+  const [barcodes, setBarcodes] = useState<string[]>(
+    initialBarcodes.length > 0 ? initialBarcodes : [""],
+  );
   const [trackStock, setTrackStock] = useState<"true" | "false">(
     initialValues?.trackStock ?? "true",
   );
   const [stockQuantity, setStockQuantity] = useState(
     initialValues?.stockQuantity ?? "",
   );
+
+  function setBarcodeAt(index: number, value: string) {
+    setBarcodes((prev) => prev.map((b, i) => (i === index ? value : b)));
+  }
+  function addBarcode() {
+    setBarcodes((prev) => [...prev, ""]);
+  }
+  function removeBarcode(index: number) {
+    setBarcodes((prev) =>
+      prev.length <= 1 ? [""] : prev.filter((_, i) => i !== index),
+    );
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-5" noValidate>
@@ -75,40 +91,60 @@ export function ProductForm({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="barcode" className="text-base">
-          Código de barras{" "}
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-base font-medium">
+          Códigos de barras{" "}
           <span className="text-muted-foreground font-normal">(opcional)</span>
-        </Label>
-        <Input
-          id="barcode"
-          name="barcode"
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          value={barcode}
-          onChange={(e) => setBarcode(e.target.value)}
-          aria-invalid={Boolean(state.fieldErrors?.barcode)}
-          aria-describedby={
-            state.fieldErrors?.barcode ? "barcode-error" : "barcode-hint"
-          }
-          className="h-14 text-lg"
-          placeholder="Bipe ou digite o código"
-        />
-        {state.fieldErrors?.barcode ? (
-          <p
-            id="barcode-error"
-            className="text-destructive text-sm"
-            role="alert"
-          >
-            {state.fieldErrors.barcode}
+        </legend>
+        <p
+          id="barcodes-hint"
+          className="text-muted-foreground text-sm"
+        >
+          Você pode cadastrar mais de um código para o mesmo produto — útil
+          quando a embalagem muda ou o item é vendido em formatos diferentes.
+        </p>
+        <ul className="flex flex-col gap-2">
+          {barcodes.map((code, index) => (
+            <li key={index} className="flex items-center gap-2">
+              <Input
+                name="barcodes"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                value={code}
+                onChange={(e) => setBarcodeAt(index, e.target.value)}
+                aria-label={`Código de barras ${index + 1}`}
+                aria-describedby="barcodes-hint"
+                className="h-14 flex-1 text-lg"
+                placeholder="Bipe ou digite o código"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => removeBarcode(index)}
+                aria-label={`Remover código ${index + 1}`}
+                className="h-14 w-14 p-0"
+              >
+                <Trash2 aria-hidden="true" className="size-5" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={addBarcode}
+          className="h-12 self-start px-4 text-base"
+        >
+          <Plus aria-hidden="true" className="size-4" />
+          Adicionar outro código
+        </Button>
+        {state.fieldErrors?.barcodes ? (
+          <p className="text-destructive text-sm" role="alert">
+            {state.fieldErrors.barcodes}
           </p>
-        ) : (
-          <p id="barcode-hint" className="text-muted-foreground text-sm">
-            Deixe em branco se o produto não tiver código.
-          </p>
-        )}
-      </div>
+        ) : null}
+      </fieldset>
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="price" className="text-base">

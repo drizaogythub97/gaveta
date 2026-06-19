@@ -320,14 +320,7 @@ export function PosClient() {
                   onClick={() => addProductToCart(p)}
                   className="hover:bg-muted focus-visible:bg-muted flex w-full items-center justify-between gap-3 rounded-md px-3 py-3 text-left text-base outline-none"
                 >
-                  <span className="flex flex-col">
-                    <span className="text-foreground font-medium">{p.name}</span>
-                    {p.barcode ? (
-                      <span className="text-muted-foreground font-mono text-sm">
-                        {p.barcode}
-                      </span>
-                    ) : null}
-                  </span>
+                  <span className="text-foreground font-medium">{p.name}</span>
                   <span className="text-foreground text-lg font-semibold">
                     {formatBRL(p.price)}
                   </span>

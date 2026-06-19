@@ -11,11 +11,14 @@ import { productSchema } from "@/lib/validations/products";
 export type ProductFormState = {
   error?: string;
   fieldErrors?: Partial<
-    Record<"name" | "barcode" | "price" | "trackStock" | "stockQuantity", string>
+    Record<
+      "name" | "barcodes" | "price" | "trackStock" | "stockQuantity",
+      string
+    >
   >;
   values?: {
     name?: string;
-    barcode?: string;
+    barcodes?: string[];
     price?: string;
     trackStock?: "true" | "false";
     stockQuantity?: string;
@@ -25,7 +28,7 @@ export type ProductFormState = {
 function readForm(formData: FormData) {
   return {
     name: String(formData.get("name") ?? ""),
-    barcode: String(formData.get("barcode") ?? ""),
+    barcodes: formData.getAll("barcodes").map((v) => String(v)),
     price: String(formData.get("price") ?? ""),
     trackStock: String(formData.get("trackStock") ?? ""),
     stockQuantity: String(formData.get("stockQuantity") ?? ""),
@@ -35,7 +38,7 @@ function readForm(formData: FormData) {
 function rawValues(raw: ReturnType<typeof readForm>) {
   return {
     name: raw.name,
-    barcode: raw.barcode,
+    barcodes: raw.barcodes,
     price: raw.price,
     trackStock:
       raw.trackStock === "true" || raw.trackStock === "false"
@@ -51,7 +54,7 @@ function collectFieldErrors(issues: ZodIssue[]): ProductFormState["fieldErrors"]
     const key = issue.path[0];
     if (
       key === "name" ||
-      key === "barcode" ||
+      key === "barcodes" ||
       key === "price" ||
       key === "trackStock" ||
       key === "stockQuantity"
@@ -64,13 +67,39 @@ function collectFieldErrors(issues: ZodIssue[]): ProductFormState["fieldErrors"]
 
 function dbErrorToPortuguese(message: string | undefined): string {
   if (!message) return "Não foi possível salvar. Tente novamente.";
-  if (/uniq_products_user_barcode|duplicate key/i.test(message)) {
-    return "Já existe um produto com este código de barras.";
+  if (/uniq_product_barcodes_user_barcode|duplicate key/i.test(message)) {
+    return "Um dos códigos de barras já está em uso em outro produto.";
   }
   if (/products_stock_qty_when_tracked/i.test(message)) {
     return "Informe a quantidade quando o estoque é controlado.";
   }
   return "Não foi possível salvar. Tente novamente.";
+}
+
+async function syncBarcodes(
+  productId: string,
+  userId: string,
+  barcodes: string[],
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { error: delError } = await supabase
+    .from("product_barcodes")
+    .delete()
+    .eq("product_id", productId)
+    .eq("user_id", userId);
+  if (delError) return { error: dbErrorToPortuguese(delError.message) };
+
+  if (barcodes.length === 0) return {};
+
+  const { error: insError } = await supabase.from("product_barcodes").insert(
+    barcodes.map((barcode) => ({
+      product_id: productId,
+      user_id: userId,
+      barcode,
+    })),
+  );
+  if (insError) return { error: dbErrorToPortuguese(insError.message) };
+  return {};
 }
 
 export async function createProduct(
@@ -95,20 +124,38 @@ export async function createProduct(
   }
 
   const tracks = parsed.data.trackStock === "true";
-  const { error } = await supabase.from("products").insert({
-    user_id: user.id,
-    name: parsed.data.name,
-    barcode: parsed.data.barcode,
-    price: parsed.data.price,
-    track_stock: tracks,
-    stock_quantity: tracks ? (parsed.data.stockQuantity ?? 0) : null,
-  });
+  const { data: inserted, error } = await supabase
+    .from("products")
+    .insert({
+      user_id: user.id,
+      name: parsed.data.name,
+      price: parsed.data.price,
+      track_stock: tracks,
+      stock_quantity: tracks ? (parsed.data.stockQuantity ?? 0) : null,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !inserted) {
     return {
-      error: dbErrorToPortuguese(error.message),
+      error: dbErrorToPortuguese(error?.message),
       values: rawValues(raw),
     };
+  }
+
+  const syncResult = await syncBarcodes(
+    inserted.id,
+    user.id,
+    parsed.data.barcodes,
+  );
+  if (syncResult.error) {
+    // Rollback: deleta o produto recém-criado para evitar entrada órfã.
+    await supabase
+      .from("products")
+      .delete()
+      .eq("id", inserted.id)
+      .eq("user_id", user.id);
+    return { error: syncResult.error, values: rawValues(raw) };
   }
 
   revalidatePath("/produtos");
@@ -142,7 +189,6 @@ export async function updateProduct(
     .from("products")
     .update({
       name: parsed.data.name,
-      barcode: parsed.data.barcode,
       price: parsed.data.price,
       track_stock: tracks,
       stock_quantity: tracks ? (parsed.data.stockQuantity ?? 0) : null,
@@ -156,6 +202,11 @@ export async function updateProduct(
       error: dbErrorToPortuguese(error.message),
       values: rawValues(raw),
     };
+  }
+
+  const syncResult = await syncBarcodes(id, user.id, parsed.data.barcodes);
+  if (syncResult.error) {
+    return { error: syncResult.error, values: rawValues(raw) };
   }
 
   revalidatePath("/produtos");

@@ -6,7 +6,7 @@ import type { Product, SaleItemInput } from "@/lib/types/db";
 const SEARCH_LIMIT = 8;
 
 const PRODUCT_COLUMNS =
-  "id, user_id, name, barcode, price, track_stock, stock_quantity, created_at, updated_at";
+  "id, user_id, name, price, track_stock, stock_quantity, created_at, updated_at";
 
 export async function searchProductsByName(query: string): Promise<Product[]> {
   const term = query.trim();
@@ -31,13 +31,20 @@ export async function findProductByCode(
 
   const supabase = await createClient();
 
-  const { data: byBarcode } = await supabase
-    .from("products")
-    .select(PRODUCT_COLUMNS)
+  const { data: barcodeMatch } = await supabase
+    .from("product_barcodes")
+    .select("product_id")
     .eq("barcode", term)
     .maybeSingle();
 
-  if (byBarcode) return byBarcode as Product;
+  if (barcodeMatch?.product_id) {
+    const { data: product } = await supabase
+      .from("products")
+      .select(PRODUCT_COLUMNS)
+      .eq("id", barcodeMatch.product_id)
+      .maybeSingle();
+    if (product) return product as Product;
+  }
 
   const { data: byName } = await supabase
     .from("products")

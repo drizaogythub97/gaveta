@@ -20,15 +20,21 @@ export default async function EditProductPage({
   const { data } = await supabase
     .from("products")
     .select(
-      "id, user_id, name, barcode, price, track_stock, stock_quantity, created_at, updated_at",
+      "id, user_id, name, price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode)",
     )
     .eq("id", id)
     .maybeSingle();
 
-  const product = data as Product | null;
-  if (!product) {
+  const row = data as
+    | (Product & { product_barcodes: { barcode: string }[] | null })
+    | null;
+  if (!row) {
     notFound();
   }
+  const product = {
+    ...row,
+    barcodes: (row.product_barcodes ?? []).map((b) => b.barcode),
+  };
 
   const boundAction = async (
     state: ProductFormState,
@@ -50,7 +56,7 @@ export default async function EditProductPage({
         action={boundAction}
         initialValues={{
           name: product.name,
-          barcode: product.barcode ?? "",
+          barcodes: product.barcodes,
           price: product.price,
           trackStock: product.track_stock ? "true" : "false",
           stockQuantity:

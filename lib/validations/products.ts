@@ -8,13 +8,6 @@ const name = z
   .min(1, "Informe o nome do produto.")
   .max(120, "Nome muito longo (máx. 120 caracteres).");
 
-const barcode = z
-  .string()
-  .trim()
-  .max(64, "Código de barras muito longo.")
-  .optional()
-  .transform((v) => (v && v.length > 0 ? v : null));
-
 const priceField = z
   .string()
   .min(1, "Informe o preço.")
@@ -54,10 +47,38 @@ const stockField = z
     return n;
   });
 
+const barcodesField = z
+  .array(z.string())
+  .optional()
+  .transform((arr, ctx) => {
+    if (!arr) return [] as string[];
+    const cleaned = arr
+      .map((b) => b.trim())
+      .filter((b) => b.length > 0);
+    for (const code of cleaned) {
+      if (code.length > 64) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Código de barras muito longo (máx. 64 caracteres).",
+        });
+        return z.NEVER;
+      }
+    }
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const code of cleaned) {
+      if (!seen.has(code)) {
+        seen.add(code);
+        deduped.push(code);
+      }
+    }
+    return deduped;
+  });
+
 export const productSchema = z
   .object({
     name,
-    barcode,
+    barcodes: barcodesField,
     price: priceField,
     trackStock: z.enum(["true", "false"], {
       error: "Escolha se controla estoque.",

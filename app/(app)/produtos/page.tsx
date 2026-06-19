@@ -5,7 +5,7 @@ import { ConfirmDeleteButton } from "@/components/app/confirm-delete-button";
 import { buttonVariants } from "@/components/ui/button";
 import { formatBRL, formatQuantity } from "@/lib/products/format";
 import { createClient } from "@/lib/supabase/server";
-import type { Product } from "@/lib/types/db";
+import type { Product, ProductWithBarcodes } from "@/lib/types/db";
 import { cn } from "@/lib/utils";
 
 import { deleteProduct } from "./actions";
@@ -19,11 +19,18 @@ export default async function ProductsPage() {
   const { data, error } = await supabase
     .from("products")
     .select(
-      "id, user_id, name, barcode, price, track_stock, stock_quantity, created_at, updated_at",
+      "id, user_id, name, price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode)",
     )
     .order("created_at", { ascending: false });
 
-  const products = (data ?? []) as Product[];
+  const products: ProductWithBarcodes[] = (
+    (data ?? []) as (Product & {
+      product_barcodes: { barcode: string }[] | null;
+    })[]
+  ).map((p) => ({
+    ...p,
+    barcodes: (p.product_barcodes ?? []).map((b) => b.barcode),
+  }));
 
   return (
     <section className="flex flex-col gap-6">
@@ -70,9 +77,12 @@ export default async function ProductsPage() {
                   <span className="text-foreground text-lg font-medium">
                     {formatBRL(p.price)}
                   </span>
-                  {p.barcode ? (
-                    <span aria-label={`Código de barras ${p.barcode}`}>
-                      Código: <span className="font-mono">{p.barcode}</span>
+                  {p.barcodes.length > 0 ? (
+                    <span aria-label={`Códigos de barras ${p.barcodes.join(", ")}`}>
+                      {p.barcodes.length === 1 ? "Código: " : "Códigos: "}
+                      <span className="font-mono">
+                        {p.barcodes.join(" · ")}
+                      </span>
                     </span>
                   ) : null}
                 </div>
