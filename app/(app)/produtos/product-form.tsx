@@ -63,6 +63,29 @@ export function ProductForm({
       prev.length <= 1 ? [""] : prev.filter((_, i) => i !== index),
     );
   }
+  function handleBarcodeKeyDown(
+    event: React.KeyboardEvent<HTMLInputElement>,
+    index: number,
+  ) {
+    if (event.key !== "Enter") return;
+    // O leitor USB termina o envio do código com Enter, o que submeteria
+    // o formulário (anti-intuitivo: o usuário ainda está editando). Em vez
+    // disso, abrimos uma nova linha vazia se a atual já tem código,
+    // mantendo o foco pronto para o próximo bipe.
+    event.preventDefault();
+    const current = barcodes[index]?.trim() ?? "";
+    if (current.length === 0) return;
+    if (index === barcodes.length - 1) {
+      setBarcodes((prev) => [...prev, ""]);
+    }
+    // Foca a próxima linha após o render.
+    setTimeout(() => {
+      const next = event.currentTarget.form?.querySelectorAll<HTMLInputElement>(
+        'input[name="barcodes"]',
+      );
+      next?.[index + 1]?.focus();
+    }, 0);
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-5" noValidate>
@@ -113,6 +136,7 @@ export function ProductForm({
                 autoComplete="off"
                 value={code}
                 onChange={(e) => setBarcodeAt(index, e.target.value)}
+                onKeyDown={(e) => handleBarcodeKeyDown(e, index)}
                 aria-label={`Código de barras ${index + 1}`}
                 aria-describedby="barcodes-hint"
                 className="h-14 flex-1 text-lg"

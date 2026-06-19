@@ -12,7 +12,7 @@ export default async function InventoryPage() {
   const { data } = await supabase
     .from("products")
     .select(
-      "id, user_id, name, barcode, price, track_stock, stock_quantity, created_at, updated_at",
+      "id, user_id, name, price, track_stock, stock_quantity, created_at, updated_at",
     )
     .eq("track_stock", true)
     .order("name", { ascending: true });

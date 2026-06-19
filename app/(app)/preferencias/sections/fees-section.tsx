@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { ErrorAlert, SuccessAlert } from "@/components/auth/form-feedback";
 import { SubmitButton } from "@/components/auth/submit-button";
@@ -47,6 +47,20 @@ function format(value: number): string {
 
 export function FeesSection({ initialFees }: Props) {
   const [state, formAction] = useActionState(saveFees, initialState);
+  const [values, setValues] = useState<Record<keyof PaymentFees, string>>(() => ({
+    pix_pct: format(initialFees.pix_pct),
+    debito_pct: format(initialFees.debito_pct),
+    credito_avista_pct: format(initialFees.credito_avista_pct),
+    credito_parcelado_base_pct: format(initialFees.credito_parcelado_base_pct),
+    credito_parcelado_por_parcela_pct: format(
+      initialFees.credito_parcelado_por_parcela_pct,
+    ),
+    vale_pct: format(initialFees.vale_pct),
+  }));
+
+  function setValue(key: keyof PaymentFees, v: string) {
+    setValues((prev) => ({ ...prev, [key]: v }));
+  }
 
   return (
     <section
@@ -78,7 +92,8 @@ export function FeesSection({ initialFees }: Props) {
                   name={f.name}
                   type="text"
                   inputMode="decimal"
-                  defaultValue={format(initialFees[f.name])}
+                  value={values[f.name]}
+                  onChange={(e) => setValue(f.name, e.target.value)}
                   placeholder="0"
                   className="h-14 pr-10 text-lg"
                 />
