@@ -3,58 +3,176 @@
 import { createClient as createSbClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 
 import { getServiceRoleKey, publicEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 
-export type ProfileFormState = {
-  ok?: boolean;
-  error?: string;
-  fieldErrors?: Partial<Record<"fullName", string>>;
-};
+export type ActionResult = { ok: boolean; error?: string };
 
-export async function updateProfile(
-  _prev: ProfileFormState,
-  formData: FormData,
-): Promise<ProfileFormState> {
-  const fullName = String(formData.get("fullName") ?? "").trim();
-  if (fullName.length < 2) {
-    return {
-      fieldErrors: { fullName: "Informe seu nome (mínimo 2 caracteres)." },
-    };
-  }
-  if (fullName.length > 120) {
-    return { fieldErrors: { fullName: "Nome muito longo (máx. 120)." } };
+const nameSchema = z
+  .string()
+  .trim()
+  .min(2, "Informe seu nome (mínimo 2 caracteres).")
+  .max(120, "Nome muito longo (máx. 120 caracteres).");
+
+const emailSchema = z.email("Digite um e-mail válido.");
+
+const passwordSchema = z
+  .string()
+  .min(8, "A nova senha deve ter ao menos 8 caracteres.")
+  .max(72, "A nova senha é muito longa.");
+
+// =====================================================================
+// Atualizar nome
+// =====================================================================
+
+export async function updateName(fullName: string): Promise<ActionResult> {
+  const parsed = nameSchema.safeParse(fullName);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Nome inválido." };
   }
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Sessão expirada." };
+  if (!user) return { ok: false, error: "Sessão expirada." };
 
   const [profileResult, authResult] = await Promise.all([
     supabase
       .from("profiles")
-      .update({ full_name: fullName })
+      .update({ full_name: parsed.data })
       .eq("id", user.id),
-    supabase.auth.updateUser({ data: { full_name: fullName } }),
+    supabase.auth.updateUser({ data: { full_name: parsed.data } }),
   ]);
 
   if (profileResult.error || authResult.error) {
-    return { error: "Não foi possível salvar." };
+    return { ok: false, error: "Não foi possível salvar." };
   }
 
   revalidatePath("/", "layout");
   return { ok: true };
 }
 
+// =====================================================================
+// Helper: reautentica com a senha atual antes de permitir mudança sensível
+// =====================================================================
+
+async function reauthenticate(
+  currentPassword: string,
+): Promise<{ ok: true; email: string } | { ok: false; error: string }> {
+  if (!currentPassword || currentPassword.length === 0) {
+    return { ok: false, error: "Informe sua senha atual." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !user.email) {
+    return { ok: false, error: "Sessão expirada. Entre novamente." };
+  }
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+  if (error) {
+    if (/rate limit|too many/i.test(error.message)) {
+      return {
+        ok: false,
+        error: "Muitas tentativas. Aguarde alguns minutos.",
+      };
+    }
+    return { ok: false, error: "Senha atual incorreta." };
+  }
+
+  return { ok: true, email: user.email };
+}
+
+// =====================================================================
+// Trocar e-mail
+// =====================================================================
+
+export async function changeEmail(
+  currentPassword: string,
+  newEmail: string,
+): Promise<ActionResult> {
+  const parsed = emailSchema.safeParse(newEmail.trim().toLowerCase());
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "E-mail inválido." };
+  }
+
+  const auth = await reauthenticate(currentPassword);
+  if (!auth.ok) return auth;
+
+  if (parsed.data === auth.email.toLowerCase()) {
+    return { ok: false, error: "O novo e-mail é igual ao atual." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser(
+    { email: parsed.data },
+    { emailRedirectTo: `${publicEnv.siteUrl}/auth/callback?next=/minha-conta` },
+  );
+  if (error) {
+    if (/already (registered|exists)/i.test(error.message)) {
+      return { ok: false, error: "Este e-mail já está em uso." };
+    }
+    if (/rate limit|too many/i.test(error.message)) {
+      return {
+        ok: false,
+        error: "Muitas tentativas. Aguarde alguns minutos.",
+      };
+    }
+    return { ok: false, error: "Não foi possível solicitar a troca." };
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+// =====================================================================
+// Trocar senha
+// =====================================================================
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<ActionResult> {
+  const parsed = passwordSchema.safeParse(newPassword);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Senha inválida." };
+  }
+  if (currentPassword === parsed.data) {
+    return { ok: false, error: "A nova senha deve ser diferente da atual." };
+  }
+
+  const auth = await reauthenticate(currentPassword);
+  if (!auth.ok) return auth;
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password: parsed.data });
+  if (error) {
+    if (/rate limit|too many/i.test(error.message)) {
+      return {
+        ok: false,
+        error: "Muitas tentativas. Aguarde alguns minutos.",
+      };
+    }
+    return { ok: false, error: "Não foi possível alterar a senha." };
+  }
+
+  return { ok: true };
+}
+
+// =====================================================================
+// Excluir conta (já existia — mantido)
+// =====================================================================
+
 export type DeleteAccountResult = { ok: false; error: string };
 
-/**
- * Em caso de erro retorna { ok: false, error }. Em caso de sucesso chama
- * `redirect("/")` (que lança NEXT_REDIRECT e nunca retorna).
- */
 export async function deleteAccount(
   password: string,
 ): Promise<DeleteAccountResult | void> {
@@ -72,7 +190,6 @@ export async function deleteAccount(
   const userId = user.id;
   const email = user.email;
 
-  // Re-autentica para confirmar que é o próprio dono da conta.
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -81,8 +198,6 @@ export async function deleteAccount(
     return { ok: false, error: "Senha incorreta." };
   }
 
-  // Apaga eventuais arquivos do usuário no bucket de logos.
-  // Path convention: <userId>/<uuid>.<ext>.
   const { data: files } = await supabase.storage
     .from("brand-logos")
     .list(userId);
@@ -92,9 +207,6 @@ export async function deleteAccount(
       .remove(files.map((f) => `${userId}/${f.name}`));
   }
 
-  // Apaga o usuário com service_role. O ON DELETE CASCADE em auth.users
-  // remove profiles, products, product_barcodes, sales, sale_items e
-  // preferences_fees automaticamente.
   const admin = createSbClient(
     publicEnv.supabaseUrl,
     getServiceRoleKey(),
