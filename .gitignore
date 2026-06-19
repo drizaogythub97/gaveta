@@ -40,3 +40,6 @@ yarn-error.log*
 
 # Vercel
 .vercel
+
+# Claude Code (estado local por usuário)
+.claude/settings.local.json
