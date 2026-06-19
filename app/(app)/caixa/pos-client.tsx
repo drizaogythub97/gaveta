@@ -13,7 +13,13 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatBRL, parseDecimalPtBR } from "@/lib/products/format";
+import {
+  digitsToBRL,
+  digitsToNumber,
+  formatBRL,
+  parseDecimalPtBR,
+  sanitizeDigits,
+} from "@/lib/products/format";
 import type { Product, SaleItemInput } from "@/lib/types/db";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +42,16 @@ type Feedback =
   | { kind: "error"; message: string }
   | null;
 
+type PaymentMethod = "dinheiro" | "pix" | "debito" | "credito" | "vale";
+
+const PAYMENT_METHODS: ReadonlyArray<{ value: PaymentMethod; label: string }> = [
+  { value: "dinheiro", label: "Dinheiro" },
+  { value: "pix", label: "Pix" },
+  { value: "debito", label: "Cartão de débito" },
+  { value: "credito", label: "Cartão de crédito" },
+  { value: "vale", label: "Vale alimentação / refeição" },
+];
+
 function makeKey() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -55,8 +71,10 @@ export function PosClient() {
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [manualName, setManualName] = useState<string | null>(null);
-  const [manualPrice, setManualPrice] = useState("");
+  const [manualPriceDigits, setManualPriceDigits] = useState("");
   const [manualQty, setManualQty] = useState("1");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("dinheiro");
+  const [paidDigits, setPaidDigits] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [isRegistering, startRegister] = useTransition();
 
@@ -82,7 +100,7 @@ export function PosClient() {
 
   function clearManual() {
     setManualName(null);
-    setManualPrice("");
+    setManualPriceDigits("");
     setManualQty("1");
   }
 
@@ -101,7 +119,6 @@ export function PosClient() {
     setQuery("");
     setSuggestions([]);
     clearManual();
-    setFeedback(null);
     refocus();
   }
 
@@ -137,16 +154,16 @@ export function PosClient() {
 
     setSuggestions([]);
     setManualName(term);
-    setManualPrice("");
+    setManualPriceDigits("");
     setManualQty("1");
     setFeedback(null);
   }
 
   function handleManualSubmit() {
     if (!manualName) return;
-    const price = parseDecimalPtBR(manualPrice);
+    const price = digitsToNumber(manualPriceDigits);
     const qty = parseDecimalPtBR(manualQty);
-    if (!Number.isFinite(price) || price < 0) {
+    if (!Number.isFinite(price) || price <= 0) {
       setFeedback({ kind: "error", message: "Informe um valor válido." });
       return;
     }
@@ -199,11 +216,24 @@ export function PosClient() {
     0,
   );
 
+  const isCash = paymentMethod === "dinheiro";
+  const paidAmount = isCash ? digitsToNumber(paidDigits) : 0;
+  const changeAmount = Math.round((paidAmount - total) * 100) / 100;
+  const showChange = isCash && paidDigits.length > 0 && cart.length > 0;
+  const enoughCash = !isCash || paidAmount >= total || cart.length === 0;
+
   function handleRegister() {
     if (cart.length === 0) {
       setFeedback({
         kind: "error",
         message: "Adicione ao menos um item à venda.",
+      });
+      return;
+    }
+    if (isCash && paidAmount < total) {
+      setFeedback({
+        kind: "error",
+        message: "Valor recebido é menor que o total.",
       });
       return;
     }
@@ -213,6 +243,10 @@ export function PosClient() {
       unit_price: it.unit_price,
       quantity: Math.round(it.quantity * 1000) / 1000,
     }));
+    const changeMessage =
+      isCash && changeAmount > 0
+        ? ` Troco: ${formatBRL(changeAmount)}.`
+        : "";
     startRegister(async () => {
       const result = await registerSale(items);
       if (result.ok) {
@@ -220,9 +254,11 @@ export function PosClient() {
         setQuery("");
         clearManual();
         setSuggestions([]);
+        setPaymentMethod("dinheiro");
+        setPaidDigits("");
         setFeedback({
           kind: "success",
-          message: `Venda registrada! Total ${formatBRL(total)}.`,
+          message: `Venda registrada! Total ${formatBRL(total)}.${changeMessage}`,
         });
         refocus();
       } else {
@@ -312,15 +348,21 @@ export function PosClient() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1">
                 <Label htmlFor={manualPriceId} className="text-sm">
-                  Valor (R$)
+                  Valor
                 </Label>
                 <Input
                   id={manualPriceId}
                   type="text"
-                  inputMode="decimal"
-                  value={manualPrice}
-                  onChange={(e) => setManualPrice(e.target.value)}
-                  placeholder="Ex.: 12,00"
+                  inputMode="numeric"
+                  value={
+                    manualPriceDigits === ""
+                      ? ""
+                      : digitsToBRL(manualPriceDigits)
+                  }
+                  onChange={(e) =>
+                    setManualPriceDigits(sanitizeDigits(e.target.value))
+                  }
+                  placeholder="R$ 0,00"
                   className="h-12 text-base"
                 />
               </div>
@@ -463,29 +505,108 @@ export function PosClient() {
       </section>
 
       <section
-        aria-labelledby="total-heading"
-        className="bg-primary text-primary-foreground flex flex-col gap-4 rounded-xl p-5 sm:flex-row sm:items-center sm:justify-between"
+        aria-labelledby="payment-heading"
+        className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
       >
-        <div>
-          <p id="total-heading" className="text-base opacity-90">
-            Total da venda
-          </p>
-          <p
-            className="text-4xl font-bold tabular-nums sm:text-5xl"
+        <h2 id="payment-heading" className="text-xl font-semibold">
+          Forma de pagamento
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="payment-method" className="text-base">
+              Como o cliente vai pagar?
+            </Label>
+            <select
+              id="payment-method"
+              value={paymentMethod}
+              onChange={(e) => {
+                setPaymentMethod(e.target.value as PaymentMethod);
+                if (e.target.value !== "dinheiro") {
+                  setPaidDigits("");
+                }
+              }}
+              className="border-input bg-background h-14 w-full rounded-lg border px-3 text-lg outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="paid-amount" className="text-base">
+              Valor recebido
+              {!isCash ? (
+                <span className="text-muted-foreground ml-1 text-sm font-normal">
+                  (apenas dinheiro)
+                </span>
+              ) : null}
+            </Label>
+            <Input
+              id="paid-amount"
+              type="text"
+              inputMode="numeric"
+              value={paidDigits === "" ? "" : digitsToBRL(paidDigits)}
+              onChange={(e) => setPaidDigits(sanitizeDigits(e.target.value))}
+              disabled={!isCash}
+              placeholder="R$ 0,00"
+              className="h-14 text-lg"
+              aria-describedby="paid-amount-hint"
+            />
+            <p id="paid-amount-hint" className="text-muted-foreground text-sm">
+              {isCash
+                ? "Digite quanto o cliente entregou para calcular o troco."
+                : "Não há troco para esta forma de pagamento."}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="total-heading"
+        className="bg-primary text-primary-foreground flex flex-col gap-4 rounded-xl p-5"
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p id="total-heading" className="text-base opacity-90">
+              Total da venda
+            </p>
+            <p
+              className="text-4xl font-bold tabular-nums sm:text-5xl"
+              aria-live="polite"
+            >
+              {formatBRL(total)}
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={handleRegister}
+            disabled={isRegistering || cart.length === 0 || !enoughCash}
+            aria-busy={isRegistering}
+            className="bg-background text-primary hover:bg-background/90 h-16 px-8 text-xl font-semibold"
+          >
+            {isRegistering ? "Registrando…" : "Registrar venda"}
+          </Button>
+        </div>
+        {showChange ? (
+          <div
+            className="bg-primary-foreground/10 flex items-center justify-between rounded-lg px-4 py-3 text-lg"
             aria-live="polite"
           >
-            {formatBRL(total)}
-          </p>
-        </div>
-        <Button
-          type="button"
-          onClick={handleRegister}
-          disabled={isRegistering || cart.length === 0}
-          aria-busy={isRegistering}
-          className="bg-background text-primary hover:bg-background/90 h-16 px-8 text-xl font-semibold"
-        >
-          {isRegistering ? "Registrando…" : "Registrar venda"}
-        </Button>
+            <span className="opacity-90">
+              {changeAmount >= 0 ? "Troco" : "Falta"}
+            </span>
+            <span
+              className={cn(
+                "text-2xl font-bold tabular-nums",
+                changeAmount < 0 ? "text-warning-foreground" : "",
+              )}
+            >
+              {formatBRL(Math.abs(changeAmount))}
+            </span>
+          </div>
+        ) : null}
       </section>
     </div>
   );
