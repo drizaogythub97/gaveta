@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AppNav } from "@/components/app/app-nav";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
@@ -49,6 +50,7 @@ export default async function AppLayout({
             </form>
           </div>
         </div>
+        <AppNav />
       </header>
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
         {children}
