@@ -66,6 +66,34 @@
   --radius: 0.5rem;
 }
 
+.dark {
+  /* Tema escuro: mantém o verde primário; texto suavemente off-white para
+     reduzir glare; superfícies em níveis de cinza-azulado escuro. */
+  --background: #0f1115;
+  --foreground: #e8e8e8;
+  --card: #161a21;
+  --card-foreground: #e8e8e8;
+  --popover: #161a21;
+  --popover-foreground: #e8e8e8;
+  --primary: #2fa05f;
+  --primary-foreground: #0a0c10;
+  --secondary: #1c2129;
+  --secondary-foreground: #e8e8e8;
+  --muted: #1c2129;
+  --muted-foreground: #9ca3af;
+  --accent: #1c2129;
+  --accent-foreground: #e8e8e8;
+  --destructive: #ef4444;
+  --destructive-foreground: #0a0c10;
+  --success: #22c55e;
+  --success-foreground: #0a0c10;
+  --warning: #f59e0b;
+  --warning-foreground: #0a0c10;
+  --border: #2a313c;
+  --input: #2a313c;
+  --ring: #2fa05f;
+}
+
 html {
   /* Base 18px respeitando o zoom do usuario (1rem = 18px quando padrao do browser e 16px). */
   font-size: 112.5%;

@@ -136,7 +136,7 @@ function StockBadge({ product }: { product: Product }) {
   if (!product.track_stock) {
     return (
       <span
-        className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-800"
+        className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
         aria-label="Produto sob demanda, sem controle de estoque"
       >
         <UtensilsCrossed aria-hidden="true" className="size-4" />
