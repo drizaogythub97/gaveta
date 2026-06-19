@@ -20,6 +20,7 @@ import {
   parseDecimalPtBR,
   sanitizeDigits,
 } from "@/lib/products/format";
+import { computeFeeAmount, type PaymentFees } from "@/lib/preferences/types";
 import type { Product, SaleItemInput } from "@/lib/types/db";
 import { cn } from "@/lib/utils";
 
@@ -47,9 +48,12 @@ const PAYMENT_METHODS: ReadonlyArray<{ value: PaymentMethod; label: string }> = 
   { value: "dinheiro", label: "Dinheiro" },
   { value: "pix", label: "Pix" },
   { value: "debito", label: "Cartão de débito" },
-  { value: "credito", label: "Cartão de crédito" },
+  { value: "credito_avista", label: "Cartão de crédito à vista" },
+  { value: "credito_parcelado", label: "Cartão de crédito parcelado" },
   { value: "vale", label: "Vale alimentação / refeição" },
 ];
+
+const INSTALLMENT_OPTIONS = Array.from({ length: 11 }, (_, i) => i + 2); // 2x..12x
 
 function makeKey() {
   return Math.random().toString(36).slice(2, 10);
@@ -65,7 +69,7 @@ function toItem(product: Product): CartItem {
   };
 }
 
-export function PosClient() {
+export function PosClient({ fees }: { fees: PaymentFees }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -73,6 +77,7 @@ export function PosClient() {
   const [manualPriceDigits, setManualPriceDigits] = useState("");
   const [manualQty, setManualQty] = useState("1");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("dinheiro");
+  const [installments, setInstallments] = useState<number>(2);
   const [paidDigits, setPaidDigits] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [isRegistering, startRegister] = useTransition();
@@ -216,10 +221,24 @@ export function PosClient() {
   );
 
   const isCash = paymentMethod === "dinheiro";
+  const isInstallment = paymentMethod === "credito_parcelado";
   const paidAmount = isCash ? digitsToNumber(paidDigits) : 0;
   const changeAmount = Math.round((paidAmount - total) * 100) / 100;
   const showChange = isCash && paidDigits.length > 0 && cart.length > 0;
   const enoughCash = !isCash || paidAmount >= total || cart.length === 0;
+
+  const effectiveInstallments = isInstallment ? installments : null;
+  const feeAmount = computeFeeAmount(
+    total,
+    paymentMethod,
+    effectiveInstallments,
+    fees,
+  );
+  const netAmount = Math.round((total - feeAmount) * 100) / 100;
+  const installmentValue =
+    isInstallment && installments > 0
+      ? Math.round((total / installments) * 100) / 100
+      : 0;
 
   function handleRegister() {
     if (cart.length === 0) {
@@ -247,17 +266,27 @@ export function PosClient() {
         ? ` Troco: ${formatBRL(changeAmount)}.`
         : "";
     startRegister(async () => {
-      const result = await registerSale(items, paymentMethod);
+      const result = await registerSale(
+        items,
+        paymentMethod,
+        effectiveInstallments,
+        feeAmount,
+      );
       if (result.ok) {
         setCart([]);
         setQuery("");
         clearManual();
         setSuggestions([]);
         setPaymentMethod("dinheiro");
+        setInstallments(2);
         setPaidDigits("");
+        const feeMessage =
+          feeAmount > 0
+            ? ` Taxa: ${formatBRL(feeAmount)}. Líquido: ${formatBRL(netAmount)}.`
+            : "";
         setFeedback({
           kind: "success",
-          message: `Venda registrada! Total ${formatBRL(total)}.${changeMessage}`,
+          message: `Venda registrada! Total ${formatBRL(total)}.${changeMessage}${feeMessage}`,
         });
         refocus();
       } else {
@@ -512,10 +541,9 @@ export function PosClient() {
               id="payment-method"
               value={paymentMethod}
               onChange={(e) => {
-                setPaymentMethod(e.target.value as PaymentMethod);
-                if (e.target.value !== "dinheiro") {
-                  setPaidDigits("");
-                }
+                const next = e.target.value as PaymentMethod;
+                setPaymentMethod(next);
+                if (next !== "dinheiro") setPaidDigits("");
               }}
               className="border-input bg-background h-14 w-full rounded-lg border px-3 text-lg outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
@@ -526,33 +554,75 @@ export function PosClient() {
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="paid-amount" className="text-base">
-              Valor recebido
-              {!isCash ? (
-                <span className="text-muted-foreground ml-1 text-sm font-normal">
-                  (apenas dinheiro)
-                </span>
+          {isInstallment ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="installments" className="text-base">
+                Número de parcelas
+              </Label>
+              <select
+                id="installments"
+                value={installments}
+                onChange={(e) => setInstallments(Number(e.target.value))}
+                className="border-input bg-background h-14 w-full rounded-lg border px-3 text-lg outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                {INSTALLMENT_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}x
+                  </option>
+                ))}
+              </select>
+              {cart.length > 0 ? (
+                <p className="text-muted-foreground text-sm">
+                  {installments}× de{" "}
+                  <strong className="text-foreground font-medium">
+                    {formatBRL(installmentValue)}
+                  </strong>
+                  .
+                </p>
               ) : null}
-            </Label>
-            <Input
-              id="paid-amount"
-              type="text"
-              inputMode="numeric"
-              value={paidDigits === "" ? "" : digitsToBRL(paidDigits)}
-              onChange={(e) => setPaidDigits(sanitizeDigits(e.target.value))}
-              disabled={!isCash}
-              placeholder="R$ 0,00"
-              className="h-14 text-lg"
-              aria-describedby="paid-amount-hint"
-            />
-            <p id="paid-amount-hint" className="text-muted-foreground text-sm">
-              {isCash
-                ? "Digite quanto o cliente entregou para calcular o troco."
-                : "Não há troco para esta forma de pagamento."}
-            </p>
-          </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="paid-amount" className="text-base">
+                Valor recebido
+                {!isCash ? (
+                  <span className="text-muted-foreground ml-1 text-sm font-normal">
+                    (apenas dinheiro)
+                  </span>
+                ) : null}
+              </Label>
+              <Input
+                id="paid-amount"
+                type="text"
+                inputMode="numeric"
+                value={paidDigits === "" ? "" : digitsToBRL(paidDigits)}
+                onChange={(e) => setPaidDigits(sanitizeDigits(e.target.value))}
+                disabled={!isCash}
+                placeholder="R$ 0,00"
+                className="h-14 text-lg"
+                aria-describedby="paid-amount-hint"
+              />
+              <p id="paid-amount-hint" className="text-muted-foreground text-sm">
+                {isCash
+                  ? "Digite quanto o cliente entregou para calcular o troco."
+                  : "Não há troco para esta forma de pagamento."}
+              </p>
+            </div>
+          )}
         </div>
+        {feeAmount > 0 && cart.length > 0 ? (
+          <p className="text-muted-foreground text-sm">
+            Taxa estimada:{" "}
+            <strong className="text-foreground font-medium">
+              {formatBRL(feeAmount)}
+            </strong>{" "}
+            · Líquido:{" "}
+            <strong className="text-foreground font-medium">
+              {formatBRL(netAmount)}
+            </strong>
+            .
+          </p>
+        ) : null}
       </section>
 
       <section

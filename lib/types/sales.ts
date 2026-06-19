@@ -16,6 +16,8 @@ export type SaleRow = {
   total: number;
   status: SaleStatus;
   payment_method: PaymentMethod;
+  installments: number | null;
+  fee_amount: number;
   created_at: string;
   sale_items: SaleItemRow[];
 };
@@ -24,6 +26,7 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   dinheiro: "Dinheiro",
   pix: "Pix",
   debito: "Cartão de débito",
-  credito: "Cartão de crédito",
+  credito_avista: "Crédito à vista",
+  credito_parcelado: "Crédito parcelado",
   vale: "Vale alim./refeição",
 };

@@ -1,10 +1,16 @@
+import { DEFAULT_FEES, type PaymentFees } from "@/lib/preferences/types";
+
+import { loadPaymentFees } from "./actions";
 import { PosClient } from "./pos-client";
 
 export const metadata = {
   title: "Caixa — ERP Simples",
 };
 
-export default function CaixaPage() {
+export default async function CaixaPage() {
+  const dbFees = await loadPaymentFees();
+  const fees: PaymentFees = dbFees ?? DEFAULT_FEES;
+
   return (
     <section className="flex flex-col gap-6">
       <header>
@@ -15,7 +21,7 @@ export default function CaixaPage() {
           Bipe ou busque produtos e registre a venda.
         </p>
       </header>
-      <PosClient />
+      <PosClient fees={fees} />
     </section>
   );
 }

@@ -60,14 +60,16 @@ export type PaymentMethod =
   | "dinheiro"
   | "pix"
   | "debito"
-  | "credito"
+  | "credito_avista"
+  | "credito_parcelado"
   | "vale";
 
 const VALID_METHODS: ReadonlySet<PaymentMethod> = new Set([
   "dinheiro",
   "pix",
   "debito",
-  "credito",
+  "credito_avista",
+  "credito_parcelado",
   "vale",
 ]);
 
@@ -75,9 +77,27 @@ export type RegisterSaleResult =
   | { ok: true; saleId: string }
   | { ok: false; error: string };
 
+export async function loadPaymentFees() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data } = await supabase
+    .from("preferences_fees")
+    .select(
+      "pix_pct, debito_pct, credito_avista_pct, credito_parcelado_base_pct, credito_parcelado_por_parcela_pct, vale_pct",
+    )
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return data;
+}
+
 export async function registerSale(
   items: SaleItemInput[],
   paymentMethod: PaymentMethod,
+  installments: number | null,
+  feeAmount: number,
 ): Promise<RegisterSaleResult> {
   if (items.length === 0) {
     return { ok: false, error: "Adicione ao menos um item à venda." };
@@ -89,6 +109,12 @@ export async function registerSale(
   }
   if (!VALID_METHODS.has(paymentMethod)) {
     return { ok: false, error: "Forma de pagamento inválida." };
+  }
+  if (
+    paymentMethod === "credito_parcelado" &&
+    (!installments || installments < 2 || installments > 24)
+  ) {
+    return { ok: false, error: "Número de parcelas inválido (2 a 24)." };
   }
 
   const supabase = await createClient();
@@ -102,6 +128,9 @@ export async function registerSale(
   const { data, error } = await supabase.rpc("register_sale", {
     items: payload,
     payment_method: paymentMethod,
+    installments:
+      paymentMethod === "credito_parcelado" ? installments : null,
+    fee_amount: Math.max(0, Math.round(feeAmount * 100) / 100),
   });
 
   if (error) {
