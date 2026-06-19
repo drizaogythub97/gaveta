@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 
 import { ErrorAlert } from "@/components/auth/form-feedback";
 import { SubmitButton } from "@/components/auth/submit-button";
+import { CurrencyInput } from "@/components/app/currency-input";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +21,7 @@ type Props = {
   initialValues?: {
     name?: string;
     barcode?: string;
-    price?: string;
+    price?: number;
     trackStock?: "true" | "false";
     stockQuantity?: string;
   };
@@ -37,10 +38,15 @@ export function ProductForm({
   submitPendingLabel,
 }: Props) {
   const [state, formAction] = useActionState(action, initialState);
-  const values = { ...initialValues, ...state.values };
 
-  const initialTrack: "true" | "false" = values.trackStock ?? "true";
-  const [trackStock, setTrackStock] = useState<"true" | "false">(initialTrack);
+  const [name, setName] = useState(initialValues?.name ?? "");
+  const [barcode, setBarcode] = useState(initialValues?.barcode ?? "");
+  const [trackStock, setTrackStock] = useState<"true" | "false">(
+    initialValues?.trackStock ?? "true",
+  );
+  const [stockQuantity, setStockQuantity] = useState(
+    initialValues?.stockQuantity ?? "",
+  );
 
   return (
     <form action={formAction} className="flex flex-col gap-5" noValidate>
@@ -56,7 +62,8 @@ export function ProductForm({
           type="text"
           autoComplete="off"
           required
-          defaultValue={values.name ?? ""}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           aria-invalid={Boolean(state.fieldErrors?.name)}
           aria-describedby={state.fieldErrors?.name ? "name-error" : undefined}
           className="h-14 text-lg"
@@ -79,7 +86,8 @@ export function ProductForm({
           type="text"
           inputMode="numeric"
           autoComplete="off"
-          defaultValue={values.barcode ?? ""}
+          value={barcode}
+          onChange={(e) => setBarcode(e.target.value)}
           aria-invalid={Boolean(state.fieldErrors?.barcode)}
           aria-describedby={
             state.fieldErrors?.barcode ? "barcode-error" : "barcode-hint"
@@ -104,20 +112,16 @@ export function ProductForm({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="price" className="text-base">
-          Preço (R$)
+          Preço
         </Label>
-        <Input
+        <CurrencyInput
           id="price"
           name="price"
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
           required
-          defaultValue={values.price ?? ""}
+          initialValue={initialValues?.price ?? null}
           aria-invalid={Boolean(state.fieldErrors?.price)}
           aria-describedby={state.fieldErrors?.price ? "price-error" : undefined}
           className="h-14 text-lg"
-          placeholder="Ex.: 10,50"
         />
         {state.fieldErrors?.price ? (
           <p id="price-error" className="text-destructive text-sm" role="alert">
@@ -182,7 +186,8 @@ export function ProductForm({
             inputMode="decimal"
             autoComplete="off"
             required
-            defaultValue={values.stockQuantity ?? ""}
+            value={stockQuantity}
+            onChange={(e) => setStockQuantity(e.target.value)}
             aria-invalid={Boolean(state.fieldErrors?.stockQuantity)}
             aria-describedby={
               state.fieldErrors?.stockQuantity ? "stock-error" : undefined

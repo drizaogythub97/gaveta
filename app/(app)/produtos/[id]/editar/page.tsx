@@ -51,7 +51,7 @@ export default async function EditProductPage({
         initialValues={{
           name: product.name,
           barcode: product.barcode ?? "",
-          price: product.price.toString().replace(".", ","),
+          price: product.price,
           trackStock: product.track_stock ? "true" : "false",
           stockQuantity:
             product.stock_quantity === null

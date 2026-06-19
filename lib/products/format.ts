@@ -31,3 +31,32 @@ export function parseDecimalPtBR(input: string): number {
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : NaN;
 }
+
+// =====================================================================
+// Helpers para máscara monetária (entrada digit-a-digit, em centavos)
+// =====================================================================
+
+const MAX_DIGITS = 11; // até R$ 999.999.999,99
+
+export function sanitizeDigits(raw: string): string {
+  return raw.replace(/\D/g, "").slice(0, MAX_DIGITS).replace(/^0+(?=\d)/, "");
+}
+
+export function numberToDigits(value: number | null | undefined): string {
+  if (!value || !Number.isFinite(value) || value <= 0) return "";
+  return Math.round(value * 100).toString();
+}
+
+export function digitsToNumber(digits: string): number {
+  if (digits.length === 0) return 0;
+  return Number(digits) / 100;
+}
+
+export function digitsToBRL(digits: string): string {
+  return formatBRL(digitsToNumber(digits));
+}
+
+/** Formato adequado para envio em FormData / parseDecimalPtBR ("10.50"). */
+export function digitsToDecimalString(digits: string): string {
+  return digitsToNumber(digits).toFixed(2);
+}
