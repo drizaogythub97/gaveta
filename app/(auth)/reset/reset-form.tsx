@@ -3,8 +3,8 @@
 import { useActionState } from "react";
 
 import { ErrorAlert } from "@/components/auth/form-feedback";
+import { PasswordField } from "@/components/auth/password-field";
 import { SubmitButton } from "@/components/auth/submit-button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { reset, type ResetState } from "./actions";
@@ -22,10 +22,9 @@ export function ResetForm() {
         <Label htmlFor="password" className="text-base">
           Nova senha (mínimo 8 caracteres)
         </Label>
-        <Input
+        <PasswordField
           id="password"
           name="password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={8}
@@ -50,10 +49,9 @@ export function ResetForm() {
         <Label htmlFor="passwordConfirm" className="text-base">
           Repita a nova senha
         </Label>
-        <Input
+        <PasswordField
           id="passwordConfirm"
           name="passwordConfirm"
-          type="password"
           autoComplete="new-password"
           required
           minLength={8}

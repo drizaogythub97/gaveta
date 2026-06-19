@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState } from "react";
 
 import { ErrorAlert, SuccessAlert } from "@/components/auth/form-feedback";
+import { PasswordField } from "@/components/auth/password-field";
 import { SubmitButton } from "@/components/auth/submit-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -90,10 +91,9 @@ export function SignupForm() {
         <Label htmlFor="password" className="text-base">
           Senha (mínimo 8 caracteres)
         </Label>
-        <Input
+        <PasswordField
           id="password"
           name="password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={8}
