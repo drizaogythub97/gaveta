@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { deleteProduct } from "./actions";
 
 export const metadata = {
-  title: "Produtos — ERP Simples",
+  title: "Produtos",
 };
 
 export default async function ProductsPage() {

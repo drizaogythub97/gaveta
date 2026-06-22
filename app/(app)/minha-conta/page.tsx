@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AccountClient } from "./account-client";
 
 export const metadata = {
-  title: "Minha conta — ERP Simples",
+  title: "Minha conta",
 };
 
 export default async function AccountPage() {

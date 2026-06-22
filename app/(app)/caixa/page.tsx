@@ -4,7 +4,7 @@ import { loadPaymentFees } from "./actions";
 import { PosClient } from "./pos-client";
 
 export const metadata = {
-  title: "Caixa — ERP Simples",
+  title: "Caixa",
 };
 
 export default async function CaixaPage() {
