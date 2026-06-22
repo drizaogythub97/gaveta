@@ -1,8 +1,10 @@
 /* Animações do loader de marca "Gaveta" (conceitos A/B/C).
-   Movimento (transform/desenho) só roda quando o usuário NÃO pediu redução de
-   movimento. As animações de opacidade são mantidas mesmo no modo reduzido
-   (opacidade não dispara desconforto vestibular), para o loader continuar
-   "vivo" sem mover nada. */
+   DECISÃO (do dono do produto): o loader é um estado de carregamento breve e
+   transitório, então a animação roda SEMPRE — inclusive quando o sistema está
+   com "reduzir movimento" ligado (override intencional). Animações de
+   carregamento são uma exceção aceita; o estado estático ficava estranho.
+   Obs.: as transições de página (template.tsx) continuam respeitando
+   prefers-reduced-motion (ficam instantâneas), pois isso é imperceptível. */
 
 .breathe {
   animation: breathe 2.4s ease-in-out infinite;
@@ -134,26 +136,5 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  /* Sem movimento: congela transform e desenho num quadro "cheio" e legível. */
-  .breathe,
-  .float,
-  .spin {
-    animation: none !important;
-    transform: none !important;
-  }
-  .bar {
-    animation: none !important;
-    transform: none !important; /* barras ficam na altura cheia */
-    opacity: 1 !important;
-  }
-  .trend {
-    animation: none !important;
-    stroke-dashoffset: 0 !important; /* seta desenhada por completo */
-  }
-  .rise {
-    animation: none !important;
-    opacity: 0 !important; /* cifrões somem (eram só enfeite em movimento) */
-  }
-  /* .pulseOpacity e .dots permanecem (apenas opacidade). */
-}
+/* Sem bloco @media de redução de movimento aqui: o loader anima sempre,
+   por decisão de produto (ver comentário no topo do arquivo). */

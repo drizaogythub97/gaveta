@@ -183,7 +183,8 @@ function RingScene() {
 /**
  * Loader de marca. Sorteia um dos três conceitos a cada montagem (ou seja, a
  * cada transição), revezando-os entre as telas. Anuncia "Carregando…" para
- * leitores de tela e respeita "reduzir movimento" (via CSS).
+ * leitores de tela. Por decisão de produto, a animação roda mesmo com
+ * "reduzir movimento" ativo no sistema (é um estado breve de carregamento).
  */
 export function GavetaLoader() {
   const [variant] = useState<Variant>(pickVariant);
