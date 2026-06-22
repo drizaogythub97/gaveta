@@ -1,0 +1,159 @@
+/* Animações do loader de marca "Gaveta" (conceitos A/B/C).
+   Movimento (transform/desenho) só roda quando o usuário NÃO pediu redução de
+   movimento. As animações de opacidade são mantidas mesmo no modo reduzido
+   (opacidade não dispara desconforto vestibular), para o loader continuar
+   "vivo" sem mover nada. */
+
+.breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+.float {
+  animation: float 3s ease-in-out infinite;
+}
+.delay05 {
+  animation-delay: 0.5s;
+}
+.delay1 {
+  animation-delay: 1s;
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.bar {
+  transform-origin: bottom;
+  animation: grow 1.8s ease-in-out infinite;
+}
+@keyframes grow {
+  0% {
+    transform: scaleY(0.25);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(0.25);
+    opacity: 0.5;
+  }
+}
+
+.trend {
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  animation: draw 1.8s ease-in-out infinite;
+}
+@keyframes draw {
+  0% {
+    stroke-dashoffset: 220;
+  }
+  55% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+.spin {
+  animation: spin 2.4s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rise {
+  opacity: 0;
+  animation: rise 3s ease-in infinite;
+}
+@keyframes rise {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-120px);
+    opacity: 0;
+  }
+}
+
+/* Opacidade suave — mantida também no modo "reduzir movimento". */
+.pulseOpacity {
+  animation: pulseOpacity 2.2s ease-in-out infinite;
+}
+@keyframes pulseOpacity {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.dots span {
+  animation: blink 1.4s infinite both;
+}
+.dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Sem movimento: congela transform e desenho num quadro "cheio" e legível. */
+  .breathe,
+  .float,
+  .spin {
+    animation: none !important;
+    transform: none !important;
+  }
+  .bar {
+    animation: none !important;
+    transform: none !important; /* barras ficam na altura cheia */
+    opacity: 1 !important;
+  }
+  .trend {
+    animation: none !important;
+    stroke-dashoffset: 0 !important; /* seta desenhada por completo */
+  }
+  .rise {
+    animation: none !important;
+    opacity: 0 !important; /* cifrões somem (eram só enfeite em movimento) */
+  }
+  /* .pulseOpacity e .dots permanecem (apenas opacidade). */
+}
