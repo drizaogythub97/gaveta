@@ -10,9 +10,10 @@ export default function AuthLayout({
       <div className="w-full max-w-md">
         <Link
           href="/"
+          aria-label="Gaveta — página inicial"
           className="text-foreground mb-6 block text-center text-2xl font-semibold tracking-tight"
         >
-          ERP Simples
+          Gaveta
         </Link>
         {children}
       </div>

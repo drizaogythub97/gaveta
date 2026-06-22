@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Geist } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -12,10 +12,44 @@ const inter = Inter({
   display: "swap",
 });
 
+const SITE_URL = "https://erp-simples.vercel.app";
+const SITE_DESCRIPTION =
+  "Frente de caixa e gestão simples para produtos, vendas e faturamento — acessível e fácil de usar.";
+
 export const metadata: Metadata = {
-  title: "ERP Simples",
-  description:
-    "Sistema de gestão simples para produtos, vendas e faturamento — acessível e fácil de usar.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Gaveta",
+    template: "%s · Gaveta",
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: "Gaveta",
+  openGraph: {
+    type: "website",
+    siteName: "Gaveta",
+    title: "Gaveta",
+    description: SITE_DESCRIPTION,
+    locale: "pt_BR",
+    url: SITE_URL,
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Gaveta — frente de caixa e gestão simples",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Gaveta",
+    description: SITE_DESCRIPTION,
+    images: ["/og-image.png"],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1b7a43",
 };
 
 // Script injetado no <head> para aplicar o tema antes da hidratação,
