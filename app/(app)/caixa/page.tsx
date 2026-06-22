@@ -1,3 +1,4 @@
+import { CaixaFullscreenTip } from "@/components/app/caixa-fullscreen-tip";
 import { DEFAULT_FEES, type PaymentFees } from "@/lib/preferences/types";
 
 import { loadPaymentFees } from "./actions";
@@ -22,6 +23,7 @@ export default async function CaixaPage() {
         </p>
       </header>
       <PosClient fees={fees} />
+      <CaixaFullscreenTip />
     </section>
   );
 }
