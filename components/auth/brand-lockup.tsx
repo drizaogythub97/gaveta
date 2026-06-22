@@ -12,18 +12,18 @@ export function BrandLockup() {
       <Image
         src="/logo-mark.png"
         alt=""
-        width={64}
-        height={64}
+        width={192}
+        height={192}
         priority
-        className="size-16 dark:hidden"
+        className="size-48 object-contain dark:hidden"
       />
       <Image
         src="/logo-mono-white.png"
         alt=""
-        width={64}
-        height={64}
+        width={192}
+        height={192}
         priority
-        className="hidden size-16 dark:block"
+        className="hidden size-48 object-contain dark:block"
       />
       <span className="text-foreground text-2xl font-bold tracking-tight">
         Gaveta

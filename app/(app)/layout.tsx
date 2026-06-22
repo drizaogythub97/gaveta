@@ -65,14 +65,14 @@ export default async function AppLayout({
                   alt=""
                   width={40}
                   height={40}
-                  className="size-10 dark:hidden"
+                  className="size-10 object-contain dark:hidden"
                 />
                 <Image
                   src="/logo-mono-white.png"
                   alt=""
                   width={40}
                   height={40}
-                  className="hidden size-10 dark:block"
+                  className="hidden size-10 object-contain dark:block"
                 />
               </>
             )}
