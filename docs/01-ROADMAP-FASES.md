@@ -94,6 +94,62 @@ O objetivo é deixar as contas e segredos prontos. Você já tem **GitHub**; fal
 > nem customizar templates de e-mail — fora do escopo. O reset de senha
 > continua funcionando com os e-mails padrão do Supabase.
 
+---
+
+## Fases de melhoria pós-deploy (A–C) — ANTES das Fases 7 e 8
+
+> Decisão (2026-06-22): antes de fechar segurança (7) e qualidade (8), entram
+> três melhorias. **Marca do produto definida: "Gaveta".** Tudo em **branch**
+> (a `main` é produção). A integração no código respeita os tokens atuais do
+> sistema — **não trocar a paleta**; a identidade é que segue o sistema.
+
+### FASE A — Identidade visual ✅ CONCLUÍDA (parte criativa)
+- Nome do produto: **Gaveta** (pesquisa de disponibilidade feita; "Gestor" e
+  "Galp" descartados — genérico/concorrido e marca registrada, respectivamente).
+- Assets finais em **`assets/brand/`**, nas cores exatas dos tokens do sistema
+  (`--primary #1b7a43`, `--foreground #1a1a1a`, branco). Ver `assets/brand/BRAND.md`.
+- Inclui: ícones de app (master/512/192), `maskable` (192/512), `apple-touch-icon`,
+  `favicon.ico` (+16/32/48), `og-image` (1200×630), wordmark horizontal e
+  empilhado, marca isolada transparente e versões monocromáticas (tinta/branco).
+- **Pendente (no Claude Code, em branch):** integrar — substituir
+  `app/favicon.ico`, adicionar `app/icon.png`/`app/apple-icon.png`, criar
+  `manifest.webmanifest` (referenciando inclusive os `maskable`), definir
+  `metadata`/OpenGraph com `og-image.png` e exibir o nome **"Gaveta"** na UI.
+  - ⚠️ "Gaveta" é a marca do **produto**, separada do `brand_name`/logo **por
+    loja** que cada usuário já personaliza em Preferências. Não misturar.
+
+### FASE B — Microinterações, loading e toasts 🤖 ⏱️ ~1h30
+- Transições suaves entre telas/estados e animações de carregamento via
+  `loading.tsx` (skeletons) por rota + transições CSS. **Sempre respeitar
+  `prefers-reduced-motion`** e manter movimento sóbrio (público idoso).
+- Sistema de **toasts** (sugestão: Sonner, compatível com o shadcn em uso).
+- Toasts de orientação: (1) incentivar **personalização** (link p/ Preferências);
+  (2) avisar do **modo tela cheia** da frente de caixa (este depende da Fase C).
+- Toasts dismissíveis, `aria-live`, tempo generoso; "já vi isto" persistido em
+  armazenamento **não sensível** (localStorage/cookie ou preferência do usuário).
+
+### FASE C — Frente de caixa: desktop horizontal + tela cheia 🤖 ⏱️ ~2h
+- Reorganizar o POS (`app/(app)/caixa/`) em layout de duas colunas que usa o
+  espaço horizontal **sem rolagem** em telas grandes (`lg+`): busca/entrada de um
+  lado, carrinho/totais do outro.
+- **Modo tela cheia via atalho** (Fullscreen API) + botão.
+- **Mobile permanece como está hoje** (restringir por breakpoints).
+- ⚠️ **Atenção crítica:** o POS lê **código de barras como entrada de teclado**.
+  O atalho de tela cheia precisa de tecla que **não** apareça em códigos de
+  barras (ex.: `F11`/F-key dedicada, ou botão + modificador). Definir e testar
+  para o scanner não disparar fullscreen sem querer.
+
+> Depois de A(integração)+B+C aprovadas e mescladas, seguir para as Fases 7 e 8.
+
+### (BACKLOG FUTURO) App Android nativo — fora do escopo atual
+- Requisito do usuário: **sessão persistente** + **funcionamento offline**
+  (guardar localmente e sincronizar quando reconectar). Isso aponta para **app
+  nativo** (não só WebView/PWA). Decisão WebView × PWA→TWA × nativo **em aberto**.
+- Dedicar **sprints próprios só de discussão** antes de implementar. Não iniciar
+  junto das fases A–C/7/8.
+
+---
+
 ## FASE 7 — Segurança aprofundada 🤖 ⏱️ ~1h
 
 Ver fases detalhadas em [03-SEGURANCA-E-DADOS.md](./03-SEGURANCA-E-DADOS.md#fases-de-segurança):
