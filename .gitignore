@@ -47,3 +47,6 @@ yarn-error.log*
 
 # Screenshots / artefatos locais de conferência
 prints/
+
+# Estudos de design (protótipos locais, não vão para produção)
+concept/

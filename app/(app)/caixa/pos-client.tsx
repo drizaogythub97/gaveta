@@ -3,12 +3,21 @@
 import {
   AlertCircle,
   CheckCircle2,
+  Maximize2,
+  Minimize2,
   Minus,
   Plus,
   ScanBarcode,
   Trash2,
 } from "lucide-react";
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,8 +90,10 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
   const [paidDigits, setPaidDigits] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [isRegistering, startRegister] = useTransition();
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const posRef = useRef<HTMLDivElement>(null);
   const fetchSeq = useRef(0);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const manualPriceId = useId();
@@ -97,6 +108,40 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
   }, []);
+
+  // Modo tela cheia (Fullscreen API) com atalho seguro para o scanner.
+  const toggleFullscreen = useCallback(() => {
+    const el = posRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    } else {
+      void el.requestFullscreen().catch(() => {});
+    }
+    // Mantém o foco no campo para o leitor de código continuar funcionando.
+    setTimeout(() => inputRef.current?.focus(), 60);
+  }, []);
+
+  useEffect(() => {
+    function onFsChange() {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    }
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      // Alt+Shift+F: o leitor de código (keyboard wedge) nunca emite
+      // modificadores, então este atalho não dispara ao bipar um produto.
+      if (e.altKey && e.shiftKey && (e.key === "F" || e.key === "f")) {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleFullscreen]);
 
   function refocus() {
     setTimeout(() => inputRef.current?.focus(), 0);
@@ -296,134 +341,39 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <section
-        aria-labelledby="add-item-heading"
-        className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
-      >
-        <h2
-          id="add-item-heading"
-          className="flex items-center gap-2 text-xl font-semibold"
+    <div
+      ref={posRef}
+      className={cn(
+        "flex flex-col gap-6",
+        isFullscreen &&
+          "bg-background fixed inset-0 z-50 overflow-y-auto p-4 lg:p-6",
+      )}
+    >
+      {/* Barra de ações: título (só em tela cheia) + botão de tela cheia. */}
+      <div className="flex items-center justify-between gap-3">
+        {isFullscreen ? (
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Frente de caixa
+          </h2>
+        ) : (
+          <span aria-hidden="true" />
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={toggleFullscreen}
+          aria-pressed={isFullscreen}
+          className="h-12 gap-2 px-4 text-base"
+          title="Atalho: Alt + Shift + F"
         >
-          <ScanBarcode aria-hidden="true" className="size-6" />
-          Adicionar item
-        </h2>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="pos-query" className="text-base">
-            Bipe o código de barras ou digite o nome
-          </Label>
-          <Input
-            ref={inputRef}
-            id="pos-query"
-            type="text"
-            autoComplete="off"
-            inputMode="text"
-            value={query}
-            onChange={(e) => handleQueryChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void handleSubmitQuery();
-              }
-            }}
-            className="h-16 text-xl"
-            placeholder="Ex.: 7891234567890 ou Refrigerante"
-            aria-describedby="pos-query-hint"
-            disabled={isRegistering}
-          />
-          <p id="pos-query-hint" className="text-muted-foreground text-sm">
-            O leitor USB envia o código e aperta Enter automaticamente.
-          </p>
-        </div>
-
-        {suggestions.length > 0 && manualName === null ? (
-          <ul
-            role="listbox"
-            aria-label="Sugestões de produtos"
-            className="flex flex-col gap-1"
-          >
-            {suggestions.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  onClick={() => addProductToCart(p)}
-                  className="hover:bg-muted focus-visible:bg-muted flex w-full items-center justify-between gap-3 rounded-md px-3 py-3 text-left text-base outline-none"
-                >
-                  <span className="text-foreground font-medium">{p.name}</span>
-                  <span className="text-foreground text-lg font-semibold">
-                    {formatBRL(p.price)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-
-        {manualName ? (
-          <div className="border-border flex flex-col gap-3 rounded-lg border border-dashed p-4">
-            <p className="text-base">
-              Nenhum produto encontrado para{" "}
-              <strong className="font-medium">&ldquo;{manualName}&rdquo;</strong>.
-              Adicionar como item avulso?
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor={manualPriceId} className="text-sm">
-                  Valor
-                </Label>
-                <Input
-                  id={manualPriceId}
-                  type="text"
-                  inputMode="numeric"
-                  value={
-                    manualPriceDigits === ""
-                      ? ""
-                      : digitsToBRL(manualPriceDigits)
-                  }
-                  onChange={(e) =>
-                    setManualPriceDigits(sanitizeDigits(e.target.value))
-                  }
-                  placeholder="R$ 0,00"
-                  className="h-12 text-base"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor={manualQtyId} className="text-sm">
-                  Quantidade
-                </Label>
-                <Input
-                  id={manualQtyId}
-                  type="text"
-                  inputMode="decimal"
-                  value={manualQty}
-                  onChange={(e) => setManualQty(e.target.value)}
-                  className="h-12 text-base"
-                />
-              </div>
-            </div>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  clearManual();
-                  refocus();
-                }}
-                className="h-12 px-5 text-base"
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                onClick={handleManualSubmit}
-                className="h-12 px-5 text-base"
-              >
-                Adicionar avulso
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </section>
+          {isFullscreen ? (
+            <Minimize2 aria-hidden="true" className="size-5" />
+          ) : (
+            <Maximize2 aria-hidden="true" className="size-5" />
+          )}
+          {isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+        </Button>
+      </div>
 
       {feedback ? (
         <div
@@ -444,232 +394,387 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
         </div>
       ) : null}
 
-      <section
-        aria-labelledby="cart-heading"
-        className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
-      >
-        <h2 id="cart-heading" className="text-xl font-semibold">
-          Itens da venda
-        </h2>
-        {cart.length === 0 ? (
-          <p className="text-muted-foreground text-base">
-            Bipe ou digite para começar.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {cart.map((it) => (
-              <li
-                key={it.key}
-                className="border-border flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="flex flex-col">
-                  <span className="text-foreground text-lg font-medium">
-                    {it.name}
-                    {it.product_id === null ? (
-                      <span className="text-muted-foreground ml-2 text-sm font-normal">
-                        (avulso)
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="text-muted-foreground text-base">
-                    {formatBRL(it.unit_price)} cada
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => updateQuantity(it.key, -1)}
-                      aria-label="Diminuir quantidade"
-                      className="h-12 w-12 p-0"
-                    >
-                      <Minus aria-hidden="true" className="size-5" />
-                    </Button>
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={it.quantity.toString().replace(".", ",")}
-                      onChange={(e) => setQuantity(it.key, e.target.value)}
-                      aria-label={`Quantidade de ${it.name}`}
-                      className="h-12 w-20 text-center text-lg"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => updateQuantity(it.key, 1)}
-                      aria-label="Aumentar quantidade"
-                      className="h-12 w-12 p-0"
-                    >
-                      <Plus aria-hidden="true" className="size-5" />
-                    </Button>
-                  </div>
-                  <span className="text-foreground min-w-[6rem] text-right text-lg font-semibold">
-                    {formatBRL(
-                      Math.round(it.unit_price * it.quantity * 100) / 100,
-                    )}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => removeItem(it.key)}
-                    aria-label={`Remover ${it.name}`}
-                    className="h-12 w-12 p-0"
-                  >
-                    <Trash2 aria-hidden="true" className="size-5" />
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section
-        aria-labelledby="payment-heading"
-        className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
-      >
-        <h2 id="payment-heading" className="text-xl font-semibold">
-          Forma de pagamento
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="payment-method" className="text-base">
-              Como o cliente vai pagar?
-            </Label>
-            <select
-              id="payment-method"
-              value={paymentMethod}
-              onChange={(e) => {
-                const next = e.target.value as PaymentMethod;
-                setPaymentMethod(next);
-                if (next !== "dinheiro") setPaidDigits("");
-              }}
-              className="border-input bg-background h-14 w-full rounded-lg border px-3 text-lg outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+      {/* lg+: duas colunas (entrada/pagamento | carrinho/total). Mobile: empilhado. */}
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:items-start">
+        {/* Coluna esquerda */}
+        <div className="flex flex-col gap-6">
+          <section
+            aria-labelledby="add-item-heading"
+            className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
+          >
+            <h2
+              id="add-item-heading"
+              className="flex items-center gap-2 text-xl font-semibold"
             >
-              {PAYMENT_METHODS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {isInstallment ? (
+              <ScanBarcode aria-hidden="true" className="size-6" />
+              Adicionar item
+            </h2>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="installments" className="text-base">
-                Número de parcelas
-              </Label>
-              <select
-                id="installments"
-                value={installments}
-                onChange={(e) => setInstallments(Number(e.target.value))}
-                className="border-input bg-background h-14 w-full rounded-lg border px-3 text-lg outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                {INSTALLMENT_OPTIONS.map((n) => (
-                  <option key={n} value={n}>
-                    {n}x
-                  </option>
-                ))}
-              </select>
-              {cart.length > 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  {installments}× de{" "}
-                  <strong className="text-foreground font-medium">
-                    {formatBRL(installmentValue)}
-                  </strong>
-                  .
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="paid-amount" className="text-base">
-                Valor recebido
-                {!isCash ? (
-                  <span className="text-muted-foreground ml-1 text-sm font-normal">
-                    (apenas dinheiro)
-                  </span>
-                ) : null}
+              <Label htmlFor="pos-query" className="text-base">
+                Bipe o código de barras ou digite o nome
               </Label>
               <Input
-                id="paid-amount"
+                ref={inputRef}
+                id="pos-query"
                 type="text"
-                inputMode="numeric"
-                value={paidDigits === "" ? "" : digitsToBRL(paidDigits)}
-                onChange={(e) => setPaidDigits(sanitizeDigits(e.target.value))}
-                disabled={!isCash}
-                placeholder="R$ 0,00"
-                className="h-14 text-lg"
-                aria-describedby="paid-amount-hint"
+                autoComplete="off"
+                inputMode="text"
+                value={query}
+                onChange={(e) => handleQueryChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleSubmitQuery();
+                  }
+                }}
+                className="h-16 text-xl"
+                placeholder="Ex.: 7891234567890 ou Refrigerante"
+                aria-describedby="pos-query-hint"
+                disabled={isRegistering}
               />
-              <p id="paid-amount-hint" className="text-muted-foreground text-sm">
-                {isCash
-                  ? "Digite quanto o cliente entregou para calcular o troco."
-                  : "Não há troco para esta forma de pagamento."}
+              <p id="pos-query-hint" className="text-muted-foreground text-sm">
+                O leitor USB envia o código e aperta Enter automaticamente.
               </p>
             </div>
-          )}
-        </div>
-        {feeAmount > 0 && cart.length > 0 ? (
-          <p className="text-muted-foreground text-sm">
-            Taxa estimada:{" "}
-            <strong className="text-foreground font-medium">
-              {formatBRL(feeAmount)}
-            </strong>{" "}
-            · Líquido:{" "}
-            <strong className="text-foreground font-medium">
-              {formatBRL(netAmount)}
-            </strong>
-            .
-          </p>
-        ) : null}
-      </section>
 
-      <section
-        aria-labelledby="total-heading"
-        className="bg-primary text-primary-foreground flex flex-col gap-4 rounded-xl p-5"
-      >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p id="total-heading" className="text-base opacity-90">
-              Total da venda
-            </p>
-            <p
-              className="text-4xl font-bold tabular-nums sm:text-5xl"
-              aria-live="polite"
-            >
-              {formatBRL(total)}
-            </p>
-          </div>
-          <Button
-            type="button"
-            onClick={handleRegister}
-            disabled={isRegistering || cart.length === 0 || !enoughCash}
-            aria-busy={isRegistering}
-            className="bg-background text-primary hover:bg-background/90 h-16 px-8 text-xl font-semibold"
+            {suggestions.length > 0 && manualName === null ? (
+              <ul
+                role="listbox"
+                aria-label="Sugestões de produtos"
+                className="flex flex-col gap-1"
+              >
+                {suggestions.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => addProductToCart(p)}
+                      className="hover:bg-muted focus-visible:bg-muted flex w-full items-center justify-between gap-3 rounded-md px-3 py-3 text-left text-base outline-none"
+                    >
+                      <span className="text-foreground font-medium">
+                        {p.name}
+                      </span>
+                      <span className="text-foreground text-lg font-semibold">
+                        {formatBRL(p.price)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            {manualName ? (
+              <div className="border-border flex flex-col gap-3 rounded-lg border border-dashed p-4">
+                <p className="text-base">
+                  Nenhum produto encontrado para{" "}
+                  <strong className="font-medium">
+                    &ldquo;{manualName}&rdquo;
+                  </strong>
+                  . Adicionar como item avulso?
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor={manualPriceId} className="text-sm">
+                      Valor
+                    </Label>
+                    <Input
+                      id={manualPriceId}
+                      type="text"
+                      inputMode="numeric"
+                      value={
+                        manualPriceDigits === ""
+                          ? ""
+                          : digitsToBRL(manualPriceDigits)
+                      }
+                      onChange={(e) =>
+                        setManualPriceDigits(sanitizeDigits(e.target.value))
+                      }
+                      placeholder="R$ 0,00"
+                      className="h-12 text-base"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor={manualQtyId} className="text-sm">
+                      Quantidade
+                    </Label>
+                    <Input
+                      id={manualQtyId}
+                      type="text"
+                      inputMode="decimal"
+                      value={manualQty}
+                      onChange={(e) => setManualQty(e.target.value)}
+                      className="h-12 text-base"
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      clearManual();
+                      refocus();
+                    }}
+                    className="h-12 px-5 text-base"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleManualSubmit}
+                    className="h-12 px-5 text-base"
+                  >
+                    Adicionar avulso
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
+          <section
+            aria-labelledby="payment-heading"
+            className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
           >
-            {isRegistering ? "Registrando…" : "Registrar venda"}
-          </Button>
-        </div>
-        {showChange ? (
-          <div
-            className="bg-primary-foreground/10 flex items-center justify-between rounded-lg px-4 py-3 text-lg"
-            aria-live="polite"
-          >
-            <span className="opacity-90">
-              {changeAmount >= 0 ? "Troco" : "Falta"}
-            </span>
-            <span
-              className={cn(
-                "text-2xl font-bold tabular-nums",
-                changeAmount < 0 ? "text-warning-foreground" : "",
+            <h2 id="payment-heading" className="text-xl font-semibold">
+              Forma de pagamento
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="payment-method" className="text-base">
+                  Como o cliente vai pagar?
+                </Label>
+                <select
+                  id="payment-method"
+                  value={paymentMethod}
+                  onChange={(e) => {
+                    const next = e.target.value as PaymentMethod;
+                    setPaymentMethod(next);
+                    if (next !== "dinheiro") setPaidDigits("");
+                  }}
+                  className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-14 w-full rounded-lg border px-3 text-lg outline-none focus-visible:ring-3"
+                >
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {isInstallment ? (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="installments" className="text-base">
+                    Número de parcelas
+                  </Label>
+                  <select
+                    id="installments"
+                    value={installments}
+                    onChange={(e) => setInstallments(Number(e.target.value))}
+                    className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-14 w-full rounded-lg border px-3 text-lg outline-none focus-visible:ring-3"
+                  >
+                    {INSTALLMENT_OPTIONS.map((n) => (
+                      <option key={n} value={n}>
+                        {n}x
+                      </option>
+                    ))}
+                  </select>
+                  {cart.length > 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                      {installments}× de{" "}
+                      <strong className="text-foreground font-medium">
+                        {formatBRL(installmentValue)}
+                      </strong>
+                      .
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="paid-amount" className="text-base">
+                    Valor recebido
+                    {!isCash ? (
+                      <span className="text-muted-foreground ml-1 text-sm font-normal">
+                        (apenas dinheiro)
+                      </span>
+                    ) : null}
+                  </Label>
+                  <Input
+                    id="paid-amount"
+                    type="text"
+                    inputMode="numeric"
+                    value={paidDigits === "" ? "" : digitsToBRL(paidDigits)}
+                    onChange={(e) =>
+                      setPaidDigits(sanitizeDigits(e.target.value))
+                    }
+                    disabled={!isCash}
+                    placeholder="R$ 0,00"
+                    className="h-14 text-lg"
+                    aria-describedby="paid-amount-hint"
+                  />
+                  <p
+                    id="paid-amount-hint"
+                    className="text-muted-foreground text-sm"
+                  >
+                    {isCash
+                      ? "Digite quanto o cliente entregou para calcular o troco."
+                      : "Não há troco para esta forma de pagamento."}
+                  </p>
+                </div>
               )}
-            >
-              {formatBRL(Math.abs(changeAmount))}
-            </span>
-          </div>
-        ) : null}
-      </section>
+            </div>
+            {feeAmount > 0 && cart.length > 0 ? (
+              <p className="text-muted-foreground text-sm">
+                Taxa estimada:{" "}
+                <strong className="text-foreground font-medium">
+                  {formatBRL(feeAmount)}
+                </strong>{" "}
+                · Líquido:{" "}
+                <strong className="text-foreground font-medium">
+                  {formatBRL(netAmount)}
+                </strong>
+                .
+              </p>
+            ) : null}
+          </section>
+        </div>
+
+        {/* Coluna direita */}
+        <div className="flex flex-col gap-6">
+          <section
+            aria-labelledby="cart-heading"
+            className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
+          >
+            <h2 id="cart-heading" className="text-xl font-semibold">
+              Itens da venda
+            </h2>
+            {cart.length === 0 ? (
+              <p className="text-muted-foreground text-base">
+                Bipe ou digite para começar.
+              </p>
+            ) : (
+              <ul
+                className={cn(
+                  "flex flex-col gap-3",
+                  // Em telas grandes a lista rola internamente, sem empurrar a
+                  // página (mantém o total sempre visível).
+                  isFullscreen
+                    ? "lg:max-h-[calc(100vh-22rem)] lg:overflow-y-auto lg:pr-1"
+                    : "lg:max-h-[60vh] lg:overflow-y-auto lg:pr-1",
+                )}
+              >
+                {cart.map((it) => (
+                  <li
+                    key={it.key}
+                    className="border-border flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-foreground text-lg font-medium">
+                        {it.name}
+                        {it.product_id === null ? (
+                          <span className="text-muted-foreground ml-2 text-sm font-normal">
+                            (avulso)
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="text-muted-foreground text-base">
+                        {formatBRL(it.unit_price)} cada
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => updateQuantity(it.key, -1)}
+                          aria-label="Diminuir quantidade"
+                          className="h-12 w-12 p-0"
+                        >
+                          <Minus aria-hidden="true" className="size-5" />
+                        </Button>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={it.quantity.toString().replace(".", ",")}
+                          onChange={(e) => setQuantity(it.key, e.target.value)}
+                          aria-label={`Quantidade de ${it.name}`}
+                          className="h-12 w-20 text-center text-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => updateQuantity(it.key, 1)}
+                          aria-label="Aumentar quantidade"
+                          className="h-12 w-12 p-0"
+                        >
+                          <Plus aria-hidden="true" className="size-5" />
+                        </Button>
+                      </div>
+                      <span className="text-foreground min-w-[6rem] text-right text-lg font-semibold">
+                        {formatBRL(
+                          Math.round(it.unit_price * it.quantity * 100) / 100,
+                        )}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => removeItem(it.key)}
+                        aria-label={`Remover ${it.name}`}
+                        className="h-12 w-12 p-0"
+                      >
+                        <Trash2 aria-hidden="true" className="size-5" />
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section
+            aria-labelledby="total-heading"
+            className="bg-primary text-primary-foreground flex flex-col gap-4 rounded-xl p-5 lg:sticky lg:bottom-4"
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p id="total-heading" className="text-base opacity-90">
+                  Total da venda
+                </p>
+                <p
+                  className="text-4xl font-bold tabular-nums sm:text-5xl"
+                  aria-live="polite"
+                >
+                  {formatBRL(total)}
+                </p>
+              </div>
+              <Button
+                type="button"
+                onClick={handleRegister}
+                disabled={isRegistering || cart.length === 0 || !enoughCash}
+                aria-busy={isRegistering}
+                className="bg-background text-primary hover:bg-background/90 h-16 px-8 text-xl font-semibold"
+              >
+                {isRegistering ? "Registrando…" : "Registrar venda"}
+              </Button>
+            </div>
+            {showChange ? (
+              <div
+                className="bg-primary-foreground/10 flex items-center justify-between rounded-lg px-4 py-3 text-lg"
+                aria-live="polite"
+              >
+                <span className="opacity-90">
+                  {changeAmount >= 0 ? "Troco" : "Falta"}
+                </span>
+                <span
+                  className={cn(
+                    "text-2xl font-bold tabular-nums",
+                    changeAmount < 0 ? "text-warning-foreground" : "",
+                  )}
+                >
+                  {formatBRL(Math.abs(changeAmount))}
+                </span>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

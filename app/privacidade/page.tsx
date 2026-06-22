@@ -3,7 +3,7 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 
 export const metadata = {
-  title: "Política de Privacidade — ERP Simples",
+  title: "Política de Privacidade",
 };
 
 export default function PrivacidadePage() {
@@ -31,14 +31,14 @@ export default function PrivacidadePage() {
 
         <p className="mt-6 text-lg leading-relaxed">
           Esta Política explica, de forma simples, como o{" "}
-          <strong>ERP Simples</strong> trata seus dados. Ao criar uma conta,
+          <strong>Gaveta</strong> trata seus dados. Ao criar uma conta,
           você declara que leu e concorda com este documento (exigência da Lei
           nº 13.709/2018 — LGPD).
         </p>
 
         <h2 className="mt-8 text-2xl font-semibold">1. Quem somos</h2>
         <p className="text-lg leading-relaxed">
-          O ERP Simples é um sistema de gestão pessoal de produtos e vendas,
+          O Gaveta é um sistema de gestão pessoal de produtos e vendas,
           mantido por Adriano Cardoso como projeto de portfólio. Contato:
           adriano.cardoso97@gmail.com.
         </p>

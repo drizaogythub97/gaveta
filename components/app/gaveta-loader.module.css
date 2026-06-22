@@ -1,0 +1,140 @@
+/* Animações do loader de marca "Gaveta" (conceitos A/B/C).
+   DECISÃO (do dono do produto): o loader é um estado de carregamento breve e
+   transitório, então a animação roda SEMPRE — inclusive quando o sistema está
+   com "reduzir movimento" ligado (override intencional). Animações de
+   carregamento são uma exceção aceita; o estado estático ficava estranho.
+   Obs.: as transições de página (template.tsx) continuam respeitando
+   prefers-reduced-motion (ficam instantâneas), pois isso é imperceptível. */
+
+.breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+.float {
+  animation: float 3s ease-in-out infinite;
+}
+.delay05 {
+  animation-delay: 0.5s;
+}
+.delay1 {
+  animation-delay: 1s;
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.bar {
+  transform-origin: bottom;
+  animation: grow 1.8s ease-in-out infinite;
+}
+@keyframes grow {
+  0% {
+    transform: scaleY(0.25);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(0.25);
+    opacity: 0.5;
+  }
+}
+
+.trend {
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  animation: draw 1.8s ease-in-out infinite;
+}
+@keyframes draw {
+  0% {
+    stroke-dashoffset: 220;
+  }
+  55% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+.spin {
+  animation: spin 2.4s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rise {
+  opacity: 0;
+  animation: rise 3s ease-in infinite;
+}
+@keyframes rise {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-120px);
+    opacity: 0;
+  }
+}
+
+/* Opacidade suave — mantida também no modo "reduzir movimento". */
+.pulseOpacity {
+  animation: pulseOpacity 2.2s ease-in-out infinite;
+}
+@keyframes pulseOpacity {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.dots span {
+  animation: blink 1.4s infinite both;
+}
+.dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* Sem bloco @media de redução de movimento aqui: o loader anima sempre,
+   por decisão de produto (ver comentário no topo do arquivo). */

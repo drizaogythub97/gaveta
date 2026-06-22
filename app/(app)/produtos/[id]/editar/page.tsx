@@ -7,7 +7,7 @@ import { type ProductFormState, updateProduct } from "../../actions";
 import { ProductForm } from "../../product-form";
 
 export const metadata = {
-  title: "Editar produto — ERP Simples",
+  title: "Editar produto",
 };
 
 export default async function EditProductPage({

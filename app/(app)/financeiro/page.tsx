@@ -13,7 +13,7 @@ import { toggleSaleStatus } from "./actions";
 import { FinancialClient } from "./financial-client";
 
 export const metadata = {
-  title: "Financeiro — ERP Simples",
+  title: "Financeiro",
 };
 
 const VALID_PERIODS: ReadonlySet<Period> = new Set([

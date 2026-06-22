@@ -7,7 +7,7 @@ import { LogoSection } from "./sections/logo-section";
 import { ThemeSection } from "./sections/theme-section";
 
 export const metadata = {
-  title: "Preferências — ERP Simples",
+  title: "Preferências",
 };
 
 type ProfileRow = {
