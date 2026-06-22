@@ -43,7 +43,7 @@ O objetivo é deixar as contas e segredos prontos. Você já tem **GitHub**; fal
 - Crie localmente o arquivo `.env.local` (copiando de `.env.example`) e cole os valores dos passos acima.
 - **Checklist de saída da Fase 0:** repositório criado ✓ · projeto Supabase no ar ✓ · 3 chaves copiadas ✓ · conta Vercel pronta ✓.
 
-> A partir daqui o Claude Code assume. Abra o Claude Code na pasta do projeto e use os prompts do documento [05-GUIA-CLAUDE-CODE.md](./05-GUIA-CLAUDE-CODE.md).
+> A partir daqui o Claude Code assume. Abra o Claude Code na pasta do projeto e siga este roadmap por fases.
 
 ---
 
