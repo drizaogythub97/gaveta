@@ -4,7 +4,7 @@ import type { Product } from "@/lib/types/db";
 import { InventoryClient } from "./inventory-client";
 
 export const metadata = {
-  title: "Estoque — ERP Simples",
+  title: "Estoque",
 };
 
 export default async function InventoryPage() {

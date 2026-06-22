@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { BrandLockup } from "@/components/auth/brand-lockup";
+import { ResetTipReminder } from "@/components/auth/reset-tip-reminder";
 import {
   Card,
   CardContent,
@@ -13,7 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LoginForm } from "./login-form";
 
 export const metadata = {
-  title: "Entrar — ERP Simples",
+  title: "Entrar",
 };
 
 export default async function LoginPage() {
@@ -25,11 +27,15 @@ export default async function LoginPage() {
 
   return (
     <Card className="p-6">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Entrar</CardTitle>
-        <CardDescription className="text-base">
-          Acesse sua conta com e-mail e senha.
-        </CardDescription>
+      <ResetTipReminder />
+      <CardHeader className="items-center gap-4 text-center">
+        <BrandLockup />
+        <div className="flex flex-col gap-1.5">
+          <CardTitle className="text-2xl">Entrar</CardTitle>
+          <CardDescription className="text-base">
+            Acesse sua conta com e-mail e senha.
+          </CardDescription>
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
         <LoginForm />

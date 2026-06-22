@@ -45,7 +45,6 @@ Todo o planejamento está em [`/docs`](./docs):
 3. [Design system para idosos](./docs/02-DESIGN-SYSTEM-IDOSOS.md)
 4. [Segurança e modelo de dados](./docs/03-SEGURANCA-E-DADOS.md)
 5. [Política de privacidade (LGPD)](./docs/04-POLITICA-PRIVACIDADE.md)
-6. [Guia de execução no Claude Code](./docs/05-GUIA-CLAUDE-CODE.md)
 
 ## Começando
 

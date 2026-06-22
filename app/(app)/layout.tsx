@@ -1,9 +1,12 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppNav } from "@/components/app/app-nav";
 import { LogoutButton } from "@/components/app/logout-button";
+import { PersonalizationTip } from "@/components/app/personalization-tip";
 import { SettingsMenu } from "@/components/app/settings-menu";
+import { Toaster } from "@/components/ui/sonner";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({
@@ -26,12 +29,15 @@ export default async function AppLayout({
     .eq("id", user.id)
     .maybeSingle();
 
-  const brandName =
-    (profile?.brand_name as string | null) ?? "ERP Simples";
+  const customName = (profile?.brand_name as string | null) ?? null;
   const logoPath = profile?.brand_logo_path as string | null;
   const logoUrl = logoPath
     ? supabase.storage.from("brand-logos").getPublicUrl(logoPath).data.publicUrl
     : null;
+
+  // Sem personalização, o cabeçalho volta à marca padrão do produto: "Gaveta".
+  const brandName = customName ?? "Gaveta";
+  const isPersonalized = Boolean(customName) || Boolean(logoPath);
 
   const displayName =
     (user.user_metadata?.full_name as string | undefined) ?? user.email;
@@ -51,7 +57,25 @@ export default async function AppLayout({
                 alt=""
                 className="size-10 rounded-md object-cover"
               />
-            ) : null}
+            ) : (
+              <>
+                {/* Logo padrão Gaveta: colorida no claro, branca no escuro. */}
+                <Image
+                  src="/logo-mark.png"
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="size-10 object-contain dark:hidden"
+                />
+                <Image
+                  src="/logo-mono-white.png"
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="hidden size-10 object-contain dark:block"
+                />
+              </>
+            )}
             <span>{brandName}</span>
           </Link>
           <div className="flex items-center gap-2">
@@ -70,6 +94,8 @@ export default async function AppLayout({
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
         {children}
       </main>
+      <Toaster />
+      <PersonalizationTip isPersonalized={isPersonalized} />
     </div>
   );
 }

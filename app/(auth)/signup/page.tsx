@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SignupForm } from "./signup-form";
 
 export const metadata = {
-  title: "Criar conta — ERP Simples",
+  title: "Criar conta",
 };
 
 export default async function SignupPage() {

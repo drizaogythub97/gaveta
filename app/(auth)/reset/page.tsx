@@ -9,7 +9,7 @@ import {
 import { ResetForm } from "./reset-form";
 
 export const metadata = {
-  title: "Nova senha — ERP Simples",
+  title: "Nova senha",
 };
 
 export default function ResetPage() {
