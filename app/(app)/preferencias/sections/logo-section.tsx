@@ -1,6 +1,7 @@
 "use client";
 
 import { Trash2, Upload } from "lucide-react";
+import Image from "next/image";
 import { useRef, useState, useTransition } from "react";
 import ReactCrop, {
   centerCrop,
@@ -154,8 +155,9 @@ export function LogoSection({ initialLogoUrl }: Props) {
           Logo do estabelecimento
         </h2>
         <p className="text-muted-foreground text-base">
-          A imagem aparece ao lado do nome, no cabeçalho. PNG, JPEG ou WebP
-          até 4 MB. Será recortada em quadrado.
+          A imagem aparece ao lado do nome, no cabeçalho. Sem uma logo
+          personalizada, usamos a marca padrão &ldquo;Gaveta&rdquo;. PNG, JPEG
+          ou WebP até 4 MB. Será recortada em quadrado.
         </p>
       </header>
 
@@ -173,12 +175,27 @@ export function LogoSection({ initialLogoUrl }: Props) {
                 className="size-full object-cover"
               />
             ) : (
-              <span className="text-muted-foreground text-sm">
-                Sem logo
-              </span>
+              <>
+                <Image
+                  src="/logo-mark.png"
+                  alt="Marca padrão Gaveta"
+                  width={80}
+                  height={80}
+                  className="size-20 object-contain dark:hidden"
+                />
+                <Image
+                  src="/logo-mono-white.png"
+                  alt="Marca padrão Gaveta"
+                  width={80}
+                  height={80}
+                  className="hidden size-20 object-contain dark:block"
+                />
+              </>
             )}
           </div>
-          <p className="text-muted-foreground text-xs">Pré-visualização</p>
+          <p className="text-muted-foreground text-xs">
+            {previewUrl ? "Pré-visualização" : "Padrão: Gaveta"}
+          </p>
         </div>
 
         <div className="flex flex-1 flex-col gap-3">

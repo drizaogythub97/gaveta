@@ -11,7 +11,7 @@ import {
 import { RecoverForm } from "./recover-form";
 
 export const metadata = {
-  title: "Recuperar senha — ERP Simples",
+  title: "Recuperar senha",
 };
 
 export default function RecoverPage() {

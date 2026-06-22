@@ -115,6 +115,24 @@ export async function saveBrandName(
   return { ok: true };
 }
 
+export async function removeBrandName(): Promise<BrandFormState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ brand_name: null })
+    .eq("id", user.id);
+
+  if (error) return { error: "Não foi possível remover." };
+  revalidatePath("/", "layout");
+  revalidatePath("/preferencias");
+  return { ok: true };
+}
+
 export type LogoUploadResult = { ok: boolean; error?: string; path?: string };
 
 export async function uploadBrandLogo(

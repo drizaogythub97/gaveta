@@ -2,7 +2,7 @@ import { createProduct } from "../actions";
 import { ProductForm } from "../product-form";
 
 export const metadata = {
-  title: "Novo produto — ERP Simples",
+  title: "Novo produto",
 };
 
 export default function NewProductPage() {
