@@ -12,9 +12,9 @@ O objetivo é deixar as contas e segredos prontos. Você já tem **GitHub**; fal
 
 ### 0.1 — Criar o repositório no GitHub
 
-1. Crie um repositório **público** chamado `erp-simples`.
+1. Crie um repositório **público** chamado `gaveta`.
 2. **Não** adicione README/licença pelo site (o projeto já traz os seus).
-3. Guarde a URL (ex.: `https://github.com/SEU-USUARIO/erp-simples`).
+3. Guarde a URL (ex.: `https://github.com/SEU-USUARIO/gaveta`).
 
 ### 0.2 — Criar conta e projeto no Supabase
 
@@ -89,7 +89,7 @@ O objetivo é deixar as contas e segredos prontos. Você já tem **GitHub**; fal
 - **Entregável:** sistema no ar com URL pública (deploy automático a cada push).
 
 > **Status (2026-06-21):** concluída. App em produção em
-> `https://erp-simples.vercel.app` (deploy automático a cada push na `main`).
+> `https://gaveta-erp.vercel.app` (deploy automático a cada push na `main`).
 > Decisão: **não** vamos reativar "Confirm email", configurar SMTP próprio
 > nem customizar templates de e-mail — fora do escopo. O reset de senha
 > continua funcionando com os e-mails padrão do Supabase.
@@ -201,7 +201,7 @@ Fase 0 (você) → Fases 1–4 (Claude Code). Ao fim da Fase 4 já há um sistem
 
 - **Site URL e Redirect URLs de produção** no painel Supabase: além de
   `http://localhost:3000` (dev), incluir a URL da Vercel
-  (`https://erp-simples.vercel.app`) e o `/auth/callback` correspondente.
+  (`https://gaveta-erp.vercel.app`) e o `/auth/callback` correspondente.
 
 > Decisão (2026-06-21): templates de e-mail customizados, SMTP próprio e
 > reativação de "Confirm email" estão **fora do escopo**. O app usa os e-mails
