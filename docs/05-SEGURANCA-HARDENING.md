@@ -131,6 +131,12 @@ Segurança sem verificação é torcida. Cada controle foi exercitado:
     criadas como *Shared* não-linkadas na Vercel, portanto ausentes no runtime →
     *fail-open*). Corrigido para *Project / All Environments* e **re-testado até
     passar**.
+- **RLS / acesso cruzado (testes automatizados):** suíte dedicada
+  (`npm run test:rls`, **16 testes**) que cria dois usuários reais no Supabase e
+  prova, para cada tabela e para o storage, que um usuário **não lê, edita,
+  apaga nem forja** dados do outro: `profiles`, `products`, `sales`/`sale_items`
+  (via `register_sale`), `product_barcodes`, `preferences_fees` e o bucket
+  `brand-logos` (escrita restrita à pasta `user_id`; leitura pública por design).
 - **Cabeçalhos & CSP:** inspeção das respostas HTTP do Preview confirmando todos
   os cabeçalhos e a CSP com nonce; verificação de que o Next aplica o **mesmo
   nonce** aos seus scripts (a CSP não quebra a aplicação). Nota **A** em
@@ -153,7 +159,7 @@ Segurança sem verificação é torcida. Cada controle foi exercitado:
 | Rate limiting (login/cadastro/recuperação/redefinição) | ✅ Concluído e verificado |
 | Cabeçalhos de segurança + CSP com nonce | ✅ Concluído e verificado |
 | CSRF + flags de cookies (revisão dedicada) | ⏳ Planejado |
-| Revisão de RLS com **testes de acesso cruzado** automatizados | ⏳ Planejado |
+| Revisão de RLS com **testes de acesso cruzado** automatizados | ✅ Concluído e verificado |
 | Política de senha (força mínima, feedback acessível) | ⏳ Planejado |
 | `/security-review` (varredura) + correção de achados | ⏳ Planejado |
 | Backup do banco e plano de recuperação | ⏳ Planejado (Fase 8) |
@@ -188,5 +194,13 @@ práticas de segurança.
   `manifest.webmanifest` no *matcher* do middleware.
 - **Pendente da Fase 7:** CSRF/cookies, testes de acesso cruzado de RLS, política
   de senha e `/security-review`.
+
+### 2026-06-23 — Fase 7 (parte 2): testes de acesso cruzado (RLS)
+- Adicionada suíte `tests/rls/isolation-extended.test.ts` cobrindo as tabelas e o
+  storage introduzidos após a migration inicial: `profiles` (escrita cruzada),
+  `product_barcodes`, `preferences_fees` e o bucket `brand-logos`.
+- Suíte RLS total: **16 testes**, todos verdes contra o Supabase real
+  (`npm run test:rls`).
+- **Pendente da Fase 7:** CSRF/cookies, política de senha e `/security-review`.
 
 > Próximas entradas serão adicionadas ao concluir cada bloco da Fase 7.
