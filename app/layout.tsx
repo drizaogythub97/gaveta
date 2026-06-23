@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Geist } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { getThemeFromCookie } from "@/lib/theme/cookie";
@@ -74,6 +75,7 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   const theme = await getThemeFromCookie();
   const isDark = theme === "dark";
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
     <html
@@ -90,6 +92,7 @@ export default async function RootLayout({
     >
       <head>
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
         />
       </head>
