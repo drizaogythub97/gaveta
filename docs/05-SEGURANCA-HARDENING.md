@@ -81,6 +81,15 @@ Este documento é a prova desse esforço.
   Actions) antes de qualquer operação — o cliente é conveniência, não fronteira
   de confiança.
 
+### 3.1. Política de senha (alinhada ao NIST SP 800-63B)
+- Em `lib/validations/password.ts`: **comprimento** mínimo (8) e máximo (72),
+  **bloqueio de senhas comuns/previsíveis** (blocklist + sequências + baixa
+  variedade) e **proibição de conter o nome ou o e-mail** do usuário.
+- Privilegia comprimento e bloqueio de palpites em vez de exigir
+  maiúscula/símbolo — escolha deliberada de **usabilidade para o público idoso**,
+  com **dica acessível** (`aria-describedby`) nos formulários de cadastro e
+  redefinição.
+
 ### 4. Gestão de segredos
 - `service_role` / secret keys **exclusivas de servidor**; nunca com prefixo
   `NEXT_PUBLIC_`, nunca em Client Components.
@@ -131,6 +140,9 @@ Segurança sem verificação é torcida. Cada controle foi exercitado:
     criadas como *Shared* não-linkadas na Vercel, portanto ausentes no runtime →
     *fail-open*). Corrigido para *Project / All Environments* e **re-testado até
     passar**.
+- **Política de senha (testes unitários):** `tests/password.test.ts` cobre
+  rejeição de senhas comuns/sequenciais/pouco variadas e de senhas que contêm o
+  nome ou o e-mail, além da integração com o schema de cadastro.
 - **RLS / acesso cruzado (testes automatizados):** suíte dedicada
   (`npm run test:rls`, **16 testes**) que cria dois usuários reais no Supabase e
   prova, para cada tabela e para o storage, que um usuário **não lê, edita,
@@ -160,7 +172,7 @@ Segurança sem verificação é torcida. Cada controle foi exercitado:
 | Cabeçalhos de segurança + CSP com nonce | ✅ Concluído e verificado |
 | CSRF + flags de cookies (revisão dedicada) | ⏳ Planejado |
 | Revisão de RLS com **testes de acesso cruzado** automatizados | ✅ Concluído e verificado |
-| Política de senha (força mínima, feedback acessível) | ⏳ Planejado |
+| Política de senha (força mínima, feedback acessível) | ✅ Concluído e verificado |
 | `/security-review` (varredura) + correção de achados | ⏳ Planejado |
 | Backup do banco e plano de recuperação | ⏳ Planejado (Fase 8) |
 
@@ -201,6 +213,12 @@ práticas de segurança.
   `product_barcodes`, `preferences_fees` e o bucket `brand-logos`.
 - Suíte RLS total: **16 testes**, todos verdes contra o Supabase real
   (`npm run test:rls`).
-- **Pendente da Fase 7:** CSRF/cookies, política de senha e `/security-review`.
+
+### 2026-06-23 — Fase 7 (parte 3): política de senha
+- `lib/validations/password.ts` (NIST-aligned): comprimento + blocklist de senhas
+  comuns/previsíveis + proibição de conter nome/e-mail. Integrada aos schemas de
+  cadastro e redefinição; dica acessível nos formulários.
+- **8 testes unitários** novos (`tests/password.test.ts`), verdes.
+- **Pendente da Fase 7:** CSRF/cookies e `/security-review`.
 
 > Próximas entradas serão adicionadas ao concluir cada bloco da Fase 7.
