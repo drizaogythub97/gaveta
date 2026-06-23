@@ -169,6 +169,11 @@ Segurança sem verificação é torcida. Cada controle foi exercitado:
   **Vercel Deployment Protection**; os testes automatizados usam o segredo
   *Protection Bypass for Automation* — ou seja, a verificação é reproduzível por
   ferramentas, não dependente de cliques manuais.
+- **Security review (varredura focada):** revisão de segurança das mudanças da
+  branch (injeção, auth/authz, segredos, XSS/CSP, exposição de dados). Resultado:
+  **nenhuma vulnerabilidade de alta confiança** introduzida — as mudanças são
+  fortalecedoras; dados que chegam aos pontos sensíveis são gerados pelo servidor
+  ou vêm de configuração confiável. Nada a corrigir.
 
 ---
 
@@ -185,7 +190,7 @@ Segurança sem verificação é torcida. Cada controle foi exercitado:
 | CSRF + flags de cookies (revisão dedicada) | ✅ Concluído e verificado |
 | Revisão de RLS com **testes de acesso cruzado** automatizados | ✅ Concluído e verificado |
 | Política de senha (força mínima, feedback acessível) | ✅ Concluído e verificado |
-| `/security-review` (varredura) + correção de achados | ⏳ Planejado |
+| `/security-review` (varredura) + correção de achados | ✅ Concluído (sem achados) |
 | Backup do banco e plano de recuperação | ⏳ Planejado (Fase 8) |
 
 ---
@@ -238,6 +243,11 @@ práticas de segurança.
 - Revisão e **verificação** da proteção CSRF dos Server Actions (POST com `Origin`
   forjado → bloqueado). Documentada a postura dos cookies de sessão
   (`SameSite=Lax`/`Secure`; não-`httpOnly` por design, mitigado pela CSP).
-- **Pendente da Fase 7:** rodar `/security-review` e tratar achados.
+
+### 2026-06-23 — Fase 7 (parte 5): security review + fechamento
+- Executada a **security review** focada nas mudanças da branch. **Nenhum achado
+  de alta confiança**; nada a corrigir (detalhes na seção "Como verificamos").
+- ✅ **Fase 7 concluída.** Próximo: Fase 8 (Lighthouse, E2E Playwright, backup do
+  banco) e revisão final antes do merge na `main`.
 
 > Próximas entradas serão adicionadas ao concluir cada bloco da Fase 7.
