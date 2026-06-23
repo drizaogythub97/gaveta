@@ -105,6 +105,15 @@ Este documento é a prova desse esforço.
   as credenciais do Redis não estão configuradas (ambiente local), ativo em
   produção.
 
+### 5.1. CSRF e cookies de sessão
+- **CSRF:** os *Server Actions* do Next só aceitam `POST` e **rejeitam
+  requisições cross-origin** (comparação `Origin` × `Host`). Verificado: um POST
+  com `Origin` forjado retorna erro e **não executa** a ação.
+- **Cookies de sessão** (`@supabase/ssr`): `SameSite=Lax` e `Secure` em produção.
+  Por design do Supabase SSR, **não são `httpOnly`** (o client de navegador
+  precisa lê-los) — por isso a **CSP estrita sem `unsafe-inline` em scripts** é a
+  principal defesa contra roubo de token via XSS.
+
 ### 6. Cabeçalhos de segurança & Content-Security-Policy
 - Cabeçalhos estáticos em `next.config.ts` para **todas** as rotas:
   - `Strict-Transport-Security` (HSTS, 2 anos, `includeSubDomains`)
@@ -149,6 +158,9 @@ Segurança sem verificação é torcida. Cada controle foi exercitado:
   apaga nem forja** dados do outro: `profiles`, `products`, `sales`/`sale_items`
   (via `register_sale`), `product_barcodes`, `preferences_fees` e o bucket
   `brand-logos` (escrita restrita à pasta `user_id`; leitura pública por design).
+- **CSRF (teste com Origin forjado):** POST de Server Action com
+  `Origin: https://evil.example.com` → resposta de erro e ação **não executada**,
+  confirmando a checagem de mesma origem do Next.
 - **Cabeçalhos & CSP:** inspeção das respostas HTTP do Preview confirmando todos
   os cabeçalhos e a CSP com nonce; verificação de que o Next aplica o **mesmo
   nonce** aos seus scripts (a CSP não quebra a aplicação). Nota **A** em
@@ -170,7 +182,7 @@ Segurança sem verificação é torcida. Cada controle foi exercitado:
 | Isolamento de segredos (sem `NEXT_PUBLIC_` em secrets) | ✅ Concluído |
 | Rate limiting (login/cadastro/recuperação/redefinição) | ✅ Concluído e verificado |
 | Cabeçalhos de segurança + CSP com nonce | ✅ Concluído e verificado |
-| CSRF + flags de cookies (revisão dedicada) | ⏳ Planejado |
+| CSRF + flags de cookies (revisão dedicada) | ✅ Concluído e verificado |
 | Revisão de RLS com **testes de acesso cruzado** automatizados | ✅ Concluído e verificado |
 | Política de senha (força mínima, feedback acessível) | ✅ Concluído e verificado |
 | `/security-review` (varredura) + correção de achados | ⏳ Planejado |
@@ -219,6 +231,13 @@ práticas de segurança.
   comuns/previsíveis + proibição de conter nome/e-mail. Integrada aos schemas de
   cadastro e redefinição; dica acessível nos formulários.
 - **8 testes unitários** novos (`tests/password.test.ts`), verdes.
-- **Pendente da Fase 7:** CSRF/cookies e `/security-review`.
+- Verificação ponta a ponta no Preview: cadastro rejeita senha comum, senha com o
+  nome e senha sem variedade — sem criar conta.
+
+### 2026-06-23 — Fase 7 (parte 4): CSRF e cookies
+- Revisão e **verificação** da proteção CSRF dos Server Actions (POST com `Origin`
+  forjado → bloqueado). Documentada a postura dos cookies de sessão
+  (`SameSite=Lax`/`Secure`; não-`httpOnly` por design, mitigado pela CSP).
+- **Pendente da Fase 7:** rodar `/security-review` e tratar achados.
 
 > Próximas entradas serão adicionadas ao concluir cada bloco da Fase 7.
