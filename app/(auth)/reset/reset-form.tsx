@@ -6,6 +6,7 @@ import { ErrorAlert } from "@/components/auth/form-feedback";
 import { PasswordField } from "@/components/auth/password-field";
 import { SubmitButton } from "@/components/auth/submit-button";
 import { Label } from "@/components/ui/label";
+import { PASSWORD_HINT } from "@/lib/validations/password";
 
 import { reset, type ResetState } from "./actions";
 
@@ -30,10 +31,15 @@ export function ResetForm() {
           minLength={8}
           aria-invalid={Boolean(state.fieldErrors?.password)}
           aria-describedby={
-            state.fieldErrors?.password ? "password-error" : undefined
+            state.fieldErrors?.password
+              ? "password-error password-hint"
+              : "password-hint"
           }
           className="h-14 text-lg"
         />
+        <p id="password-hint" className="text-muted-foreground text-sm">
+          {PASSWORD_HINT}
+        </p>
         {state.fieldErrors?.password ? (
           <p
             id="password-error"

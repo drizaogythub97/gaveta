@@ -25,8 +25,11 @@ function isAuthOnly(pathname: string) {
   );
 }
 
-export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+export async function updateSession(
+  request: NextRequest,
+  requestHeaders: Headers,
+) {
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const supabase = createServerClient(
     publicEnv.supabaseUrl,
@@ -40,7 +43,10 @@ export async function updateSession(request: NextRequest) {
           for (const { name, value } of cookiesToSet) {
             request.cookies.set(name, value);
           }
-          response = NextResponse.next({ request });
+          // Reflete os cookies refrescados nos headers encaminhados ao render,
+          // para que os Server Components vejam a sessao atualizada.
+          requestHeaders.set("cookie", request.cookies.toString());
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
           }

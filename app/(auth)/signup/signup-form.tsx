@@ -9,6 +9,7 @@ import { SubmitButton } from "@/components/auth/submit-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PASSWORD_HINT } from "@/lib/validations/password";
 
 import { signup, type SignupState } from "./actions";
 
@@ -99,10 +100,15 @@ export function SignupForm() {
           minLength={8}
           aria-invalid={Boolean(state.fieldErrors?.password)}
           aria-describedby={
-            state.fieldErrors?.password ? "password-error" : undefined
+            state.fieldErrors?.password
+              ? "password-error password-hint"
+              : "password-hint"
           }
           className="h-14 text-lg"
         />
+        <p id="password-hint" className="text-muted-foreground text-sm">
+          {PASSWORD_HINT}
+        </p>
         {state.fieldErrors?.password ? (
           <p
             id="password-error"

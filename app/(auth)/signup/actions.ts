@@ -2,6 +2,7 @@
 
 import { publicEnv } from "@/lib/env";
 import { toPortugueseAuthError } from "@/lib/auth/errors";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { signupSchema } from "@/lib/validations/auth";
 
@@ -45,6 +46,14 @@ export async function signup(
     return {
       fieldErrors,
       values: { fullName: raw.fullName, email: raw.email },
+    };
+  }
+
+  const rate = await checkRateLimit("signup");
+  if (!rate.ok) {
+    return {
+      error: rate.message,
+      values: { fullName: parsed.data.fullName, email: parsed.data.email },
     };
   }
 

@@ -1,11 +1,17 @@
 import { z } from "zod";
 
+import {
+  PASSWORD_MAX,
+  PASSWORD_MIN,
+  checkPasswordStrength,
+} from "./password";
+
 const email = z.email("Digite um e-mail válido.");
 
 const password = z
   .string()
-  .min(8, "A senha deve ter ao menos 8 caracteres.")
-  .max(72, "A senha é muito longa.");
+  .min(PASSWORD_MIN, `A senha deve ter ao menos ${PASSWORD_MIN} caracteres.`)
+  .max(PASSWORD_MAX, "A senha é muito longa.");
 
 const fullName = z
   .string()
@@ -17,14 +23,25 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Informe a senha."),
 });
 
-export const signupSchema = z.object({
-  fullName,
-  email,
-  password,
-  privacyAccepted: z.literal("on", {
-    error: "Você precisa aceitar a Política de Privacidade.",
-  }),
-});
+export const signupSchema = z
+  .object({
+    fullName,
+    email,
+    password,
+    privacyAccepted: z.literal("on", {
+      error: "Você precisa aceitar a Política de Privacidade.",
+    }),
+  })
+  .superRefine((data, ctx) => {
+    if (data.password.length < PASSWORD_MIN) return;
+    const issue = checkPasswordStrength(data.password, {
+      email: data.email,
+      name: data.fullName,
+    });
+    if (issue) {
+      ctx.addIssue({ code: "custom", path: ["password"], message: issue });
+    }
+  });
 
 export const recoverSchema = z.object({
   email,
@@ -35,9 +52,20 @@ export const resetSchema = z
     password,
     passwordConfirm: z.string().min(1, "Confirme a nova senha."),
   })
-  .refine((data) => data.password === data.passwordConfirm, {
-    path: ["passwordConfirm"],
-    message: "As senhas não coincidem.",
+  .superRefine((data, ctx) => {
+    if (data.password.length >= PASSWORD_MIN) {
+      const issue = checkPasswordStrength(data.password);
+      if (issue) {
+        ctx.addIssue({ code: "custom", path: ["password"], message: issue });
+      }
+    }
+    if (data.password !== data.passwordConfirm) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["passwordConfirm"],
+        message: "As senhas não coincidem.",
+      });
+    }
   });
 
 export type LoginInput = z.infer<typeof loginSchema>;
