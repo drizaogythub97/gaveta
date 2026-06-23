@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { toPortugueseAuthError } from "@/lib/auth/errors";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { loginSchema } from "@/lib/validations/auth";
 
@@ -31,6 +32,11 @@ export async function login(
       }
     }
     return { fieldErrors, email: raw.email };
+  }
+
+  const rate = await checkRateLimit("login");
+  if (!rate.ok) {
+    return { error: rate.message, email: parsed.data.email };
   }
 
   const supabase = await createClient();
