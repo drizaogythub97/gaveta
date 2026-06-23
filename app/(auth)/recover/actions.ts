@@ -2,6 +2,7 @@
 
 import { publicEnv } from "@/lib/env";
 import { toPortugueseAuthError } from "@/lib/auth/errors";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { recoverSchema } from "@/lib/validations/auth";
 
@@ -28,6 +29,11 @@ export async function recover(
       if (key === "email") fieldErrors[key] = issue.message;
     }
     return { fieldErrors, email: raw.email };
+  }
+
+  const rate = await checkRateLimit("recover");
+  if (!rate.ok) {
+    return { error: rate.message, email: parsed.data.email };
   }
 
   const supabase = await createClient();
