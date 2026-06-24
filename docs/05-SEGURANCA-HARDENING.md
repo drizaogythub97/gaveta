@@ -1,4 +1,4 @@
-# Segurança & Hardening — Gaveta (ERP Simples)
+# Segurança & Hardening — Gaveta
 
 > **Documento vivo.** Registra a postura de segurança do projeto: o que foi
 > implementado, *por quê*, e **como foi verificado**. Serve a três leitores:

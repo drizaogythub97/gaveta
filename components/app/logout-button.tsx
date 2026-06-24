@@ -33,7 +33,7 @@ export function LogoutButton() {
       <ConfirmDialog
         open={open}
         onClose={() => setOpen(false)}
-        title="Sair do ERP Simples?"
+        title="Sair da Gaveta?"
         description="Você precisará entrar de novo com seu e-mail e senha para acessar o sistema."
         confirmLabel="Sair"
         confirmVariant="destructive"
