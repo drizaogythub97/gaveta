@@ -68,7 +68,7 @@ tests/              # vitest + playwright
 
 ## Sistema em produção — política de branch (desde 2026-06-21)
 
-O sistema **está no ar** em `https://erp-simples.vercel.app` (Vercel, deploy
+O sistema **está no ar** em `https://gaveta-erp.vercel.app` (Vercel, deploy
 automático a cada push na `main`). Por isso:
 
 - **A `main` é produção.** Toda melhoria ou nova implementação é desenvolvida

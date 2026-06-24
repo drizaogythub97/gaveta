@@ -13,7 +13,7 @@ const inter = Inter({
   display: "swap",
 });
 
-const SITE_URL = "https://erp-simples.vercel.app";
+const SITE_URL = "https://gaveta-erp.vercel.app";
 const SITE_DESCRIPTION =
   "Frente de caixa e gestão simples para produtos, vendas e faturamento — acessível e fácil de usar.";
 
