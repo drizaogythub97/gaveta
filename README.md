@@ -1,6 +1,6 @@
-# ERP Simples
+# Gaveta
 
-> Sistema de gestão (ERP) leve e acessível para registro de **produtos**, **vendas** e **demonstrativos de faturamento**, com foco em usabilidade para pessoas com pouca familiaridade com tecnologia.
+> **Gaveta** — sistema de gestão (ERP) leve e acessível para registro de **produtos**, **vendas** e **demonstrativos de faturamento**, com foco em usabilidade para pessoas com pouca familiaridade com tecnologia.
 
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3FCF8E)](https://supabase.com/)
@@ -45,6 +45,7 @@ Todo o planejamento está em [`/docs`](./docs):
 3. [Design system para idosos](./docs/02-DESIGN-SYSTEM-IDOSOS.md)
 4. [Segurança e modelo de dados](./docs/03-SEGURANCA-E-DADOS.md)
 5. [Política de privacidade (LGPD)](./docs/04-POLITICA-PRIVACIDADE.md)
+6. [Segurança & hardening — controles, evidências e verificação](./docs/05-SEGURANCA-HARDENING.md)
 
 ## Começando
 

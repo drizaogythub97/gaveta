@@ -1,12 +1,12 @@
-# Política de Privacidade — ERP Simples
+# Política de Privacidade — Gaveta
 
 _Última atualização: a definir na publicação._
 
-Esta Política explica, de forma simples, como o **ERP Simples** trata seus dados. Ao criar uma conta, você declara que leu e concorda com este documento (exigência da Lei nº 13.709/2018 — LGPD).
+Esta Política explica, de forma simples, como o **Gaveta** trata seus dados. Ao criar uma conta, você declara que leu e concorda com este documento (exigência da Lei nº 13.709/2018 — LGPD).
 
 ## 1. Quem somos
 
-O ERP Simples é um sistema de gestão pessoal de produtos e vendas, mantido por Adriano Cardoso como projeto de portfólio. Contato: adriano.cardoso97@gmail.com.
+O Gaveta é um sistema de gestão pessoal de produtos e vendas, mantido por Adriano Cardoso como projeto de portfólio. Contato: adriano.cardoso97@gmail.com.
 
 ## 2. Quais dados coletamos
 
