@@ -80,6 +80,59 @@ Acessibilidade e Performance.
 
 ## 3. Backup do banco
 
-Ver seção dedicada (a documentar nesta mesma fase): estratégia de export
-periódico do PostgreSQL no Supabase, compensando a ausência de backup
-automático no plano grátis.
+O plano grátis do Supabase **não** oferece backup automático (PITR/snapshots são
+pagos). Para compensar, o projeto faz **backup automático, criptografado e
+off-site**, sem exigir ação manual recorrente.
+
+### Como funciona
+
+- **Workflow:** `.github/workflows/backup-db.yml`, agendado por cron (domingos
+  03:00 UTC) + disparo manual (`workflow_dispatch`).
+- **Dump:** `pg_dump` rodando na imagem `postgres:17-alpine` (um cliente novo
+  dumpa servidores mais antigos sem problema), comprimido com `gzip -9`.
+- **Criptografia:** o dump é cifrado com **GPG simétrico (AES-256)** *antes* de
+  sair do runner, usando uma senha guardada em *secret*. Por isso é seguro
+  guardá-lo como **artifact** mesmo o repositório sendo **público** — o conteúdo
+  em claro nunca é publicado.
+- **Armazenamento:** artifact do GitHub Actions, retenção de **90 dias**
+  (rotação automática). Fica **fora do Supabase**, então protege contra erro de
+  migração, deleção acidental ou perda da base.
+- **Segurança operacional:** a connection string fica apenas no *env* do
+  container (nunca no `argv`/logs); os passos não imprimem segredos.
+
+> Também há `scripts/backup-db.sh` para gerar um backup criptografado **local**
+> sob demanda (mesma lógica), útil antes de uma migração arriscada.
+
+### Configuração (uma única vez)
+
+Cadastrar dois *secrets* no repositório (`Settings → Secrets and variables →
+Actions`, ou via `gh secret set`):
+
+| Secret | O que é | Onde obter |
+| --- | --- | --- |
+| `SUPABASE_DB_URL` | Connection string do **Session pooler** (IPv4, porta 5432) | Supabase → *Project Settings → Database → Connection string → Session pooler* (inclua a senha do banco) |
+| `BACKUP_PASSPHRASE` | Senha forte para cifrar/decifrar os dumps | Você define. **Guarde fora do repo** — sem ela o backup é irrecuperável. |
+
+> Usa-se o **Session pooler** (não a conexão direta) porque os runners do GitHub
+> são IPv4 e a conexão direta do Supabase é IPv6.
+
+O cron só dispara a partir da branch padrão (`main`), então o backup passa a
+rodar sozinho **após o merge**. Para validar na hora: *Actions → Backup do banco
+→ Run workflow* (ou `gh workflow run backup-db.yml`).
+
+### Restauração
+
+1. Baixar o artifact desejado (*Actions → run → Artifacts*) — um `.sql.gz.gpg`.
+2. Decifrar e descomprimir:
+   ```bash
+   gpg --batch --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" \
+     --decrypt gaveta-XXXX.sql.gz.gpg | gunzip > restore.sql
+   ```
+3. Restaurar em um banco (de preferência um projeto/instância limpa):
+   ```bash
+   psql "$DB_URL" -f restore.sql
+   ```
+
+> O dump inclui o schema `public` (dados do app) com `--no-owner
+> --no-privileges`, facilitando restaurar em outra instância. Schemas geridos
+> pelo Supabase (`auth`, `storage`) são recriados pela própria plataforma.
