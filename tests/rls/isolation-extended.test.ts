@@ -512,3 +512,74 @@ describe("RLS + funcional — sessão de caixa (Fase E)", () => {
     expect(error).not.toBeNull();
   });
 });
+
+// =====================================================================
+// Fase F — despesas (expenses): RLS por user_id.
+// =====================================================================
+describe("RLS — expenses (Fase F)", () => {
+  let expenseId: string;
+
+  it("Alice cria despesa; Bob não enxerga", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const { data, error } = await aliceApp
+      .from("expenses")
+      .insert({
+        user_id: alice.id,
+        incurred_on: "2026-06-26",
+        category: "aluguel",
+        amount: 1200,
+        description: "aluguel do mês",
+      })
+      .select("id")
+      .single();
+    expect(error).toBeNull();
+    expenseId = data!.id as string;
+
+    const bobApp = userClient(bob.accessToken);
+    const { data: bobRows } = await bobApp.from("expenses").select("id");
+    expect(bobRows).toHaveLength(0);
+  });
+
+  it("Bob não consegue inserir despesa forjando o user_id de Alice", async () => {
+    const bobApp = userClient(bob.accessToken);
+    const { error } = await bobApp.from("expenses").insert({
+      user_id: alice.id,
+      incurred_on: "2026-06-26",
+      category: "outros",
+      amount: 1,
+    });
+    expect(error).not.toBeNull();
+  });
+
+  it("Bob não consegue editar nem excluir a despesa de Alice", async () => {
+    const bobApp = userClient(bob.accessToken);
+
+    const { data: upData } = await bobApp
+      .from("expenses")
+      .update({ amount: 1 })
+      .eq("id", expenseId)
+      .select("id");
+    expect(upData).toHaveLength(0);
+
+    await bobApp.from("expenses").delete().eq("id", expenseId);
+    const admin = adminClient();
+    const { data: still } = await admin
+      .from("expenses")
+      .select("id, amount")
+      .eq("id", expenseId)
+      .single();
+    expect(still?.id).toBe(expenseId);
+    expect(Number(still?.amount)).toBe(1200);
+  });
+
+  it("categoria inválida é rejeitada pelo CHECK", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const { error } = await aliceApp.from("expenses").insert({
+      user_id: alice.id,
+      incurred_on: "2026-06-26",
+      category: "categoria-invalida",
+      amount: 10,
+    });
+    expect(error).not.toBeNull();
+  });
+});
