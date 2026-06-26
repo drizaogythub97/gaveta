@@ -175,37 +175,39 @@ Ver fases detalhadas em [03-SEGURANCA-E-DADOS.md](./03-SEGURANCA-E-DADOS.md#fase
 > Cada item pode virar uma branch própria. Migrações novas seguem a ordem
 > `0006+` com RLS desde o início.
 
-### FASE D — Caixa e estoque: correções e novos recursos 🤖
-- **Estorno que devolve o estoque.** Hoje `financeiro/actions.ts → toggleSaleStatus`
-  só inverte `completed`↔`voided` e **não repõe** o estoque baixado. Corrigir:
-  ao estornar, devolver as quantidades; ao "des-estornar", baixar de novo.
-  Ignorar produtos `track_stock = false`. Considerar fazer via RPC dedicada
-  (transacional) para coerência.
-- **Desconto na venda** (por item e/ou no total) no POS. Exige coluna nova em
-  `sales` (ex.: `discount_amount`), ajuste do `register_sale` e do cálculo de
-  total. Validar no servidor (0 ≤ desconto ≤ subtotal).
-- **Histórico de movimentação de estoque.** Nova tabela `stock_movements`
-  (`user_id`, `product_id`, tipo: venda/estorno/reposição/ajuste, quantidade,
-  referência, timestamp), alimentada pela venda, pelo estorno e pela reposição
-  manual (`estoque/actions.ts`). RLS por `user_id`.
+### FASE D — Caixa e estoque: correções e novos recursos ✅ CONCLUÍDA (PR #8, 2026-06-26)
+- **Estorno que devolve o estoque** — feito via RPC transacional
+  `set_sale_status` (substitui o update simples do `toggleSaleStatus`): estorno
+  devolve quantidades, reativação rebaixa; idempotente; ignora `track_stock=false`.
+- **Desconto na venda** — implementado **só no total** (decisão do dono):
+  coluna `sales.discount_amount`, validação `0 ≤ desconto ≤ subtotal` no servidor
+  e na RPC `register_sale`; campo no POS e exibição no Financeiro.
+- **Histórico de movimentação** — tabela `stock_movements` (RLS, **só
+  insert/select** = imutável), alimentada por venda/estorno (RPCs) e
+  reposição/ajuste (nova RPC `adjust_stock`); página `/estoque/movimentacoes`.
+- Migration `0006`. Bônus na mesma PR: correção de animações aceleradas sob
+  `prefers-reduced-motion` + indicador "Buscando produto…" no POS.
 
-### FASE E — Fechamento de caixa 🤖
-- Sessão de caixa: **abertura com troco**, **sangria** (retirada), **suprimento**
-  (reforço) e **fechamento com conferência** (esperado × contado).
-- Tabela de sessões + movimentos de caixa; vincular vendas em dinheiro à sessão
-  aberta. O relatório do fechamento entra no Resumo do Financeiro (Fase F).
+### FASE E — Fechamento de caixa ✅ CONCLUÍDA (PR #9, 2026-06-26)
+- `cash_sessions` (uma aberta por usuário, índice parcial único) + `cash_movements`
+  (sangria/suprimento); `sales.cash_session_id` vincula vendas em dinheiro à
+  sessão aberta (pix/cartão não vinculam).
+- RPCs `open_cash_session` / `add_cash_movement` / `close_cash_session`;
+  `register_sale` passou a vincular (sem mudar assinatura).
+- Página `/caixa/sessao` (abrir, sangria/suprimento, fechar com conferência
+  esperado×contado, histórico) + banner de status na frente de caixa.
+- Esperado = troco + vendas em dinheiro concluídas + suprimentos − sangrias.
+  Migration `0007`.
 
-### FASE F — Financeiro: entradas, saídas e resumo 🤖
-- Reestruturar em 3 abas: **Vendas** (atual), **Despesas** (nova) e **Resumo**.
-- **Despesas:** tabela `expenses` (`user_id`, data, categoria, valor, descrição).
-  Categorias fixas: insumos/mercadorias, salários, aluguel, contas, impostos,
-  outros. RLS + Zod. **Despesas e estoque separados na v1** (vínculo opcional
-  fica para depois).
-- **Resumo:** receita bruta, taxas, receita líquida, despesas por categoria e
-  **resultado (líquida − despesas)**, com **projeção simples** rotulada como
-  estimativa (ex.: média diária × dias restantes do mês).
+### FASE F — Financeiro: entradas, saídas e resumo ✅ CONCLUÍDA (PR #10, 2026-06-26)
+- 3 abas via `?tab=`: **Vendas** (atual), **Despesas** e **Resumo**.
+- `expenses` (categorias fixas: insumos/salários/aluguel/contas/impostos/outros),
+  RLS + Zod, add/delete. **Despesas e estoque separados na v1.**
+- Resumo: bruta, taxas, líquida, despesas por categoria, **resultado
+  (líquida − despesas)**, fechamentos de caixa do período e **projeção do mês**
+  rotulada como estimativa. Migration `0008`.
 
-### FASE G — Impressão de comprovantes 🤖
+### FASE G — Impressão de comprovantes 🤖 ⏪ PRÓXIMA
 - Caminho **HTML/CSS + diálogo de impressão** (usa o driver da impressora; cobre
   **bobina 80/58 mm — ref. Epson TM-T20x** e **A4**). ESC/POS direto fica para o
   app nativo (Fase H).
