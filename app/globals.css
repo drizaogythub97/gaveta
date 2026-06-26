@@ -113,8 +113,13 @@ body {
   *,
   ::before,
   ::after {
+    /* Sem animation-iteration-count: 1, animações `infinite` ficavam em loop a
+       cada 0.01ms (efeito "ultra acelerado"). Capar a 1 iteração as encerra de
+       fato. O loader de marca é exceção intencional e se reativa no seu módulo. */
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
