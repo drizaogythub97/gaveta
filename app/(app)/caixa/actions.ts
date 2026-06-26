@@ -98,15 +98,19 @@ export async function registerSale(
   paymentMethod: PaymentMethod,
   installments: number | null,
   feeAmount: number,
+  discountAmount: number,
 ): Promise<RegisterSaleResult> {
   if (items.length === 0) {
     return { ok: false, error: "Adicione ao menos um item à venda." };
   }
+  let subtotal = 0;
   for (const item of items) {
     if (!item.name || item.quantity <= 0 || item.unit_price < 0) {
       return { ok: false, error: "Há itens inválidos na venda." };
     }
+    subtotal += Math.round(item.unit_price * item.quantity * 100) / 100;
   }
+  subtotal = Math.round(subtotal * 100) / 100;
   if (!VALID_METHODS.has(paymentMethod)) {
     return { ok: false, error: "Forma de pagamento inválida." };
   }
@@ -115,6 +119,11 @@ export async function registerSale(
     (!installments || installments < 2 || installments > 24)
   ) {
     return { ok: false, error: "Número de parcelas inválido (2 a 24)." };
+  }
+
+  const discount = Math.max(0, Math.round((discountAmount || 0) * 100) / 100);
+  if (!Number.isFinite(discount) || discount > subtotal) {
+    return { ok: false, error: "Desconto inválido." };
   }
 
   const supabase = await createClient();
@@ -131,6 +140,7 @@ export async function registerSale(
     installments:
       paymentMethod === "credito_parcelado" ? installments : null,
     fee_amount: Math.max(0, Math.round(feeAmount * 100) / 100),
+    discount_amount: discount,
   });
 
   if (error) {

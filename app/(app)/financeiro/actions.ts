@@ -20,12 +20,15 @@ export async function toggleSaleStatus(
   if (!user) return;
 
   const nextStatus = current === "completed" ? "voided" : "completed";
-  await supabase
-    .from("sales")
-    .update({ status: nextStatus })
-    .eq("id", id)
-    .eq("user_id", user.id);
+  // RPC transacional: inverte o status e, ao mesmo tempo, devolve (estorno)
+  // ou rebaixa (reativação) o estoque dos itens que controlam quantidade,
+  // registrando o movimento. Ignora produtos com track_stock = false.
+  await supabase.rpc("set_sale_status", {
+    p_sale_id: id,
+    p_status: nextStatus,
+  });
 
   revalidatePath("/financeiro");
   revalidatePath("/dashboard");
+  revalidatePath("/estoque");
 }

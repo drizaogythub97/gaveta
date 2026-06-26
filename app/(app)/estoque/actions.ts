@@ -36,38 +36,22 @@ export async function updateStock(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
 
-  const { data: current, error: readError } = await supabase
-    .from("products")
-    .select("stock_quantity, track_stock")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // RPC transacional: ajusta o estoque e registra o movimento
+  // (reposição/ajuste) em stock_movements de uma só vez.
+  const { error: rpcError } = await supabase.rpc("adjust_stock", {
+    p_product_id: id,
+    p_mode: mode,
+    p_quantity: qty,
+  });
 
-  if (readError || !current) {
-    return { ok: false, error: "Produto não encontrado." };
-  }
-  if (!current.track_stock) {
-    return {
-      ok: false,
-      error: "Este produto não controla estoque.",
-    };
-  }
-
-  const newQty =
-    mode === "set"
-      ? qty
-      : Math.round(((current.stock_quantity ?? 0) + qty) * 1000) / 1000;
-
-  const { error: updError } = await supabase
-    .from("products")
-    .update({
-      stock_quantity: newQty,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (updError) {
+  if (rpcError) {
+    const msg = rpcError.message?.toLowerCase() ?? "";
+    if (msg.includes("não encontrado")) {
+      return { ok: false, error: "Produto não encontrado." };
+    }
+    if (msg.includes("não controla estoque")) {
+      return { ok: false, error: "Este produto não controla estoque." };
+    }
     return { ok: false, error: "Não foi possível atualizar." };
   }
 

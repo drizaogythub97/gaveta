@@ -18,6 +18,7 @@ export type SaleRow = {
   payment_method: PaymentMethod;
   installments: number | null;
   fee_amount: number;
+  discount_amount: number;
   created_at: string;
   sale_items: SaleItemRow[];
 };
