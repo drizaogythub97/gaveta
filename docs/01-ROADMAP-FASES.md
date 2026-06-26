@@ -118,7 +118,7 @@ O objetivo é deixar as contas e segredos prontos. Você já tem **GitHub**; fal
   - ⚠️ "Gaveta" é a marca do **produto**, separada do `brand_name`/logo **por
     loja** que cada usuário já personaliza em Preferências. Não misturar.
 
-### FASE B — Microinterações, loading e toasts 🤖 ⏱️ ~1h30
+### FASE B — Microinterações, loading e toasts ✅ CONCLUÍDA
 - Transições suaves entre telas/estados e animações de carregamento via
   `loading.tsx` (skeletons) por rota + transições CSS. **Sempre respeitar
   `prefers-reduced-motion`** e manter movimento sóbrio (público idoso).
@@ -128,7 +128,7 @@ O objetivo é deixar as contas e segredos prontos. Você já tem **GitHub**; fal
 - Toasts dismissíveis, `aria-live`, tempo generoso; "já vi isto" persistido em
   armazenamento **não sensível** (localStorage/cookie ou preferência do usuário).
 
-### FASE C — Frente de caixa: desktop horizontal + tela cheia 🤖 ⏱️ ~2h
+### FASE C — Frente de caixa: desktop horizontal + tela cheia ✅ CONCLUÍDA
 - Reorganizar o POS (`app/(app)/caixa/`) em layout de duas colunas que usa o
   espaço horizontal **sem rolagem** em telas grandes (`lg+`): busca/entrada de um
   lado, carrinho/totais do outro.
@@ -139,14 +139,8 @@ O objetivo é deixar as contas e segredos prontos. Você já tem **GitHub**; fal
   barras (ex.: `F11`/F-key dedicada, ou botão + modificador). Definir e testar
   para o scanner não disparar fullscreen sem querer.
 
-> Depois de A(integração)+B+C aprovadas e mescladas, seguir para as Fases 7 e 8.
-
-### (BACKLOG FUTURO) App Android nativo — fora do escopo atual
-- Requisito do usuário: **sessão persistente** + **funcionamento offline**
-  (guardar localmente e sincronizar quando reconectar). Isso aponta para **app
-  nativo** (não só WebView/PWA). Decisão WebView × PWA→TWA × nativo **em aberto**.
-- Dedicar **sprints próprios só de discussão** antes de implementar. Não iniciar
-  junto das fases A–C/7/8.
+> Fases A–C **concluídas** e mescladas. As Fases 7 e 8 também (ver abaixo).
+> As novas melhorias **D–H** (definidas em 2026-06-26) entram **antes da Fase 9**.
 
 ---
 
@@ -160,12 +154,93 @@ Ver fases detalhadas em [03-SEGURANCA-E-DADOS.md](./03-SEGURANCA-E-DADOS.md#fase
 - Política de senha, sanitização e tratamento de erros sem vazar informação.
 - Rodar `/security-review` e corrigir achados.
 
+> **Status: concluída** (ver `docs/05-SEGURANCA-HARDENING.md`).
+
 ## FASE 8 — Qualidade, acessibilidade e polimento 🤖 ⏱️ ~1h
 
 - Auditoria Lighthouse (meta ≥ 95 em Acessibilidade/Performance).
 - Testes E2E (Playwright) dos fluxos críticos.
 - Responsividade fina (mobile/desktop), estados de carregamento e vazio.
 - Backup: documentar/automatizar export periódico do banco (compensa a ausência de backup no plano grátis).
+
+> **Status: concluída** (ver `docs/06-QUALIDADE-FASE8.md`).
+
+---
+
+## Melhorias pré-portfólio (D–H) — definidas em 2026-06-26, ANTES da Fase 9
+
+> Tudo em **branch** (a `main` é produção). Pilares inegociáveis mantidos:
+> **simplicidade/intuitividade** e **segurança** (RLS sempre, Zod no servidor,
+> `service_role` nunca no cliente, erros genéricos, `getUser()` no servidor).
+> Cada item pode virar uma branch própria. Migrações novas seguem a ordem
+> `0006+` com RLS desde o início.
+
+### FASE D — Caixa e estoque: correções e novos recursos 🤖
+- **Estorno que devolve o estoque.** Hoje `financeiro/actions.ts → toggleSaleStatus`
+  só inverte `completed`↔`voided` e **não repõe** o estoque baixado. Corrigir:
+  ao estornar, devolver as quantidades; ao "des-estornar", baixar de novo.
+  Ignorar produtos `track_stock = false`. Considerar fazer via RPC dedicada
+  (transacional) para coerência.
+- **Desconto na venda** (por item e/ou no total) no POS. Exige coluna nova em
+  `sales` (ex.: `discount_amount`), ajuste do `register_sale` e do cálculo de
+  total. Validar no servidor (0 ≤ desconto ≤ subtotal).
+- **Histórico de movimentação de estoque.** Nova tabela `stock_movements`
+  (`user_id`, `product_id`, tipo: venda/estorno/reposição/ajuste, quantidade,
+  referência, timestamp), alimentada pela venda, pelo estorno e pela reposição
+  manual (`estoque/actions.ts`). RLS por `user_id`.
+
+### FASE E — Fechamento de caixa 🤖
+- Sessão de caixa: **abertura com troco**, **sangria** (retirada), **suprimento**
+  (reforço) e **fechamento com conferência** (esperado × contado).
+- Tabela de sessões + movimentos de caixa; vincular vendas em dinheiro à sessão
+  aberta. O relatório do fechamento entra no Resumo do Financeiro (Fase F).
+
+### FASE F — Financeiro: entradas, saídas e resumo 🤖
+- Reestruturar em 3 abas: **Vendas** (atual), **Despesas** (nova) e **Resumo**.
+- **Despesas:** tabela `expenses` (`user_id`, data, categoria, valor, descrição).
+  Categorias fixas: insumos/mercadorias, salários, aluguel, contas, impostos,
+  outros. RLS + Zod. **Despesas e estoque separados na v1** (vínculo opcional
+  fica para depois).
+- **Resumo:** receita bruta, taxas, receita líquida, despesas por categoria e
+  **resultado (líquida − despesas)**, com **projeção simples** rotulada como
+  estimativa (ex.: média diária × dias restantes do mês).
+
+### FASE G — Impressão de comprovantes 🤖
+- Caminho **HTML/CSS + diálogo de impressão** (usa o driver da impressora; cobre
+  **bobina 80/58 mm — ref. Epson TM-T20x** e **A4**). ESC/POS direto fica para o
+  app nativo (Fase H).
+- Gatilhos: modal "Imprimir comprovante? [Sim/Não]" após registrar a venda no
+  caixa + botão "Imprimir venda" em cada bloco do Financeiro.
+- Preferências → seção **Impressão**: formato/largura, cabeçalho com nome+logo
+  (opcionais), mensagem de rodapé e **pré-visualização**. Template aprovado
+  (modelo 80 mm); rodapé **"não é documento fiscal"** obrigatório.
+- Segurança: sem APIs de dispositivo/USB; dados da venda sob `getUser()` + RLS;
+  textos do usuário renderizados como texto puro (React escapa) + limite via
+  Zod; nada é enviado a terceiros.
+- Vem após D/F para refletir o modelo final da venda (desconto/estorno).
+
+### FASE H — App Android nativo (Kotlin, online) 🤖
+- Cliente **nativo Kotlin** (Jetpack Compose) consumindo o **mesmo** Supabase via
+  `supabase-kt`, **online**. O requisito de salvamento offline + sync foi
+  **REMOVIDO em 2026-06-26**: o objetivo é apenas ser tão eficiente quanto a web.
+- Ganhos nativos: leitura de código de barras pela **câmera (ML Kit)** e
+  **impressão térmica via Bluetooth (ESC/POS)**.
+- Segurança: **nunca** embarcar `service_role`; só anon key + sessão do usuário
+  (a RLS no servidor é a espinha dorsal); token em **EncryptedSharedPreferences/
+  Keystore**; TLS (certificate pinning opcional).
+
+> Depois de D–H: **Fase 9 (Portfólio)**.
+
+## Objetos de estudo para o futuro (fora do escopo atual)
+- **Integração com o FiadoApp (ecossistema do autor).** O Gaveta **não** terá
+  fiado próprio; estudar integrar o **FiadoApp** (sistema do Adriano) ao Gaveta,
+  fomentando um ecossistema de produtos integrados.
+- **Multiusuário por loja (dono + funcionários).** Migrar do modelo `user_id`
+  isolado para **loja-tenant + membros** (impacta toda a RLS). Épico próprio.
+- **Fiscal (NFC-e/SAT).** Emissão fiscal real (certificado, SEFAZ): cara e
+  complexa. Manter o comprovante **não fiscal** por ora.
+
+---
 
 ## FASE 9 — Portfólio 🤖 + 👤 ⏱️ ~30 min
 

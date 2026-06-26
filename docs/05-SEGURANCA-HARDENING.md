@@ -95,6 +95,9 @@ Este documento é a prova desse esforço.
   `NEXT_PUBLIC_`, nunca em Client Components.
 - Segredos só em `.env.local` (dev) e no painel da Vercel (prod); `.env*` nunca
   é commitado. `.env.example` documenta as variáveis sem valores reais.
+- **Rotação da `service_role` realizada em 2026-06-26** (higiene preventiva):
+  chave secreta regenerada no Supabase, atualizada em `.env.local` e na Vercel
+  (`SUPABASE_SERVICE_ROLE_KEY`) com redeploy, e a chave anterior revogada. ✅
 
 ### 5. Rate limiting (anti força-bruta)
 - **Upstash Redis** (`@upstash/ratelimit` + `@upstash/redis`), janela deslizante
