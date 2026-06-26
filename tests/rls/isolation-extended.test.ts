@@ -398,3 +398,117 @@ describe("RLS + funcional — stock_movements e RPCs da Fase D", () => {
     expect(error).not.toBeNull();
   });
 });
+
+// =====================================================================
+// Fase E — fechamento de caixa: cash_sessions, cash_movements, vínculo de
+// vendas em dinheiro e conferência esperado × contado.
+// =====================================================================
+describe("RLS + funcional — sessão de caixa (Fase E)", () => {
+  let sessionId: string;
+
+  it("Alice abre caixa; abrir de novo falha (uma sessão aberta por vez)", async () => {
+    const aliceApp = userClient(alice.accessToken);
+
+    const { data: id, error } = await aliceApp.rpc("open_cash_session", {
+      p_opening: 100,
+      p_note: "turno teste",
+    });
+    expect(error).toBeNull();
+    sessionId = id as string;
+
+    const { error: dupErr } = await aliceApp.rpc("open_cash_session", {
+      p_opening: 0,
+    });
+    expect(dupErr).not.toBeNull();
+  });
+
+  it("venda em dinheiro vincula à sessão; pix não vincula", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const admin = adminClient();
+
+    const { data: cashSale } = await aliceApp.rpc("register_sale", {
+      items: [
+        { product_id: null, name: "Avulso dinheiro", unit_price: 30, quantity: 1 },
+      ],
+      payment_method: "dinheiro",
+    });
+    const { data: pixSale } = await aliceApp.rpc("register_sale", {
+      items: [
+        { product_id: null, name: "Avulso pix", unit_price: 40, quantity: 1 },
+      ],
+      payment_method: "pix",
+    });
+
+    const { data: cashRow } = await admin
+      .from("sales")
+      .select("cash_session_id")
+      .eq("id", cashSale as string)
+      .single();
+    const { data: pixRow } = await admin
+      .from("sales")
+      .select("cash_session_id")
+      .eq("id", pixSale as string)
+      .single();
+    expect(cashRow?.cash_session_id).toBe(sessionId);
+    expect(pixRow?.cash_session_id).toBeNull();
+  });
+
+  it("sangria e suprimento exigem caixa aberto e ficam isolados de Bob", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const bobApp = userClient(bob.accessToken);
+
+    const { error: suprErr } = await aliceApp.rpc("add_cash_movement", {
+      p_type: "suprimento",
+      p_amount: 50,
+    });
+    expect(suprErr).toBeNull();
+    const { error: sangErr } = await aliceApp.rpc("add_cash_movement", {
+      p_type: "sangria",
+      p_amount: 20,
+      p_note: "troco para o cofre",
+    });
+    expect(sangErr).toBeNull();
+
+    const { data: bobSessions } = await bobApp.from("cash_sessions").select("id");
+    expect(bobSessions).toHaveLength(0);
+    const { data: bobMoves } = await bobApp.from("cash_movements").select("id");
+    expect(bobMoves).toHaveLength(0);
+
+    // Bob não tem caixa aberto → movimento falha.
+    const { error: bobErr } = await bobApp.rpc("add_cash_movement", {
+      p_type: "sangria",
+      p_amount: 10,
+    });
+    expect(bobErr).not.toBeNull();
+  });
+
+  it("fechamento calcula esperado = troco + vendas dinheiro + suprimentos − sangrias", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const admin = adminClient();
+
+    // Esperado = 100 + 30 + 50 − 20 = 160. Contado 158 → falta 2.
+    const { error } = await aliceApp.rpc("close_cash_session", {
+      p_counted: 158,
+    });
+    expect(error).toBeNull();
+
+    const { data: closed } = await admin
+      .from("cash_sessions")
+      .select("status, expected_amount, counted_amount, difference_amount")
+      .eq("id", sessionId)
+      .single();
+    expect(closed?.status).toBe("closed");
+    expect(Number(closed?.expected_amount)).toBe(160);
+    expect(Number(closed?.counted_amount)).toBe(158);
+    expect(Number(closed?.difference_amount)).toBe(-2);
+  });
+
+  it("Bob nao consegue forjar uma sessão com o user_id de Alice", async () => {
+    const bobApp = userClient(bob.accessToken);
+    const { error } = await bobApp.from("cash_sessions").insert({
+      user_id: alice.id,
+      opening_amount: 0,
+    });
+    expect(error).not.toBeNull();
+  });
+});
