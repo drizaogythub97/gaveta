@@ -1,3 +1,6 @@
+import { History } from "lucide-react";
+import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
 import type { Product } from "@/lib/types/db";
 
@@ -21,13 +24,22 @@ export default async function InventoryPage() {
 
   return (
     <section className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Estoque</h1>
-        <p className="text-muted-foreground mt-2 text-lg">
-          Atualize quantidades e registre entradas dos produtos que você
-          controla por estoque. Itens sob demanda ficam em{" "}
-          <span className="text-foreground font-medium">Produtos</span>.
-        </p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Estoque</h1>
+          <p className="text-muted-foreground mt-2 text-lg">
+            Atualize quantidades e registre entradas dos produtos que você
+            controla por estoque. Itens sob demanda ficam em{" "}
+            <span className="text-foreground font-medium">Produtos</span>.
+          </p>
+        </div>
+        <Link
+          href="/estoque/movimentacoes"
+          className="border-border hover:bg-muted inline-flex h-12 w-fit shrink-0 items-center gap-2 rounded-lg border px-4 text-base font-medium transition-colors"
+        >
+          <History aria-hidden="true" className="size-5" />
+          Ver movimentação
+        </Link>
       </header>
       <InventoryClient products={products} />
     </section>

@@ -136,5 +136,48 @@
   }
 }
 
-/* Sem bloco @media de redução de movimento aqui: o loader anima sempre,
-   por decisão de produto (ver comentário no topo do arquivo). */
+/* Exceção intencional de redução de movimento: o loader anima SEMPRE (decisão
+   de produto). O override global em globals.css usa `*` com !important, então
+   reafirmamos aqui com !important e maior especificidade (classe > universal)
+   para que as animações mantenham a duração/contagem reais — sem isto, o loader
+   herdava `animation-duration: 0.01ms` + loop infinito e piscava acelerado.
+   As durações abaixo espelham as definições normais acima. */
+@media (prefers-reduced-motion: reduce) {
+  .breathe {
+    animation: breathe 2.4s ease-in-out infinite !important;
+  }
+  .float {
+    animation: float 3s ease-in-out infinite !important;
+  }
+  .bar {
+    animation: grow 1.8s ease-in-out infinite !important;
+  }
+  .trend {
+    animation: draw 1.8s ease-in-out infinite !important;
+  }
+  .spin {
+    animation: spin 2.4s linear infinite !important;
+  }
+  .rise {
+    animation: rise 3s ease-in infinite !important;
+  }
+  .pulseOpacity {
+    animation: pulseOpacity 2.2s ease-in-out infinite !important;
+  }
+  .dots span {
+    animation: blink 1.4s infinite both !important;
+  }
+  /* Reafirma os delays depois dos shorthands (o shorthand zera o delay). */
+  .delay05 {
+    animation-delay: 0.5s !important;
+  }
+  .delay1 {
+    animation-delay: 1s !important;
+  }
+  .dots span:nth-child(2) {
+    animation-delay: 0.2s !important;
+  }
+  .dots span:nth-child(3) {
+    animation-delay: 0.4s !important;
+  }
+}

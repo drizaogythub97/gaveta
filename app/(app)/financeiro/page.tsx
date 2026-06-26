@@ -66,7 +66,7 @@ export default async function FinancialPage({
   let query = supabase
     .from("sales")
     .select(
-      "id, total, status, payment_method, installments, fee_amount, created_at, sale_items(id, product_id, name_snapshot, unit_price, quantity, line_total)",
+      "id, total, status, payment_method, installments, fee_amount, discount_amount, created_at, sale_items(id, product_id, name_snapshot, unit_price, quantity, line_total)",
     )
     .gte("created_at", from)
     .lte("created_at", to);
@@ -202,6 +202,14 @@ function SaleCard({ sale }: { sale: SaleRow }) {
             }).format(new Date(sale.created_at))}{" "}
             · {itemsLabel}
           </p>
+          {Number(sale.discount_amount) > 0 ? (
+            <p className="text-muted-foreground text-sm">
+              Desconto aplicado{" "}
+              <span className="text-foreground font-medium">
+                {formatBRL(Number(sale.discount_amount))}
+              </span>
+            </p>
+          ) : null}
           {Number(sale.fee_amount) > 0 ? (
             <p className="text-muted-foreground text-sm">
               Taxa{" "}

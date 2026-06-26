@@ -33,6 +33,8 @@ import { computeFeeAmount, type PaymentFees } from "@/lib/preferences/types";
 import type { Product, SaleItemInput } from "@/lib/types/db";
 import { cn } from "@/lib/utils";
 
+import loaderStyles from "@/components/app/gaveta-loader.module.css";
+
 import {
   findProductByCode,
   type PaymentMethod,
@@ -81,6 +83,7 @@ function toItem(product: Product): CartItem {
 export function PosClient({ fees }: { fees: PaymentFees }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [manualName, setManualName] = useState<string | null>(null);
   const [manualPriceDigits, setManualPriceDigits] = useState("");
@@ -88,6 +91,7 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("dinheiro");
   const [installments, setInstallments] = useState<number>(2);
   const [paidDigits, setPaidDigits] = useState("");
+  const [discountDigits, setDiscountDigits] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [isRegistering, startRegister] = useTransition();
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -167,6 +171,7 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
     });
     setQuery("");
     setSuggestions([]);
+    setIsSearching(false);
     clearManual();
     refocus();
   }
@@ -180,12 +185,18 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
     const term = value.trim();
     if (term.length === 0) {
       setSuggestions([]);
+      setIsSearching(false);
       return;
     }
+    // Indica imediatamente que o sistema está procurando enquanto se digita.
+    setIsSearching(true);
     const seq = ++fetchSeq.current;
     debounceTimer.current = setTimeout(async () => {
       const result = await searchProductsByName(term);
-      if (seq === fetchSeq.current) setSuggestions(result);
+      if (seq === fetchSeq.current) {
+        setSuggestions(result);
+        setIsSearching(false);
+      }
     }, 220);
   }
 
@@ -194,8 +205,10 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
     if (term.length === 0) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     fetchSeq.current++;
+    setIsSearching(true);
 
     const product = await findProductByCode(term);
+    setIsSearching(false);
     if (product) {
       addProductToCart(product);
       return;
@@ -260,10 +273,18 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
     setCart((prev) => prev.filter((it) => it.key !== key));
   }
 
-  const total = cart.reduce(
+  const subtotal = cart.reduce(
     (sum, it) => sum + Math.round(it.unit_price * it.quantity * 100) / 100,
     0,
   );
+
+  // Desconto no total da venda (R$), nunca maior que o subtotal.
+  const rawDiscount = digitsToNumber(discountDigits);
+  const discount = Math.min(
+    Math.max(0, Math.round(rawDiscount * 100) / 100),
+    Math.round(subtotal * 100) / 100,
+  );
+  const total = Math.round((subtotal - discount) * 100) / 100;
 
   const isCash = paymentMethod === "dinheiro";
   const isInstallment = paymentMethod === "credito_parcelado";
@@ -316,6 +337,7 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
         paymentMethod,
         effectiveInstallments,
         feeAmount,
+        discount,
       );
       if (result.ok) {
         setCart([]);
@@ -325,6 +347,7 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
         setPaymentMethod("dinheiro");
         setInstallments(2);
         setPaidDigits("");
+        setDiscountDigits("");
         const feeMessage =
           feeAmount > 0
             ? ` Taxa: ${formatBRL(feeAmount)}. Líquido: ${formatBRL(netAmount)}.`
@@ -435,6 +458,20 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
               <p id="pos-query-hint" className="text-muted-foreground text-sm">
                 O leitor USB envia o código e aperta Enter automaticamente.
               </p>
+              {isSearching && manualName === null ? (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="text-muted-foreground flex items-center text-sm"
+                >
+                  <span aria-hidden="true" className={loaderStyles.dots}>
+                    Buscando produto<span>.</span>
+                    <span>.</span>
+                    <span>.</span>
+                  </span>
+                  <span className="sr-only">Buscando produto…</span>
+                </p>
+              ) : null}
             </div>
 
             {suggestions.length > 0 && manualName === null ? (
@@ -732,6 +769,47 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
             aria-labelledby="total-heading"
             className="bg-primary text-primary-foreground flex flex-col gap-4 rounded-xl p-5 lg:sticky lg:bottom-4"
           >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex flex-col gap-1">
+                <Label
+                  htmlFor="discount-amount"
+                  className="text-base opacity-90"
+                >
+                  Desconto (opcional)
+                </Label>
+                <Input
+                  id="discount-amount"
+                  type="text"
+                  inputMode="numeric"
+                  value={discountDigits === "" ? "" : digitsToBRL(discountDigits)}
+                  onChange={(e) =>
+                    setDiscountDigits(sanitizeDigits(e.target.value))
+                  }
+                  disabled={cart.length === 0}
+                  placeholder="R$ 0,00"
+                  className="bg-primary-foreground/10 placeholder:text-primary-foreground/50 h-14 border-0 text-lg"
+                  aria-describedby="discount-hint"
+                />
+                <p
+                  id="discount-hint"
+                  className="text-primary-foreground/80 text-sm"
+                >
+                  Abatido do total. Não passa do subtotal.
+                </p>
+              </div>
+            </div>
+            {discount > 0 ? (
+              <div className="text-primary-foreground/90 flex flex-col gap-0.5 text-base">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">{formatBRL(subtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Desconto</span>
+                  <span className="tabular-nums">− {formatBRL(discount)}</span>
+                </div>
+              </div>
+            ) : null}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p id="total-heading" className="text-base opacity-90">

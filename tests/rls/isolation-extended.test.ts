@@ -229,3 +229,172 @@ describe("RLS — storage brand-logos (escrita por pasta = user_id)", () => {
     expect(names).toContain(alicePath.split("/")[1]);
   });
 });
+
+// =====================================================================
+// Fase D — estoque/caixa v2: stock_movements, estorno transacional,
+// desconto e ajuste de estoque.
+// =====================================================================
+describe("RLS + funcional — stock_movements e RPCs da Fase D", () => {
+  let trackedProductId: string;
+  let saleId: string;
+
+  it("prepara: Alice cria produto com estoque e registra venda com desconto", async () => {
+    const aliceApp = userClient(alice.accessToken);
+
+    const { data: product, error: pErr } = await aliceApp
+      .from("products")
+      .insert({
+        user_id: alice.id,
+        name: "Produto com estoque (Fase D)",
+        price: 10,
+        track_stock: true,
+        stock_quantity: 20,
+      })
+      .select("id")
+      .single();
+    expect(pErr).toBeNull();
+    trackedProductId = product!.id as string;
+
+    // Venda: 3 unidades a 10 = subtotal 30, desconto 5 => total 25.
+    const { data: newSale, error: rpcErr } = await aliceApp.rpc(
+      "register_sale",
+      {
+        items: [
+          {
+            product_id: trackedProductId,
+            name: "Produto com estoque (Fase D)",
+            unit_price: 10,
+            quantity: 3,
+          },
+        ],
+        discount_amount: 5,
+      },
+    );
+    expect(rpcErr).toBeNull();
+    saleId = newSale as string;
+
+    const admin = adminClient();
+    const { data: sale } = await admin
+      .from("sales")
+      .select("total, discount_amount")
+      .eq("id", saleId)
+      .single();
+    expect(Number(sale?.total)).toBe(25);
+    expect(Number(sale?.discount_amount)).toBe(5);
+
+    // Estoque baixou de 20 para 17.
+    const { data: prod } = await admin
+      .from("products")
+      .select("stock_quantity")
+      .eq("id", trackedProductId)
+      .single();
+    expect(Number(prod?.stock_quantity)).toBe(17);
+
+    // Movimento de venda registrado (saída de 3).
+    const { data: moves } = await admin
+      .from("stock_movements")
+      .select("type, quantity")
+      .eq("sale_id", saleId);
+    expect(moves).toHaveLength(1);
+    expect(moves![0].type).toBe("sale");
+    expect(Number(moves![0].quantity)).toBe(-3);
+  });
+
+  it("desconto maior que o subtotal e rejeitado", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const { error } = await aliceApp.rpc("register_sale", {
+      items: [
+        { product_id: null, name: "Avulso", unit_price: 5, quantity: 1 },
+      ],
+      discount_amount: 999,
+    });
+    expect(error).not.toBeNull();
+  });
+
+  it("estorno devolve o estoque e registra movimento; reativar baixa de novo", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const admin = adminClient();
+
+    // Estorna.
+    const { error: voidErr } = await aliceApp.rpc("set_sale_status", {
+      p_sale_id: saleId,
+      p_status: "voided",
+    });
+    expect(voidErr).toBeNull();
+
+    let { data: prod } = await admin
+      .from("products")
+      .select("stock_quantity")
+      .eq("id", trackedProductId)
+      .single();
+    expect(Number(prod?.stock_quantity)).toBe(20); // 17 + 3 devolvidos
+
+    // Reativa.
+    const { error: backErr } = await aliceApp.rpc("set_sale_status", {
+      p_sale_id: saleId,
+      p_status: "completed",
+    });
+    expect(backErr).toBeNull();
+
+    ({ data: prod } = await admin
+      .from("products")
+      .select("stock_quantity")
+      .eq("id", trackedProductId)
+      .single());
+    expect(Number(prod?.stock_quantity)).toBe(17); // baixou de novo
+
+    const { data: moves } = await admin
+      .from("stock_movements")
+      .select("type")
+      .eq("sale_id", saleId)
+      .order("created_at", { ascending: true });
+    expect(moves?.map((m) => m.type)).toEqual(["sale", "void", "sale"]);
+  });
+
+  it("adjust_stock registra reposicao e atualiza o estoque", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const admin = adminClient();
+
+    const { error } = await aliceApp.rpc("adjust_stock", {
+      p_product_id: trackedProductId,
+      p_mode: "add",
+      p_quantity: 8,
+    });
+    expect(error).toBeNull();
+
+    const { data: prod } = await admin
+      .from("products")
+      .select("stock_quantity")
+      .eq("id", trackedProductId)
+      .single();
+    expect(Number(prod?.stock_quantity)).toBe(25); // 17 + 8
+
+    const { data: moves } = await admin
+      .from("stock_movements")
+      .select("quantity")
+      .eq("product_id", trackedProductId)
+      .eq("type", "restock");
+    expect(moves).toHaveLength(1);
+    expect(Number(moves![0].quantity)).toBe(8);
+  });
+
+  it("Bob nao enxerga as movimentacoes de Alice", async () => {
+    const bobApp = userClient(bob.accessToken);
+    const { data, error } = await bobApp
+      .from("stock_movements")
+      .select("id");
+    expect(error).toBeNull();
+    expect(data).toHaveLength(0);
+  });
+
+  it("Bob nao consegue inserir movimentacao forjando o user_id de Alice", async () => {
+    const bobApp = userClient(bob.accessToken);
+    const { error } = await bobApp.from("stock_movements").insert({
+      user_id: alice.id,
+      product_id: trackedProductId,
+      type: "adjust",
+      quantity: 1,
+    });
+    expect(error).not.toBeNull();
+  });
+});
