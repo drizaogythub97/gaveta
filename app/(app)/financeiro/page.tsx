@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
 import {
   PERIOD_LABELS,
@@ -6,14 +8,28 @@ import {
   toDateInputValue,
 } from "@/lib/dashboard/dates";
 import { formatBRL } from "@/lib/products/format";
+import type { CashSession } from "@/lib/types/cash";
+import type { Expense, ExpenseCategory } from "@/lib/types/expenses";
+import { EXPENSE_CATEGORIES } from "@/lib/types/expenses";
 import { PAYMENT_METHOD_LABELS, type SaleRow } from "@/lib/types/sales";
 import type { PaymentMethod } from "@/app/(app)/caixa/actions";
+import { cn } from "@/lib/utils";
 
 import { toggleSaleStatus } from "./actions";
+import { ExpensesClient } from "./expenses-client";
 import { FinancialClient } from "./financial-client";
+import { SummaryView, type SummaryData } from "./summary-view";
 
 export const metadata = {
   title: "Financeiro",
+};
+
+type Tab = "vendas" | "despesas" | "resumo";
+const VALID_TABS: ReadonlySet<Tab> = new Set(["vendas", "despesas", "resumo"]);
+const TAB_LABELS: Record<Tab, string> = {
+  vendas: "Vendas",
+  despesas: "Despesas",
+  resumo: "Resumo",
 };
 
 const VALID_PERIODS: ReadonlySet<Period> = new Set([
@@ -51,6 +67,10 @@ export default async function FinancialPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+  const tabParam = pickString(params.tab);
+  const tab: Tab =
+    tabParam && VALID_TABS.has(tabParam as Tab) ? (tabParam as Tab) : "vendas";
+
   const periodParam = pickString(params.period);
   const period: Period =
     periodParam && VALID_PERIODS.has(periodParam as Period)
@@ -62,6 +82,92 @@ export default async function FinancialPage({
 
   const { from, to } = rangeForPeriod(period, fromParam, toParam);
 
+  return (
+    <section className="flex flex-col gap-6">
+      <header>
+        <h1 className="text-3xl font-semibold tracking-tight">Financeiro</h1>
+        <p className="text-muted-foreground mt-2 text-lg">
+          Acompanhe as vendas, registre despesas e veja o resumo do período.
+        </p>
+      </header>
+
+      <TabNav current={tab} params={params} />
+
+      <FinancialClient
+        period={period}
+        from={toDateInputValue(from)}
+        to={toDateInputValue(to)}
+        selectedMethods={methods}
+        showMethods={tab === "vendas"}
+      />
+
+      {tab === "vendas" ? (
+        <VendasTab from={from} to={to} period={period} methods={methods} />
+      ) : tab === "despesas" ? (
+        <DespesasTab from={from} to={to} />
+      ) : (
+        <ResumoTab from={from} to={to} period={period} />
+      )}
+    </section>
+  );
+}
+
+function buildTabHref(
+  params: Record<string, string | string[] | undefined>,
+  tab: Tab,
+): string {
+  const next = new URLSearchParams();
+  for (const key of ["period", "from", "to"] as const) {
+    const v = pickString(params[key]);
+    if (v) next.set(key, v);
+  }
+  next.set("tab", tab);
+  return `?${next.toString()}`;
+}
+
+function TabNav({
+  current,
+  params,
+}: {
+  current: Tab;
+  params: Record<string, string | string[] | undefined>;
+}) {
+  return (
+    <nav aria-label="Seções do financeiro" className="flex flex-wrap gap-2">
+      {(["vendas", "despesas", "resumo"] as Tab[]).map((t) => {
+        const active = t === current;
+        return (
+          <Link
+            key={t}
+            href={buildTabHref(params, t)}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex h-12 items-center rounded-lg px-5 text-base font-medium transition-colors",
+              active
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {TAB_LABELS[t]}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+// --------------------------------------------------------------------- Vendas
+async function VendasTab({
+  from,
+  to,
+  period,
+  methods,
+}: {
+  from: string;
+  to: string;
+  period: Period;
+  methods: PaymentMethod[];
+}) {
   const supabase = await createClient();
   let query = supabase
     .from("sales")
@@ -74,7 +180,6 @@ export default async function FinancialPage({
     query = query.in("payment_method", methods);
   }
   const { data, error } = await query.order("created_at", { ascending: false });
-
   const sales = (data ?? []) as SaleRow[];
 
   const completed = sales.filter((s) => s.status === "completed");
@@ -85,22 +190,7 @@ export default async function FinancialPage({
   const voidedCount = sales.filter((s) => s.status === "voided").length;
 
   return (
-    <section className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Financeiro</h1>
-        <p className="text-muted-foreground mt-2 text-lg">
-          Vendas registradas no período. Você pode estornar e reativar
-          vendas a qualquer momento.
-        </p>
-      </header>
-
-      <FinancialClient
-        period={period}
-        from={toDateInputValue(from)}
-        to={toDateInputValue(to)}
-        selectedMethods={methods}
-      />
-
+    <>
       <section className="bg-primary text-primary-foreground flex flex-col gap-3 rounded-xl p-5">
         <p className="text-base opacity-90">
           Faturamento — {PERIOD_LABELS[period]}
@@ -152,10 +242,170 @@ export default async function FinancialPage({
       ) : (
         <SalesList sales={sales} />
       )}
-    </section>
+    </>
   );
 }
 
+// ------------------------------------------------------------------- Despesas
+async function DespesasTab({ from, to }: { from: string; to: string }) {
+  const supabase = await createClient();
+  const fromDate = toDateInputValue(from);
+  const toDate = toDateInputValue(to);
+  const { data } = await supabase
+    .from("expenses")
+    .select("id, incurred_on, category, amount, description, created_at")
+    .gte("incurred_on", fromDate)
+    .lte("incurred_on", toDate)
+    .order("incurred_on", { ascending: false })
+    .order("created_at", { ascending: false });
+  const expenses = (data ?? []) as Expense[];
+  const total =
+    Math.round(expenses.reduce((s, e) => s + Number(e.amount), 0) * 100) / 100;
+
+  // Data padrão do formulário: hoje (não passa de "to").
+  const today = toDateInputValue(new Date().toISOString());
+  const defaultDate = today > toDate ? toDate : today;
+
+  return (
+    <ExpensesClient
+      expenses={expenses}
+      defaultDate={defaultDate}
+      total={total}
+    />
+  );
+}
+
+// --------------------------------------------------------------------- Resumo
+async function ResumoTab({
+  from,
+  to,
+  period,
+}: {
+  from: string;
+  to: string;
+  period: Period;
+}) {
+  const supabase = await createClient();
+  const fromDate = toDateInputValue(from);
+  const toDate = toDateInputValue(to);
+
+  const [salesRes, expensesRes, closedRes] = await Promise.all([
+    supabase
+      .from("sales")
+      .select("total, fee_amount, status")
+      .gte("created_at", from)
+      .lte("created_at", to)
+      .eq("status", "completed"),
+    supabase
+      .from("expenses")
+      .select("category, amount")
+      .gte("incurred_on", fromDate)
+      .lte("incurred_on", toDate),
+    supabase
+      .from("cash_sessions")
+      .select(
+        "id, opened_at, opening_amount, closed_at, counted_amount, expected_amount, difference_amount, status, opening_note, closing_note",
+      )
+      .eq("status", "closed")
+      .gte("closed_at", from)
+      .lte("closed_at", to)
+      .order("closed_at", { ascending: false }),
+  ]);
+
+  const sales = (salesRes.data ?? []) as {
+    total: number;
+    fee_amount: number;
+  }[];
+  const grossRevenue =
+    Math.round(sales.reduce((s, r) => s + Number(r.total), 0) * 100) / 100;
+  const feesTotal =
+    Math.round(sales.reduce((s, r) => s + Number(r.fee_amount), 0) * 100) / 100;
+  const netRevenue = Math.round((grossRevenue - feesTotal) * 100) / 100;
+
+  const expenses = (expensesRes.data ?? []) as {
+    category: ExpenseCategory;
+    amount: number;
+  }[];
+  const byCat = new Map<ExpenseCategory, number>();
+  for (const e of expenses) {
+    byCat.set(e.category, (byCat.get(e.category) ?? 0) + Number(e.amount));
+  }
+  const expensesByCategory = EXPENSE_CATEGORIES.filter((c) => byCat.has(c)).map(
+    (c) => ({ category: c, total: Math.round((byCat.get(c) ?? 0) * 100) / 100 }),
+  );
+  const expensesTotal =
+    Math.round(
+      Array.from(byCat.values()).reduce((s, v) => s + v, 0) * 100,
+    ) / 100;
+  const result = Math.round((netRevenue - expensesTotal) * 100) / 100;
+
+  const closedSessions = (closedRes.data ?? []) as CashSession[];
+
+  // Projeção do mês (estimativa), independente do período selecionado.
+  const now = new Date();
+  const monthStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    1,
+    0,
+    0,
+    0,
+    0,
+  ).toISOString();
+  const { data: monthSalesData } = await supabase
+    .from("sales")
+    .select("total, fee_amount")
+    .gte("created_at", monthStart)
+    .lte("created_at", new Date().toISOString())
+    .eq("status", "completed");
+  const monthSales = (monthSalesData ?? []) as {
+    total: number;
+    fee_amount: number;
+  }[];
+  const monthSoFarNet =
+    Math.round(
+      monthSales.reduce((s, r) => s + (Number(r.total) - Number(r.fee_amount)), 0) *
+        100,
+    ) / 100;
+  const daysElapsed = now.getDate();
+  const daysInMonth = new Date(
+    now.getFullYear(),
+    now.getMonth() + 1,
+    0,
+  ).getDate();
+  const daysRemaining = daysInMonth - daysElapsed;
+  const dailyAvg =
+    daysElapsed > 0 ? Math.round((monthSoFarNet / daysElapsed) * 100) / 100 : 0;
+  const projectedMonthNet =
+    Math.round((monthSoFarNet + dailyAvg * daysRemaining) * 100) / 100;
+
+  const data: SummaryData = {
+    grossRevenue,
+    feesTotal,
+    netRevenue,
+    expensesByCategory,
+    expensesTotal,
+    result,
+    closedSessions,
+    projection: {
+      monthSoFarNet,
+      dailyAvg,
+      daysRemaining,
+      projectedMonthNet,
+    },
+  };
+
+  return (
+    <>
+      <p className="text-muted-foreground text-base">
+        Resumo de <span className="font-medium">{PERIOD_LABELS[period]}</span>.
+      </p>
+      <SummaryView data={data} />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- componentes
 function SalesList({ sales }: { sales: SaleRow[] }) {
   return (
     <ul className="flex flex-col gap-3">
@@ -170,8 +420,8 @@ function SaleCard({ sale }: { sale: SaleRow }) {
   const voided = sale.status === "voided";
   const itemsLabel =
     sale.sale_items.length === 1 ? "1 item" : `${sale.sale_items.length} itens`;
-  const net = Math.round((Number(sale.total) - Number(sale.fee_amount)) * 100) /
-    100;
+  const net =
+    Math.round((Number(sale.total) - Number(sale.fee_amount)) * 100) / 100;
   return (
     <li
       className={

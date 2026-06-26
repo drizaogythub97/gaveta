@@ -16,6 +16,7 @@ type Props = {
   from: string;
   to: string;
   selectedMethods: PaymentMethod[];
+  showMethods?: boolean;
 };
 
 const ORDERED_PERIODS: Period[] = ["today", "7d", "30d", "month", "custom"];
@@ -47,6 +48,7 @@ export function FinancialClient({
   from,
   to,
   selectedMethods,
+  showMethods = true,
 }: Props) {
   const router = useRouter();
   const params = useSearchParams();
@@ -156,6 +158,7 @@ export function FinancialClient({
         </form>
       ) : null}
 
+      {showMethods ? (
       <fieldset className="flex flex-col gap-3">
         <legend className="text-lg font-semibold">Forma de pagamento</legend>
         <p className="text-muted-foreground text-sm">
@@ -192,6 +195,7 @@ export function FinancialClient({
           ) : null}
         </div>
       </fieldset>
+      ) : null}
     </div>
   );
 }
