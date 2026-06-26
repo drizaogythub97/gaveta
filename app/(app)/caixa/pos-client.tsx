@@ -33,6 +33,8 @@ import { computeFeeAmount, type PaymentFees } from "@/lib/preferences/types";
 import type { Product, SaleItemInput } from "@/lib/types/db";
 import { cn } from "@/lib/utils";
 
+import loaderStyles from "@/components/app/gaveta-loader.module.css";
+
 import {
   findProductByCode,
   type PaymentMethod,
@@ -81,6 +83,7 @@ function toItem(product: Product): CartItem {
 export function PosClient({ fees }: { fees: PaymentFees }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [manualName, setManualName] = useState<string | null>(null);
   const [manualPriceDigits, setManualPriceDigits] = useState("");
@@ -168,6 +171,7 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
     });
     setQuery("");
     setSuggestions([]);
+    setIsSearching(false);
     clearManual();
     refocus();
   }
@@ -181,12 +185,18 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
     const term = value.trim();
     if (term.length === 0) {
       setSuggestions([]);
+      setIsSearching(false);
       return;
     }
+    // Indica imediatamente que o sistema está procurando enquanto se digita.
+    setIsSearching(true);
     const seq = ++fetchSeq.current;
     debounceTimer.current = setTimeout(async () => {
       const result = await searchProductsByName(term);
-      if (seq === fetchSeq.current) setSuggestions(result);
+      if (seq === fetchSeq.current) {
+        setSuggestions(result);
+        setIsSearching(false);
+      }
     }, 220);
   }
 
@@ -195,8 +205,10 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
     if (term.length === 0) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     fetchSeq.current++;
+    setIsSearching(true);
 
     const product = await findProductByCode(term);
+    setIsSearching(false);
     if (product) {
       addProductToCart(product);
       return;
@@ -446,6 +458,20 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
               <p id="pos-query-hint" className="text-muted-foreground text-sm">
                 O leitor USB envia o código e aperta Enter automaticamente.
               </p>
+              {isSearching && manualName === null ? (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="text-muted-foreground flex items-center text-sm"
+                >
+                  <span aria-hidden="true" className={loaderStyles.dots}>
+                    Buscando produto<span>.</span>
+                    <span>.</span>
+                    <span>.</span>
+                  </span>
+                  <span className="sr-only">Buscando produto…</span>
+                </p>
+              ) : null}
             </div>
 
             {suggestions.length > 0 && manualName === null ? (
