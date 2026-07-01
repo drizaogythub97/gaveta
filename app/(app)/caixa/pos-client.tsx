@@ -793,7 +793,7 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
 
           <section
             aria-labelledby="total-heading"
-            className="bg-primary text-primary-foreground flex flex-col gap-4 rounded-xl p-5 lg:sticky lg:bottom-4"
+            className="bg-primary text-primary-foreground flex flex-col gap-4 rounded-xl p-5"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex flex-col gap-1">
