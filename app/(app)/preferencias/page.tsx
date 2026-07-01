@@ -1,9 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_FEES, type PaymentFees } from "@/lib/preferences/types";
+import type { ReceiptPaper, ReceiptPrefs } from "@/lib/receipt/types";
 
 import { BrandSection } from "./sections/brand-section";
 import { FeesSection } from "./sections/fees-section";
 import { LogoSection } from "./sections/logo-section";
+import { ReceiptSection } from "./sections/receipt-section";
 import { ThemeSection } from "./sections/theme-section";
 
 export const metadata = {
@@ -14,6 +16,10 @@ type ProfileRow = {
   brand_name: string | null;
   brand_logo_path: string | null;
   theme: "light" | "dark";
+  receipt_paper: ReceiptPaper;
+  receipt_show_logo: boolean;
+  receipt_show_name: boolean;
+  receipt_footer: string | null;
 };
 
 export default async function PreferencesPage() {
@@ -25,7 +31,9 @@ export default async function PreferencesPage() {
   const [{ data: profile }, { data: fees }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("brand_name, brand_logo_path, theme")
+      .select(
+        "brand_name, brand_logo_path, theme, receipt_paper, receipt_show_logo, receipt_show_name, receipt_footer",
+      )
       .eq("id", user!.id)
       .maybeSingle(),
     supabase
@@ -41,6 +49,10 @@ export default async function PreferencesPage() {
     brand_name: null,
     brand_logo_path: null,
     theme: "light",
+    receipt_paper: "80mm",
+    receipt_show_logo: true,
+    receipt_show_name: true,
+    receipt_footer: null,
   }) as ProfileRow;
   const feesData = (fees ?? DEFAULT_FEES) as PaymentFees;
   const initialLogoUrl = profileData.brand_logo_path
@@ -48,6 +60,13 @@ export default async function PreferencesPage() {
         .from("brand-logos")
         .getPublicUrl(profileData.brand_logo_path).data.publicUrl
     : null;
+
+  const receiptPrefs: ReceiptPrefs = {
+    paper: profileData.receipt_paper,
+    showLogo: profileData.receipt_show_logo,
+    showName: profileData.receipt_show_name,
+    footer: profileData.receipt_footer,
+  };
 
   return (
     <section className="flex flex-col gap-8">
@@ -62,6 +81,11 @@ export default async function PreferencesPage() {
       <ThemeSection currentTheme={profileData.theme} />
       <BrandSection initialName={profileData.brand_name ?? ""} />
       <LogoSection initialLogoUrl={initialLogoUrl} />
+      <ReceiptSection
+        initialPrefs={receiptPrefs}
+        brandName={profileData.brand_name}
+        logoUrl={initialLogoUrl}
+      />
       <FeesSection initialFees={feesData} />
     </section>
   );
