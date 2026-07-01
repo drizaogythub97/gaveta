@@ -24,8 +24,9 @@ export const config = {
      * - _next/static (assets gerados)
      * - _next/image (otimizacao de imagem)
      * - favicon.ico, robots.txt, sitemap.xml
+     * - manifest, service worker e Digital Asset Links (infra publica da PWA/TWA)
      * - arquivos com extensoes de imagem
      */
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|sw\\.js|\\.well-known|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

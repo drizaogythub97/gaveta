@@ -17,10 +17,11 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   // Nao vaza a URL completa como referer para outros sites.
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Desliga APIs sensiveis que o app nao usa.
+  // Libera a camera apenas para o proprio site (leitura de codigo de barras
+  // pelo celular na frente de caixa). Demais APIs sensiveis seguem desligadas.
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), browsing-topics=()",
+    value: "camera=(self), microphone=(), geolocation=(), browsing-topics=()",
   },
   // Isola o contexto de navegacao (protege contra ataques cross-origin).
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
