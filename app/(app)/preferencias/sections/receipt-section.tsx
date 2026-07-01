@@ -156,8 +156,8 @@ export function ReceiptSection({ initialPrefs, brandName, logoUrl }: Props) {
               className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 w-full rounded-lg border px-3 py-2 text-base outline-none focus-visible:ring-3"
             />
             <p className="text-muted-foreground text-sm">
-              Até {RECEIPT_FOOTER_MAX} caracteres. O aviso &ldquo;não tem valor
-              fiscal&rdquo; é sempre incluído.
+              {`Até ${RECEIPT_FOOTER_MAX} caracteres.`} O aviso &ldquo;não tem
+              valor fiscal&rdquo; é sempre incluído.
             </p>
           </div>
 

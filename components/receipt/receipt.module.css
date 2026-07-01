@@ -149,3 +149,23 @@
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Impressão em bobina: a área imprimível é menor que o papel e centralizada
+   (ex.: Epson TM-T20x imprime ~72 mm de 80 mm e ~48 mm de 58 mm). Se o
+   conteúdo for até a borda, as laterais são cortadas. Reduzimos a largura
+   para a faixa segura e centralizamos, deixando as zonas mortas em branco. */
+@media print {
+  .paper80 {
+    width: 72mm;
+    padding: 2mm 3mm 4mm;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .paper58 {
+    width: 48mm;
+    padding: 1.5mm 2mm 3mm;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
