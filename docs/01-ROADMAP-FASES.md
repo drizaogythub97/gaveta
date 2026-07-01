@@ -207,19 +207,25 @@ Ver fases detalhadas em [03-SEGURANCA-E-DADOS.md](./03-SEGURANCA-E-DADOS.md#fase
   (líquida − despesas)**, fechamentos de caixa do período e **projeção do mês**
   rotulada como estimativa. Migration `0008`.
 
-### FASE G — Impressão de comprovantes 🤖 ⏪ PRÓXIMA
-- Caminho **HTML/CSS + diálogo de impressão** (usa o driver da impressora; cobre
-  **bobina 80/58 mm — ref. Epson TM-T20x** e **A4**). ESC/POS direto fica para o
-  app nativo (Fase H).
+### FASE G — Impressão de comprovantes ✅ CONCLUÍDA (PR #11, 2026-07-01)
+- **HTML/CSS + `window.print()`**: rota `/comprovante/[saleId]` (sob
+  `getUser()` + RLS) que renderiza o comprovante e dispara a impressão.
+  Formatos **bobina 80/58 mm** e **A4** via `@page` dinâmico. Na impressão, a
+  largura é reduzida para a **faixa segura da bobina** (~72 mm de 80 mm; ~48 mm
+  de 58 mm) e centralizada — evita o corte lateral da Epson TM-T20x. ESC/POS
+  direto fica para o app nativo (Fase H).
 - Gatilhos: modal "Imprimir comprovante? [Sim/Não]" após registrar a venda no
-  caixa + botão "Imprimir venda" em cada bloco do Financeiro.
-- Preferências → seção **Impressão**: formato/largura, cabeçalho com nome+logo
-  (opcionais), mensagem de rodapé e **pré-visualização**. Template aprovado
-  (modelo 80 mm); rodapé **"não é documento fiscal"** obrigatório.
+  caixa + botão "Imprimir venda" em cada venda no Financeiro.
+- Preferências → seção **Impressão**: formato/largura, mostrar nome/logo
+  (opcionais), mensagem de rodapé e **pré-visualização ao vivo**. Rodapé
+  **"não tem valor fiscal"** sempre incluído. Total **sem** a taxa da maquininha;
+  reflete desconto e estorno.
 - Segurança: sem APIs de dispositivo/USB; dados da venda sob `getUser()` + RLS;
   textos do usuário renderizados como texto puro (React escapa) + limite via
-  Zod; nada é enviado a terceiros.
-- Vem após D/F para refletir o modelo final da venda (desconto/estorno).
+  Zod (rodapé ≤120); nada é enviado a terceiros.
+- Migration `0009` (profiles.receipt_*). Bônus na mesma PR: filtro de ordenação
+  no Financeiro (recentes/antigas, maior/menor valor) e correção do bloco de
+  total do caixa que sobrepunha a lista de itens ao rolar.
 
 ### FASE H — App Android nativo (Kotlin, online) 🤖
 - Cliente **nativo Kotlin** (Jetpack Compose) consumindo o **mesmo** Supabase via
