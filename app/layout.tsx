@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Geist } from "next/font/google";
 import { headers } from "next/headers";
 import "./globals.css";
+import { PwaRegister } from "@/components/app/pwa-register";
 import { cn } from "@/lib/utils";
 import { getThemeFromCookie } from "@/lib/theme/cookie";
 
@@ -98,6 +99,7 @@ export default async function RootLayout({
       </head>
       <body className="bg-background text-foreground min-h-screen">
         {children}
+        <PwaRegister />
       </body>
     </html>
   );

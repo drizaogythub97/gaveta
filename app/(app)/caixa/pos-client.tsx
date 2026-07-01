@@ -2,6 +2,7 @@
 
 import {
   AlertCircle,
+  Camera,
   CheckCircle2,
   Maximize2,
   Minimize2,
@@ -34,6 +35,11 @@ import type { Product, SaleItemInput } from "@/lib/types/db";
 import { cn } from "@/lib/utils";
 
 import loaderStyles from "@/components/app/gaveta-loader.module.css";
+import {
+  BarcodeScanner,
+  isBarcodeCameraSupported,
+} from "@/components/app/barcode-scanner";
+import { useClientFlag } from "@/lib/hooks/use-client-flag";
 
 import {
   findProductByCode,
@@ -96,6 +102,8 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
   const [isRegistering, startRegister] = useTransition();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [printSaleId, setPrintSaleId] = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
+  const scannerSupported = useClientFlag(isBarcodeCameraSupported);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const printPromptRef = useRef<HTMLDivElement>(null);
@@ -225,8 +233,8 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
     }, 220);
   }
 
-  async function handleSubmitQuery() {
-    const term = query.trim();
+  async function submitCode(rawTerm: string) {
+    const term = rawTerm.trim();
     if (term.length === 0) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     fetchSeq.current++;
@@ -239,11 +247,22 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
       return;
     }
 
+    setQuery(term);
     setSuggestions([]);
     setManualName(term);
     setManualPriceDigits("");
     setManualQty("1");
     setFeedback(null);
+  }
+
+  function handleSubmitQuery() {
+    return submitCode(query);
+  }
+
+  function handleScannerDetect(code: string) {
+    setShowScanner(false);
+    void submitCode(code);
+    refocus();
   }
 
   function handleManualSubmit() {
@@ -499,6 +518,18 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
                 </p>
               ) : null}
             </div>
+
+            {scannerSupported ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowScanner(true)}
+                className="h-12 gap-2 self-start px-4 text-base"
+              >
+                <Camera aria-hidden="true" className="size-5" />
+                Escanear com a câmera
+              </Button>
+            ) : null}
 
             {suggestions.length > 0 && manualName === null ? (
               <ul
@@ -879,6 +910,16 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
           </section>
         </div>
       </div>
+
+      {showScanner ? (
+        <BarcodeScanner
+          onDetect={handleScannerDetect}
+          onClose={() => {
+            setShowScanner(false);
+            refocus();
+          }}
+        />
+      ) : null}
 
       {printSaleId ? (
         <div

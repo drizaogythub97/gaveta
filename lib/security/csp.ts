@@ -35,6 +35,8 @@ export function buildCsp(nonce: string): string {
       ...vercelLive,
     ],
     "style-src": ["'self'", "'unsafe-inline'", ...vercelLive],
+    // Service worker da PWA (mesma origem).
+    "worker-src": ["'self'"],
     "img-src": [
       "'self'",
       "data:",
