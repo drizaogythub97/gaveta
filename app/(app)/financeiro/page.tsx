@@ -1,3 +1,4 @@
+import { Printer } from "lucide-react";
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
@@ -14,6 +15,8 @@ import { EXPENSE_CATEGORIES } from "@/lib/types/expenses";
 import { PAYMENT_METHOD_LABELS, type SaleRow } from "@/lib/types/sales";
 import type { PaymentMethod } from "@/app/(app)/caixa/actions";
 import { cn } from "@/lib/utils";
+
+import { SALE_SORTS, type SaleSort } from "@/lib/financeiro/sort";
 
 import { toggleSaleStatus } from "./actions";
 import { ExpensesClient } from "./expenses-client";
@@ -39,6 +42,19 @@ const VALID_PERIODS: ReadonlySet<Period> = new Set([
   "month",
   "custom",
 ]);
+
+const VALID_SORTS: ReadonlySet<SaleSort> = new Set(SALE_SORTS);
+
+// Mapeia a ordenação escolhida para a coluna/direção da query de vendas.
+const SORT_ORDER: Record<
+  SaleSort,
+  { column: "created_at" | "total"; ascending: boolean }
+> = {
+  recent: { column: "created_at", ascending: false },
+  oldest: { column: "created_at", ascending: true },
+  high: { column: "total", ascending: false },
+  low: { column: "total", ascending: true },
+};
 
 const ALL_METHODS: PaymentMethod[] = [
   "dinheiro",
@@ -80,6 +96,12 @@ export default async function FinancialPage({
   const toParam = pickString(params.to);
   const methods = parseMethods(params.methods);
 
+  const sortParam = pickString(params.sort);
+  const sort: SaleSort =
+    sortParam && VALID_SORTS.has(sortParam as SaleSort)
+      ? (sortParam as SaleSort)
+      : "recent";
+
   const { from, to } = rangeForPeriod(period, fromParam, toParam);
 
   return (
@@ -98,11 +120,19 @@ export default async function FinancialPage({
         from={toDateInputValue(from)}
         to={toDateInputValue(to)}
         selectedMethods={methods}
+        sort={sort}
         showMethods={tab === "vendas"}
+        showSort={tab === "vendas"}
       />
 
       {tab === "vendas" ? (
-        <VendasTab from={from} to={to} period={period} methods={methods} />
+        <VendasTab
+          from={from}
+          to={to}
+          period={period}
+          methods={methods}
+          sort={sort}
+        />
       ) : tab === "despesas" ? (
         <DespesasTab from={from} to={to} />
       ) : (
@@ -117,7 +147,7 @@ function buildTabHref(
   tab: Tab,
 ): string {
   const next = new URLSearchParams();
-  for (const key of ["period", "from", "to"] as const) {
+  for (const key of ["period", "from", "to", "sort"] as const) {
     const v = pickString(params[key]);
     if (v) next.set(key, v);
   }
@@ -162,11 +192,13 @@ async function VendasTab({
   to,
   period,
   methods,
+  sort,
 }: {
   from: string;
   to: string;
   period: Period;
   methods: PaymentMethod[];
+  sort: SaleSort;
 }) {
   const supabase = await createClient();
   let query = supabase
@@ -179,7 +211,13 @@ async function VendasTab({
   if (methods.length > 0) {
     query = query.in("payment_method", methods);
   }
-  const { data, error } = await query.order("created_at", { ascending: false });
+  const order = SORT_ORDER[sort];
+  query = query.order(order.column, { ascending: order.ascending });
+  // Desempate estável quando ordenado por valor.
+  if (order.column !== "created_at") {
+    query = query.order("created_at", { ascending: false });
+  }
+  const { data, error } = await query;
   const sales = (data ?? []) as SaleRow[];
 
   const completed = sales.filter((s) => s.status === "completed");
@@ -496,20 +534,31 @@ function SaleCard({ sale }: { sale: SaleRow }) {
             </ul>
           </details>
         </div>
-        <form action={toggleSaleStatus}>
-          <input type="hidden" name="id" value={sale.id} />
-          <input type="hidden" name="currentStatus" value={sale.status} />
-          <button
-            type="submit"
-            className={
-              voided
-                ? "h-12 rounded-lg bg-success px-5 text-base font-medium text-success-foreground hover:opacity-90"
-                : "h-12 rounded-lg bg-destructive/10 px-5 text-base font-medium text-destructive hover:bg-destructive/20"
-            }
+        <div className="flex flex-col gap-2 sm:items-end">
+          <a
+            href={`/comprovante/${sale.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border-border text-foreground hover:bg-muted flex h-12 items-center justify-center gap-2 rounded-lg border px-5 text-base font-medium"
           >
-            {voided ? "Reativar" : "Estornar"}
-          </button>
-        </form>
+            <Printer aria-hidden="true" className="size-5" />
+            Imprimir venda
+          </a>
+          <form action={toggleSaleStatus}>
+            <input type="hidden" name="id" value={sale.id} />
+            <input type="hidden" name="currentStatus" value={sale.status} />
+            <button
+              type="submit"
+              className={
+                voided
+                  ? "h-12 w-full rounded-lg bg-success px-5 text-base font-medium text-success-foreground hover:opacity-90"
+                  : "bg-destructive/10 text-destructive hover:bg-destructive/20 h-12 w-full rounded-lg px-5 text-base font-medium"
+              }
+            >
+              {voided ? "Reativar" : "Estornar"}
+            </button>
+          </form>
+        </div>
       </div>
     </li>
   );

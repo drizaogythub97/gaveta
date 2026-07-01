@@ -1,0 +1,171 @@
+/* Comprovante de venda (não fiscal) — layout para bobina térmica e A4.
+   Fonte monoespaçada para alinhar colunas como numa impressora de cupom. */
+
+.receipt {
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo,
+    Consolas, monospace;
+  color: #000;
+  background: #fff;
+  line-height: 1.35;
+  box-sizing: border-box;
+}
+
+.receipt * {
+  box-sizing: border-box;
+}
+
+/* Larguras físicas do papel de bobina. A largura fixa em mm garante que o
+   diálogo de impressão gere um cupom do tamanho certo. */
+.paper80 {
+  width: 80mm;
+  padding: 3mm 3mm 4mm;
+  font-size: 12px;
+}
+
+.paper58 {
+  width: 58mm;
+  padding: 2mm 2mm 3mm;
+  font-size: 11px;
+}
+
+.paperA4 {
+  width: 100%;
+  max-width: 150mm;
+  padding: 0;
+  font-size: 14px;
+}
+
+.header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.logo {
+  max-width: 40mm;
+  max-height: 22mm;
+  object-fit: contain;
+}
+
+.paperA4 .logo {
+  max-width: 55mm;
+  max-height: 30mm;
+}
+
+.name {
+  font-weight: 700;
+  font-size: 1.15em;
+  word-break: break-word;
+}
+
+.meta {
+  margin-top: 6px;
+  font-size: 0.9em;
+}
+
+.voided {
+  margin: 8px 0;
+  padding: 4px 0;
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  border: 1px solid #000;
+}
+
+.divider {
+  border: none;
+  border-top: 1px dashed #000;
+  margin: 8px 0;
+}
+
+.items {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.itemName {
+  padding: 2px 0;
+  text-align: left;
+  word-break: break-word;
+}
+
+.itemQty {
+  padding: 2px 0 6px;
+  text-align: left;
+  color: #000;
+  font-size: 0.9em;
+}
+
+.itemTotal {
+  padding: 2px 0;
+  text-align: right;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.totals {
+  width: 100%;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 1px 0;
+}
+
+.grandTotal {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid #000;
+  font-weight: 700;
+  font-size: 1.25em;
+}
+
+.payment {
+  margin-top: 8px;
+  font-size: 0.95em;
+}
+
+.footer {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 0.9em;
+  word-break: break-word;
+}
+
+.disclaimer {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Impressão em bobina: a área imprimível é menor que o papel e centralizada
+   (ex.: Epson TM-T20x imprime ~72 mm de 80 mm e ~48 mm de 58 mm). Se o
+   conteúdo for até a borda, as laterais são cortadas. Reduzimos a largura
+   para a faixa segura e centralizamos, deixando as zonas mortas em branco. */
+@media print {
+  .paper80 {
+    width: 72mm;
+    padding: 2mm 3mm 4mm;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .paper58 {
+    width: 48mm;
+    padding: 1.5mm 2mm 3mm;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}

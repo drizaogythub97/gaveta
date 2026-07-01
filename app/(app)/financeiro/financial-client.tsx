@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PERIOD_LABELS, type Period } from "@/lib/dashboard/dates";
+import { SALE_SORTS, SORT_LABELS, type SaleSort } from "@/lib/financeiro/sort";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types/sales";
 import type { PaymentMethod } from "@/app/(app)/caixa/actions";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,9 @@ type Props = {
   from: string;
   to: string;
   selectedMethods: PaymentMethod[];
+  sort: SaleSort;
   showMethods?: boolean;
+  showSort?: boolean;
 };
 
 const ORDERED_PERIODS: Period[] = ["today", "7d", "30d", "month", "custom"];
@@ -48,7 +51,9 @@ export function FinancialClient({
   from,
   to,
   selectedMethods,
+  sort,
   showMethods = true,
+  showSort = true,
 }: Props) {
   const router = useRouter();
   const params = useSearchParams();
@@ -156,6 +161,28 @@ export function FinancialClient({
             Aplicar
           </button>
         </form>
+      ) : null}
+
+      {showSort ? (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="sort" className="text-lg font-semibold">
+            Ordenar por
+          </Label>
+          <select
+            id="sort"
+            value={sort}
+            onChange={(e) =>
+              router.push(buildHref(baseParams, { sort: e.target.value }))
+            }
+            className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-12 w-full rounded-lg border px-3 text-base outline-none focus-visible:ring-3 sm:max-w-xs"
+          >
+            {SALE_SORTS.map((s) => (
+              <option key={s} value={s}>
+                {SORT_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
       ) : null}
 
       {showMethods ? (
