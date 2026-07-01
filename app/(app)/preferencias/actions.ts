@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseDecimalPtBR } from "@/lib/products/format";
 import { THEME_COOKIE, type Theme } from "@/lib/theme/cookie";
+import { receiptPrefsSchema } from "@/lib/validations/receipt";
 
 const ONE_YEAR = 60 * 60 * 24 * 365;
 const MAX_LOGO_BYTES = 1_500_000; // ~1,5 MB depois de cropado/reencoded
@@ -231,6 +232,47 @@ export async function removeBrandLogo(): Promise<LogoUploadResult> {
     .eq("id", user.id);
 
   revalidatePath("/", "layout");
+  revalidatePath("/preferencias");
+  return { ok: true };
+}
+
+export type ReceiptFormState = {
+  ok?: boolean;
+  error?: string;
+};
+
+export async function saveReceiptPrefs(
+  _prev: ReceiptFormState,
+  formData: FormData,
+): Promise<ReceiptFormState> {
+  const parsed = receiptPrefsSchema.safeParse({
+    paper: formData.get("paper"),
+    show_logo: formData.get("show_logo") === "on",
+    show_name: formData.get("show_name") === "on",
+    footer: String(formData.get("footer") ?? ""),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada." };
+
+  const footer = parsed.data.footer?.trim();
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      receipt_paper: parsed.data.paper,
+      receipt_show_logo: parsed.data.show_logo,
+      receipt_show_name: parsed.data.show_name,
+      receipt_footer: footer && footer.length > 0 ? footer : null,
+    })
+    .eq("id", user.id);
+
+  if (error) return { error: "Não foi possível salvar." };
   revalidatePath("/preferencias");
   return { ok: true };
 }

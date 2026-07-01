@@ -95,8 +95,10 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [isRegistering, startRegister] = useTransition();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [printSaleId, setPrintSaleId] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const printPromptRef = useRef<HTMLDivElement>(null);
   const posRef = useRef<HTMLDivElement>(null);
   const fetchSeq = useRef(0);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -149,6 +151,29 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
 
   function refocus() {
     setTimeout(() => inputRef.current?.focus(), 0);
+  }
+
+  // Foca o botão "Sim" ao abrir o convite de impressão (acessibilidade).
+  useEffect(() => {
+    if (printSaleId) {
+      setTimeout(() => {
+        printPromptRef.current
+          ?.querySelector<HTMLButtonElement>("[data-print-yes]")
+          ?.focus();
+      }, 0);
+    }
+  }, [printSaleId]);
+
+  function closePrintPrompt() {
+    setPrintSaleId(null);
+    refocus();
+  }
+
+  function confirmPrint() {
+    if (printSaleId) {
+      window.open(`/comprovante/${printSaleId}`, "_blank", "noopener");
+    }
+    closePrintPrompt();
   }
 
   function clearManual() {
@@ -356,7 +381,8 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
           kind: "success",
           message: `Venda registrada! Total ${formatBRL(total)}.${changeMessage}${feeMessage}`,
         });
-        refocus();
+        // Oferece a impressão do comprovante da venda recém-registrada.
+        setPrintSaleId(result.saleId);
       } else {
         setFeedback({ kind: "error", message: result.error });
       }
@@ -853,6 +879,52 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
           </section>
         </div>
       </div>
+
+      {printSaleId ? (
+        <div
+          ref={printPromptRef}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="print-prompt-title"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") closePrintPrompt();
+          }}
+        >
+          <div className="bg-card ring-foreground/10 flex w-full max-w-md flex-col gap-5 rounded-2xl p-6 ring-1">
+            <div className="flex flex-col gap-2">
+              <h2
+                id="print-prompt-title"
+                className="text-2xl font-semibold tracking-tight"
+              >
+                Imprimir comprovante?
+              </h2>
+              <p className="text-muted-foreground text-base">
+                Abre o comprovante da venda para impressão. Você pode ajustar o
+                formato em Preferências.
+              </p>
+            </div>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closePrintPrompt}
+                className="h-14 px-8 text-lg"
+              >
+                Não
+              </Button>
+              <Button
+                data-print-yes
+                type="button"
+                onClick={confirmPrint}
+                className="h-14 px-8 text-lg font-semibold"
+              >
+                Sim, imprimir
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

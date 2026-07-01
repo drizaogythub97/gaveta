@@ -1,3 +1,4 @@
+import { Printer } from "lucide-react";
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
@@ -496,20 +497,31 @@ function SaleCard({ sale }: { sale: SaleRow }) {
             </ul>
           </details>
         </div>
-        <form action={toggleSaleStatus}>
-          <input type="hidden" name="id" value={sale.id} />
-          <input type="hidden" name="currentStatus" value={sale.status} />
-          <button
-            type="submit"
-            className={
-              voided
-                ? "h-12 rounded-lg bg-success px-5 text-base font-medium text-success-foreground hover:opacity-90"
-                : "h-12 rounded-lg bg-destructive/10 px-5 text-base font-medium text-destructive hover:bg-destructive/20"
-            }
+        <div className="flex flex-col gap-2 sm:items-end">
+          <a
+            href={`/comprovante/${sale.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border-border text-foreground hover:bg-muted flex h-12 items-center justify-center gap-2 rounded-lg border px-5 text-base font-medium"
           >
-            {voided ? "Reativar" : "Estornar"}
-          </button>
-        </form>
+            <Printer aria-hidden="true" className="size-5" />
+            Imprimir venda
+          </a>
+          <form action={toggleSaleStatus}>
+            <input type="hidden" name="id" value={sale.id} />
+            <input type="hidden" name="currentStatus" value={sale.status} />
+            <button
+              type="submit"
+              className={
+                voided
+                  ? "h-12 w-full rounded-lg bg-success px-5 text-base font-medium text-success-foreground hover:opacity-90"
+                  : "bg-destructive/10 text-destructive hover:bg-destructive/20 h-12 w-full rounded-lg px-5 text-base font-medium"
+              }
+            >
+              {voided ? "Reativar" : "Estornar"}
+            </button>
+          </form>
+        </div>
       </div>
     </li>
   );
