@@ -1,13 +1,30 @@
 "use client";
 
-import { Printer, X } from "lucide-react";
+import { Printer, Share2, X } from "lucide-react";
 import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useClientFlag } from "@/lib/hooks/use-client-flag";
 
 import styles from "./print-page.module.css";
 
-export function PrintToolbar() {
+export function PrintToolbar({
+  shareTitle,
+  shareText,
+}: {
+  shareTitle: string;
+  shareText: string;
+}) {
+  const canShare = useClientFlag(
+    () => typeof navigator !== "undefined" && "share" in navigator,
+  );
+
+  function handleShare() {
+    navigator.share?.({ title: shareTitle, text: shareText }).catch(() => {
+      // Usuário cancelou ou compartilhamento indisponível: silencioso.
+    });
+  }
+
   // Dispara o diálogo de impressão automaticamente ao abrir, dando um
   // instante para fontes e a logo carregarem (senão saem em branco).
   useEffect(() => {
@@ -51,6 +68,17 @@ export function PrintToolbar() {
         <Printer aria-hidden="true" className="size-5" />
         Imprimir
       </Button>
+      {canShare ? (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleShare}
+          className="h-14 gap-2 px-6 text-lg"
+        >
+          <Share2 aria-hidden="true" className="size-5" />
+          Compartilhar
+        </Button>
+      ) : null}
       <Button
         type="button"
         variant="outline"

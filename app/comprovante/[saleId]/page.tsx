@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { Receipt } from "@/components/receipt/receipt";
+import { buildReceiptText } from "@/lib/receipt/text";
 import { createClient } from "@/lib/supabase/server";
 import {
   type ReceiptData,
@@ -143,20 +144,20 @@ export default async function ReceiptPage({
     footer: profile.receipt_footer,
   };
 
+  const brand = { name: profile.brand_name, logoUrl };
+  const shareTitle = `Comprovante ${(prefs.showName && brand.name) || "Gaveta"}`;
+  const shareText = buildReceiptText(data, prefs, brand);
+
   return (
     <>
       {/* style-src permite 'unsafe-inline' → @page dinâmico sem nonce. */}
       <style>{buildPrintCss(prefs.paper)}</style>
       <div className={styles.screen}>
-        <PrintToolbar />
+        <PrintToolbar shareTitle={shareTitle} shareText={shareText} />
         {/* Sem largura fixa: no flex centralizado o papel encolhe ao conteúdo
             (80/58 mm) ou ao max-width do A4, imprimindo sem overflow. */}
         <div className={styles.paper}>
-          <Receipt
-            data={data}
-            prefs={prefs}
-            brand={{ name: profile.brand_name, logoUrl }}
-          />
+          <Receipt data={data} prefs={prefs} brand={brand} />
         </div>
       </div>
     </>
