@@ -227,17 +227,28 @@ Ver fases detalhadas em [03-SEGURANCA-E-DADOS.md](./03-SEGURANCA-E-DADOS.md#fase
   no Financeiro (recentes/antigas, maior/menor valor) e correção do bloco de
   total do caixa que sobrepunha a lista de itens ao rolar.
 
-### FASE H — App Android nativo (Kotlin, online) 🤖
-- Cliente **nativo Kotlin** (Jetpack Compose) consumindo o **mesmo** Supabase via
-  `supabase-kt`, **online**. O requisito de salvamento offline + sync foi
-  **REMOVIDO em 2026-06-26**: o objetivo é apenas ser tão eficiente quanto a web.
-- Ganhos nativos: leitura de código de barras pela **câmera (ML Kit)** e
-  **impressão térmica via Bluetooth (ESC/POS)**.
-- Segurança: **nunca** embarcar `service_role`; só anon key + sessão do usuário
-  (a RLS no servidor é a espinha dorsal); token em **EncryptedSharedPreferences/
-  Keystore**; TLS (certificate pinning opcional).
+### FASE H — Mobile ✅ CONCLUÍDA como PWA (PR #12, 2026-07-01) — TWA pendente
+> **Replanejada.** O app **nativo Kotlin** foi **descartado**: seu motivo era o
+> uso **offline + sync**, requisito **REMOVIDO em 2026-06-26**. Sem isso, um
+> segundo codebase não se justifica — e a segurança do Gaveta é **server-side**
+> (RLS/`getUser()`/CSP), preservada 100% num invólucro que use o Chrome real.
+> Entregue como **PWA** (mesmo app web, instalável, tela cheia) + **preparo de
+> TWA** para a Play Store.
+- **PWA instalável**: service worker mínimo (`public/sw.js`, **sem cache/offline**
+  — não vazar dados de sessão) + registro (`components/app/pwa-register.tsx`).
+- **Leitura por câmera** na frente de caixa (`components/app/barcode-scanner.tsx`,
+  `BarcodeDetector`, com detecção de suporte). Header `Permissions-Policy:
+  camera=(self)`. No desktop o leitor USB segue igual.
+- **Compartilhar comprovante** (Web Share) enviando o comprovante **em texto**
+  (a rota `/comprovante` é privada por RLS); `window.print()` segue para PDF.
+- **Digital Asset Links**: `/.well-known/assetlinks.json` lendo
+  `ANDROID_PACKAGE_NAME`/`ANDROID_CERT_FINGERPRINT` de env.
+- **Impressão térmica Bluetooth (ESC/POS)**: fora de escopo no mobile — no
+  celular basta emitir + compartilhar; impressão física fica no desktop/USB.
+- **TWA / Play Store: PENDENTE (parte do dono)** — gerar o AAB com Bubblewrap,
+  setar as envs na Vercel e publicar. Guia: `docs/07-MOBILE-PWA-TWA.md`.
 
-> Depois de D–H: **Fase 9 (Portfólio)**.
+> Depois: **Fase 9 (Portfólio)**.
 
 ## Objetos de estudo para o futuro (fora do escopo atual)
 - **Integração com o FiadoApp (ecossistema do autor).** O Gaveta **não** terá
