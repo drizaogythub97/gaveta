@@ -1,67 +1,51 @@
-# Gaveta
+<div align="center">
 
-> **Gaveta** — sistema de gestão (ERP) leve e acessível para registro de **produtos**, **vendas** e **demonstrativos de faturamento**, com foco em usabilidade para pessoas com pouca familiaridade com tecnologia.
+<img src="assets/brand/wordmark-horizontal.png" alt="Gaveta" width="360" />
 
-[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3FCF8E)](https://supabase.com/)
-[![Vercel](https://img.shields.io/badge/Deploy-Vercel-black)](https://vercel.com/)
+**ERP web leve, acessível e seguro para o pequeno comércio.**
+Cadastro de produtos, frente de caixa e demonstrativos de faturamento — pensado para quem tem pouca intimidade com tecnologia.
+
+[![Demo](https://img.shields.io/badge/Demo-gaveta--erp.vercel.app-1b7a43)](https://gaveta-erp.vercel.app)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-149eca)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6)](https://www.typescriptlang.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth%20%2B%20RLS-3FCF8E)](https://supabase.com/)
+[![Security Headers](https://img.shields.io/badge/Security%20Headers-A-1b7a43)](https://securityheaders.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+</div>
 
 ---
 
+<div align="center">
+  <img src="docs/screenshots/demo.gif" alt="Demonstração da frente de caixa do Gaveta" width="820" />
+
+  <br/><em>Fluxo de venda (acelerado)</em> · ▶ <a href="assets/demo/Demonstrativo%20Gaveta%20Completo.mp4">ver demonstração completa (60s)</a>
+</div>
+
 ## Sobre o projeto
 
-ERP web simples e multiusuário, construído como peça de portfólio com padrões de mercado. Permite que cada usuário cadastre seus produtos, registre vendas em uma frente de caixa intuitiva e acompanhe faturamento por painéis (dashboards). O design prioriza **clareza, botões grandes, alto contraste e poucos passos** — pensado para um público inicial de pessoas idosas.
+O **Gaveta** é um ERP web multiusuário construído como peça de portfólio com padrões de mercado. Cada usuário cadastra seus produtos, registra vendas numa **frente de caixa** rápida e acompanha o faturamento por painéis. O público inicial são **pessoas idosas e lojistas com pouca familiaridade com tecnologia** — por isso a interface prioriza **clareza, botões grandes, alto contraste e poucos passos**.
 
-### Principais características
+Dois pilares guiaram todo o desenvolvimento: **simplicidade de uso** e **segurança dos dados** (tratada como requisito de primeira classe, não como um "extra no final"). O sistema está **em produção**, com custo de infraestrutura de **R$ 0** (todos os serviços em plano gratuito).
 
-- **Frente de caixa** rápida: busca por nome com autocompletar, ou digitação manual de produtos avulsos, com cálculo automático de totais.
-- **Dashboards**: inicial (visão geral), estoque (com filtros dinâmicos) e financeiro (vendas e faturamento por período).
-- **Multiusuário com isolamento total de dados** via Row Level Security (RLS) do PostgreSQL — cada usuário só acessa os próprios dados, garantido no nível do banco.
-- **Responsivo de verdade**: otimizado para desktop e celular.
-- **Acessível**: contraste AA, fontes grandes, alvos de toque ≥ 44px, feedback visual claro.
-- **LGPD**: política de privacidade com aceite no cadastro e direito de exclusão de conta/dados.
+## Funcionalidades
 
-## Stack
+- **Frente de caixa** rápida: busca por nome com autocompletar, item avulso por digitação, **leitura de código de barras por scanner USB e pela câmera** (no celular), **desconto** no total e cálculo automático.
+- **Formas de pagamento** com **taxas por método** (dinheiro, Pix, débito, crédito à vista, crédito parcelado, vale) e **parcelamento**; registro transacional que **baixa o estoque** automaticamente.
+- **Comprovante de venda** (não fiscal): impressão em **bobina 80/58 mm e A4** com pré-visualização, cabeçalho com nome/logo e rodapé personalizáveis; **compartilhamento por texto** (WhatsApp, e-mail).
+- **Estorno de venda que devolve o estoque** e **histórico imutável de movimentação de estoque** (venda, estorno, reposição, ajuste).
+- **Fechamento de caixa**: abertura com troco, **sangria/suprimento** e conferência (esperado × contado).
+- **Financeiro** em três abas: **Vendas**, **Despesas** (por categoria) e **Resumo** (receita bruta, taxas, receita líquida, despesas, **resultado** e **projeção do mês**), com filtros por período e forma de pagamento.
+- **Dashboards**: inicial (indicadores), estoque (filtros dinâmicos) e financeiro.
+- **Produtos**: CRUD com código de barras opcional (1:N) e opção de **controlar estoque ou não** (ex.: marmitas).
+- **Preferências**: tema claro/escuro, **identidade da loja** (nome + logo com upload e recorte), taxas por método e opções de impressão.
+- **PWA instalável** (tela cheia no celular), **acessibilidade** (AA), **multiusuário com isolamento total via RLS** e **LGPD** (aceite no cadastro + exclusão de conta/dados).
 
-| Camada              | Tecnologia                                | Por quê                                                           |
-| ------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
-| Front-end           | Next.js (App Router) + React + TypeScript | Padrão de mercado, ótimo para portfólio, renderização no servidor |
-| Estilo / UI         | Tailwind CSS + shadcn/ui                  | Componentes acessíveis prontos, design responsivo rápido          |
-| Back-end / DB       | Supabase (PostgreSQL)                     | Banco relacional gerenciado, ideal para vendas e relatórios       |
-| Autenticação        | Supabase Auth (email + senha)             | Login robusto pronto, com recuperação de senha                    |
-| Isolamento de dados | PostgreSQL Row Level Security             | Isolamento por usuário no nível do banco (defense-in-depth)       |
-| Hospedagem          | Vercel (preparado para Cloudflare Pages)  | Deploy automático via GitHub; migração futura facilitada          |
-| Testes              | Vitest + Playwright                       | Unidade/integração e ponta-a-ponta                                |
+## Telas
 
-Custo total: **R$ 0** (todos os serviços em plano gratuito).
-
-## Documentação
-
-Todo o planejamento está em [`/docs`](./docs):
-
-1. [Visão geral do produto](./docs/00-VISAO-GERAL.md)
-2. [Roadmap por fases (inclui Fase 0 — suas ações)](./docs/01-ROADMAP-FASES.md)
-3. [Design system para idosos](./docs/02-DESIGN-SYSTEM-IDOSOS.md)
-4. [Segurança e modelo de dados](./docs/03-SEGURANCA-E-DADOS.md)
-5. [Política de privacidade (LGPD)](./docs/04-POLITICA-PRIVACIDADE.md)
-6. [Segurança & hardening — controles, evidências e verificação](./docs/05-SEGURANCA-HARDENING.md)
-
-## Começando
-
-> **Importante:** antes de programar, conclua a **Fase 0** do [roadmap](./docs/01-ROADMAP-FASES.md) (criar contas Supabase e Vercel e configurar variáveis de ambiente).
-
-```bash
-# 1. Instalar dependências
-npm install
-
-# 2. Configurar variáveis (copie e preencha)
-cp .env.example .env.local
-
-# 3. Rodar em desenvolvimento
-npm run dev
-```
-
-## Licença
-
-MIT © Adriano Cardoso
+| Frente de caixa | Financeiro | Painel inicial |
+| :-------------: | :--------: | :------------: |
+| ![Frente de caixa](docs/screenshots/caixa.png) | ![Financeiro](docs/screenshots/financeiro.png) | ![Painel inicial](docs/screenshots/dashboard.png) |
+| **Produtos** | **Estoque** | **Login** |
+| ![Produtos](docs/screenshots/produtos.png) | ![Estoque](docs/scre
