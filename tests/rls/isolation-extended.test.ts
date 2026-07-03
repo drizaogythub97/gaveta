@@ -583,3 +583,130 @@ describe("RLS — expenses (Fase F)", () => {
     expect(error).not.toBeNull();
   });
 });
+
+// =====================================================================
+// Hardening 0010 — register_sale exige produto do próprio usuário e as
+// RPCs de agregação (sales_summary/expenses_summary) respeitam o RLS.
+// =====================================================================
+describe("Hardening 0010 — propriedade do produto e agregações", () => {
+  const RANGE = {
+    p_from: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    p_to: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  };
+
+  it("Bob não consegue vender referenciando um produto de Alice", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const bobApp = userClient(bob.accessToken);
+    const admin = adminClient();
+
+    const { data: product, error: pErr } = await aliceApp
+      .from("products")
+      .insert({
+        user_id: alice.id,
+        name: "Produto da Alice (0010)",
+        price: 50,
+        track_stock: true,
+        stock_quantity: 10,
+      })
+      .select("id")
+      .single();
+    expect(pErr).toBeNull();
+    const aliceProductId = product!.id as string;
+
+    const { error } = await bobApp.rpc("register_sale", {
+      items: [
+        {
+          product_id: aliceProductId,
+          name: "Tentativa cruzada",
+          unit_price: 50,
+          quantity: 1,
+        },
+      ],
+    });
+    expect(error).not.toBeNull();
+
+    // Estoque de Alice intacto e nenhuma venda do Bob persistida.
+    const { data: prod } = await admin
+      .from("products")
+      .select("stock_quantity")
+      .eq("id", aliceProductId)
+      .single();
+    expect(Number(prod?.stock_quantity)).toBe(10);
+
+    const { data: bobSales } = await admin
+      .from("sales")
+      .select("id")
+      .eq("user_id", bob.id);
+    expect(bobSales).toHaveLength(0);
+  });
+
+  it("sales_summary agrega só as vendas do próprio usuário", async () => {
+    const bobApp = userClient(bob.accessToken);
+
+    const { data: saleA } = await bobApp.rpc("register_sale", {
+      items: [{ product_id: null, name: "Bob A", unit_price: 10, quantity: 1 }],
+      payment_method: "pix",
+      fee_amount: 1,
+    });
+    const { data: saleB } = await bobApp.rpc("register_sale", {
+      items: [{ product_id: null, name: "Bob B", unit_price: 15, quantity: 1 }],
+    });
+    expect(saleA).toBeTruthy();
+    expect(saleB).toBeTruthy();
+
+    const { error: voidErr } = await bobApp.rpc("set_sale_status", {
+      p_sale_id: saleB as string,
+      p_status: "voided",
+    });
+    expect(voidErr).toBeNull();
+
+    type SummaryRow = {
+      gross_total: number;
+      fees_total: number;
+      completed_count: number;
+      voided_count: number;
+    };
+
+    const { data: rawSummary, error } = await bobApp
+      .rpc("sales_summary", { ...RANGE, p_methods: null })
+      .maybeSingle();
+    expect(error).toBeNull();
+    const data = rawSummary as SummaryRow | null;
+    // Só as vendas do Bob: bruta 10 (a estornada fica de fora), taxa 1.
+    expect(Number(data?.gross_total)).toBe(10);
+    expect(Number(data?.fees_total)).toBe(1);
+    expect(Number(data?.completed_count)).toBe(1);
+    expect(Number(data?.voided_count)).toBe(1);
+
+    // Filtro por forma de pagamento também agrega certo.
+    const { data: rawPixOnly } = await bobApp
+      .rpc("sales_summary", { ...RANGE, p_methods: ["pix"] })
+      .maybeSingle();
+    const pixOnly = rawPixOnly as SummaryRow | null;
+    expect(Number(pixOnly?.gross_total)).toBe(10);
+    expect(Number(pixOnly?.voided_count)).toBe(0);
+  });
+
+  it("expenses_summary não vaza despesas entre usuários", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const bobApp = userClient(bob.accessToken);
+    const window = { p_from: "2026-06-01", p_to: "2026-12-31" };
+
+    const { data: aliceRows, error: aErr } = await aliceApp.rpc(
+      "expenses_summary",
+      window,
+    );
+    expect(aErr).toBeNull();
+    const aluguel = (aliceRows ?? []).find(
+      (r: { category: string }) => r.category === "aluguel",
+    );
+    expect(Number(aluguel?.total)).toBe(1200);
+
+    const { data: bobRows, error: bErr } = await bobApp.rpc(
+      "expenses_summary",
+      window,
+    );
+    expect(bErr).toBeNull();
+    expect(bobRows ?? []).toHaveLength(0);
+  });
+});
