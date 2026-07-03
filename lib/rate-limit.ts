@@ -25,7 +25,12 @@ if (!redis && process.env.NODE_ENV === "production") {
   );
 }
 
-export type RateLimitAction = "login" | "signup" | "recover" | "reset";
+export type RateLimitAction =
+  | "login"
+  | "signup"
+  | "recover"
+  | "reset"
+  | "reauth";
 
 /**
  * Janela deslizante por ação. Valores conservadores: protegem contra
@@ -38,6 +43,9 @@ const RULES: Record<RateLimitAction, { limit: number; window: `${number} s` }> =
     signup: { limit: 5, window: "60 s" },
     recover: { limit: 4, window: "60 s" },
     reset: { limit: 6, window: "60 s" },
+    // Reautenticação por senha em ações sensíveis da conta (trocar senha/
+    // e-mail, excluir conta) — mesmo racional do login.
+    reauth: { limit: 8, window: "60 s" },
   };
 
 const limiters: Partial<Record<RateLimitAction, Ratelimit>> = {};

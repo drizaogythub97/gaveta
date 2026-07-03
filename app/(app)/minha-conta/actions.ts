@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getServiceRoleKey, publicEnv } from "@/lib/env";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 export type ActionResult = { ok: boolean; error?: string };
@@ -64,6 +65,11 @@ async function reauthenticate(
 ): Promise<{ ok: true; email: string } | { ok: false; error: string }> {
   if (!currentPassword || currentPassword.length === 0) {
     return { ok: false, error: "Informe sua senha atual." };
+  }
+
+  const rate = await checkRateLimit("reauth");
+  if (!rate.ok) {
+    return { ok: false, error: rate.message };
   }
 
   const supabase = await createClient();
@@ -178,6 +184,11 @@ export async function deleteAccount(
 ): Promise<DeleteAccountResult | void> {
   if (!password || password.length === 0) {
     return { ok: false, error: "Informe sua senha para confirmar." };
+  }
+
+  const rate = await checkRateLimit("reauth");
+  if (!rate.ok) {
+    return { ok: false, error: rate.message };
   }
 
   const supabase = await createClient();
