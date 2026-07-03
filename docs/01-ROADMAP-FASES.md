@@ -261,11 +261,15 @@ Ver fases detalhadas em [03-SEGURANCA-E-DADOS.md](./03-SEGURANCA-E-DADOS.md#fase
 
 ---
 
-## FASE 9 — Portfólio 🤖 + 👤 ⏱️ ~30 min
+## FASE 9 — Portfólio 🤖 + 👤 ⏱️ ~30 min ✅ CONCLUÍDA (2026-07-03)
 
-- Finalizar README com screenshots/GIF do sistema.
-- Texto pronto para post no LinkedIn (decisões técnicas, aprendizados).
-- Tag de versão `v1.0.0`.
+- Finalizar README com screenshots/GIF do sistema. ✅ (2026-07-02)
+- Texto pronto para post no LinkedIn (decisões técnicas, aprendizados). ✅ (2026-07-02)
+- Tag de versão `v1.0.0`. ✅ Tag anotada + Release publicada no GitHub em
+  2026-07-03 (`github.com/drizaogythub97/gaveta/releases/tag/v1.0.0`).
+
+> **Status: concluída.** Todas as 9 fases + melhorias D–H entregues.
+> Pendência manual do dono: publicar o TWA na Play Store (`docs/07-MOBILE-PWA-TWA.md`).
 
 ---
 
