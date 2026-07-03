@@ -48,5 +48,11 @@ yarn-error.log*
 # Screenshots / artefatos locais de conferência
 prints/
 
+# Arquivos só-locais (não agregam ao repositório público)
+AGENTS.md
+assets/demo/
+assets/brand/icon-master.png
+docs/ESTUDO-NOTA-FISCAL.md
+
 # Estudos de design (protótipos locais, não vão para produção)
 concept/
