@@ -69,12 +69,13 @@ export function FinancialClient({
     const list = Array.from(next);
     const href = buildHref(baseParams, {
       methods: list.length === 0 ? null : list.join(","),
+      page: null, // filtros novos voltam à primeira página
     });
     router.push(href);
   }
 
   function clearMethods() {
-    router.push(buildHref(baseParams, { methods: null }));
+    router.push(buildHref(baseParams, { methods: null, page: null }));
   }
 
   return (
@@ -92,6 +93,7 @@ export function FinancialClient({
               period: p,
               from: p === "custom" ? from : null,
               to: p === "custom" ? to : null,
+              page: null,
             });
             return (
               <Link
@@ -172,7 +174,9 @@ export function FinancialClient({
             id="sort"
             value={sort}
             onChange={(e) =>
-              router.push(buildHref(baseParams, { sort: e.target.value }))
+              router.push(
+                buildHref(baseParams, { sort: e.target.value, page: null }),
+              )
             }
             className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-12 w-full rounded-lg border px-3 text-base outline-none focus-visible:ring-3 sm:max-w-xs"
           >

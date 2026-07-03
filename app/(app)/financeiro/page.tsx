@@ -18,8 +18,8 @@ import { cn } from "@/lib/utils";
 
 import { SALE_SORTS, type SaleSort } from "@/lib/financeiro/sort";
 
-import { toggleSaleStatus } from "./actions";
 import { ExpensesClient } from "./expenses-client";
+import { ToggleSaleStatusButton } from "./toggle-sale-status-button";
 import { FinancialClient } from "./financial-client";
 import { SummaryView, type SummaryData } from "./summary-view";
 
@@ -65,8 +65,33 @@ const ALL_METHODS: PaymentMethod[] = [
   "vale",
 ];
 
+// Vendas por página na listagem. Os totais do período NÃO dependem disso:
+// são agregados no banco (RPC sales_summary), imunes ao corte de 1000
+// linhas do PostgREST.
+const SALES_PAGE_SIZE = 20;
+
+// Linha devolvida pela RPC sales_summary.
+type SalesSummaryRow = {
+  gross_total: number;
+  fees_total: number;
+  completed_count: number;
+  voided_count: number;
+};
+
+const EMPTY_SUMMARY: SalesSummaryRow = {
+  gross_total: 0,
+  fees_total: 0,
+  completed_count: 0,
+  voided_count: 0,
+};
+
 function pickString(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function parsePage(value: string | string[] | undefined): number {
+  const n = Number.parseInt(pickString(value) ?? "1", 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
 function parseMethods(value: string | string[] | undefined): PaymentMethod[] {
@@ -102,6 +127,8 @@ export default async function FinancialPage({
       ? (sortParam as SaleSort)
       : "recent";
 
+  const page = parsePage(params.page);
+
   const { from, to } = rangeForPeriod(period, fromParam, toParam);
 
   return (
@@ -132,6 +159,8 @@ export default async function FinancialPage({
           period={period}
           methods={methods}
           sort={sort}
+          page={page}
+          params={params}
         />
       ) : tab === "despesas" ? (
         <DespesasTab from={from} to={to} />
@@ -193,14 +222,40 @@ async function VendasTab({
   period,
   methods,
   sort,
+  page,
+  params,
 }: {
   from: string;
   to: string;
   period: Period;
   methods: PaymentMethod[];
   sort: SaleSort;
+  page: number;
+  params: Record<string, string | string[] | undefined>;
 }) {
   const supabase = await createClient();
+
+  // Totais do período agregados no banco (exatos, independem da paginação).
+  const { data: summaryData, error: summaryError } = await supabase
+    .rpc("sales_summary", {
+      p_from: from,
+      p_to: to,
+      p_methods: methods.length > 0 ? methods : null,
+    })
+    .maybeSingle();
+  const summary = (summaryData ?? EMPTY_SUMMARY) as SalesSummaryRow;
+
+  const grossRevenue = Number(summary.gross_total);
+  const feesTotal = Number(summary.fees_total);
+  const netRevenue = Math.round((grossRevenue - feesTotal) * 100) / 100;
+  const completedCount = Number(summary.completed_count);
+  const voidedCount = Number(summary.voided_count);
+
+  const totalSales = completedCount + voidedCount;
+  const totalPages = Math.max(1, Math.ceil(totalSales / SALES_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const offset = (currentPage - 1) * SALES_PAGE_SIZE;
+
   let query = supabase
     .from("sales")
     .select(
@@ -217,15 +272,10 @@ async function VendasTab({
   if (order.column !== "created_at") {
     query = query.order("created_at", { ascending: false });
   }
-  const { data, error } = await query;
+  query = query.range(offset, offset + SALES_PAGE_SIZE - 1);
+  const { data, error: listError } = await query;
   const sales = (data ?? []) as SaleRow[];
-
-  const completed = sales.filter((s) => s.status === "completed");
-  const grossRevenue = completed.reduce((sum, s) => sum + Number(s.total), 0);
-  const feesTotal = completed.reduce((sum, s) => sum + Number(s.fee_amount), 0);
-  const netRevenue = Math.round((grossRevenue - feesTotal) * 100) / 100;
-  const completedCount = completed.length;
-  const voidedCount = sales.filter((s) => s.status === "voided").length;
+  const error = summaryError ?? listError;
 
   return (
     <>
@@ -278,9 +328,79 @@ async function VendasTab({
           </p>
         </div>
       ) : (
-        <SalesList sales={sales} />
+        <>
+          <SalesList sales={sales} />
+          <SalesPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalSales={totalSales}
+            params={params}
+          />
+        </>
       )}
     </>
+  );
+}
+
+// Navegação entre páginas da lista de vendas, preservando filtros/ordenação.
+function SalesPagination({
+  currentPage,
+  totalPages,
+  totalSales,
+  params,
+}: {
+  currentPage: number;
+  totalPages: number;
+  totalSales: number;
+  params: Record<string, string | string[] | undefined>;
+}) {
+  if (totalPages <= 1) return null;
+
+  const pageHref = (target: number) => {
+    const next = new URLSearchParams();
+    for (const key of ["tab", "period", "from", "to", "methods", "sort"] as const) {
+      const v = pickString(params[key]);
+      if (v) next.set(key, v);
+    }
+    if (target > 1) next.set("page", String(target));
+    const qs = next.toString();
+    return qs ? `?${qs}` : "?";
+  };
+
+  const linkClass =
+    "border-border text-foreground hover:bg-muted flex h-12 items-center justify-center rounded-lg border px-5 text-base font-medium";
+  const disabledClass =
+    "border-border text-muted-foreground flex h-12 cursor-not-allowed items-center justify-center rounded-lg border px-5 text-base font-medium opacity-50";
+
+  return (
+    <nav
+      aria-label="Páginas da lista de vendas"
+      className="flex flex-wrap items-center justify-between gap-3"
+    >
+      {currentPage > 1 ? (
+        <Link href={pageHref(currentPage - 1)} className={linkClass}>
+          ← Anterior
+        </Link>
+      ) : (
+        <span aria-disabled="true" className={disabledClass}>
+          ← Anterior
+        </span>
+      )}
+      <p className="text-muted-foreground text-base">
+        Página <span className="text-foreground font-medium">{currentPage}</span>{" "}
+        de {totalPages} · {totalSales}{" "}
+        {totalSales === 1 ? "venda" : "vendas"}
+      </p>
+      {currentPage < totalPages ? (
+        <Link href={pageHref(currentPage + 1)} className={linkClass}>
+          Próxima →
+        </Link>
+      ) : (
+        <span aria-disabled="true" className={disabledClass}>
+          Próxima →
+        </span>
+      )}
+    </nav>
   );
 }
 
@@ -327,18 +447,13 @@ async function ResumoTab({
   const fromDate = toDateInputValue(from);
   const toDate = toDateInputValue(to);
 
+  // Vendas e despesas agregadas no banco (RPCs) — valores exatos mesmo com
+  // milhares de linhas no período; só as sessões fechadas vêm como lista.
   const [salesRes, expensesRes, closedRes] = await Promise.all([
     supabase
-      .from("sales")
-      .select("total, fee_amount, status")
-      .gte("created_at", from)
-      .lte("created_at", to)
-      .eq("status", "completed"),
-    supabase
-      .from("expenses")
-      .select("category, amount")
-      .gte("incurred_on", fromDate)
-      .lte("incurred_on", toDate),
+      .rpc("sales_summary", { p_from: from, p_to: to, p_methods: null })
+      .maybeSingle(),
+    supabase.rpc("expenses_summary", { p_from: fromDate, p_to: toDate }),
     supabase
       .from("cash_sessions")
       .select(
@@ -350,23 +465,17 @@ async function ResumoTab({
       .order("closed_at", { ascending: false }),
   ]);
 
-  const sales = (salesRes.data ?? []) as {
-    total: number;
-    fee_amount: number;
-  }[];
-  const grossRevenue =
-    Math.round(sales.reduce((s, r) => s + Number(r.total), 0) * 100) / 100;
-  const feesTotal =
-    Math.round(sales.reduce((s, r) => s + Number(r.fee_amount), 0) * 100) / 100;
+  const summary = (salesRes.data ?? EMPTY_SUMMARY) as SalesSummaryRow;
+  const grossRevenue = Number(summary.gross_total);
+  const feesTotal = Number(summary.fees_total);
   const netRevenue = Math.round((grossRevenue - feesTotal) * 100) / 100;
 
-  const expenses = (expensesRes.data ?? []) as {
-    category: ExpenseCategory;
-    amount: number;
-  }[];
   const byCat = new Map<ExpenseCategory, number>();
-  for (const e of expenses) {
-    byCat.set(e.category, (byCat.get(e.category) ?? 0) + Number(e.amount));
+  for (const row of (expensesRes.data ?? []) as {
+    category: ExpenseCategory;
+    total: number;
+  }[]) {
+    byCat.set(row.category, Number(row.total));
   }
   const expensesByCategory = EXPENSE_CATEGORIES.filter((c) => byCat.has(c)).map(
     (c) => ({ category: c, total: Math.round((byCat.get(c) ?? 0) * 100) / 100 }),
@@ -390,20 +499,17 @@ async function ResumoTab({
     0,
     0,
   ).toISOString();
-  const { data: monthSalesData } = await supabase
-    .from("sales")
-    .select("total, fee_amount")
-    .gte("created_at", monthStart)
-    .lte("created_at", new Date().toISOString())
-    .eq("status", "completed");
-  const monthSales = (monthSalesData ?? []) as {
-    total: number;
-    fee_amount: number;
-  }[];
+  const { data: monthSummaryData } = await supabase
+    .rpc("sales_summary", {
+      p_from: monthStart,
+      p_to: new Date().toISOString(),
+      p_methods: null,
+    })
+    .maybeSingle();
+  const monthSummary = (monthSummaryData ?? EMPTY_SUMMARY) as SalesSummaryRow;
   const monthSoFarNet =
     Math.round(
-      monthSales.reduce((s, r) => s + (Number(r.total) - Number(r.fee_amount)), 0) *
-        100,
+      (Number(monthSummary.gross_total) - Number(monthSummary.fees_total)) * 100,
     ) / 100;
   const daysElapsed = now.getDate();
   const daysInMonth = new Date(
@@ -544,20 +650,7 @@ function SaleCard({ sale }: { sale: SaleRow }) {
             <Printer aria-hidden="true" className="size-5" />
             Imprimir venda
           </a>
-          <form action={toggleSaleStatus}>
-            <input type="hidden" name="id" value={sale.id} />
-            <input type="hidden" name="currentStatus" value={sale.status} />
-            <button
-              type="submit"
-              className={
-                voided
-                  ? "h-12 w-full rounded-lg bg-success px-5 text-base font-medium text-success-foreground hover:opacity-90"
-                  : "bg-destructive/10 text-destructive hover:bg-destructive/20 h-12 w-full rounded-lg px-5 text-base font-medium"
-              }
-            >
-              {voided ? "Reativar" : "Estornar"}
-            </button>
-          </form>
+          <ToggleSaleStatusButton saleId={sale.id} status={sale.status} />
         </div>
       </div>
     </li>

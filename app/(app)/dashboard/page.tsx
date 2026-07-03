@@ -42,21 +42,17 @@ export default async function DashboardPage() {
   const todayStart = todayStartISO();
   const monthStart = monthStartISO();
 
-  const [
-    salesToday,
-    salesMonth,
-    lowStockCount,
-  ] = await Promise.all([
+  const nowISO = new Date().toISOString();
+
+  // Faturamento agregado no banco (RPC sales_summary) — exato mesmo com
+  // milhares de vendas no período (o PostgREST cortaria linhas em 1000).
+  const [salesToday, salesMonth, lowStockCount] = await Promise.all([
     supabase
-      .from("sales")
-      .select("total")
-      .eq("status", "completed")
-      .gte("created_at", todayStart),
+      .rpc("sales_summary", { p_from: todayStart, p_to: nowISO, p_methods: null })
+      .maybeSingle(),
     supabase
-      .from("sales")
-      .select("total")
-      .eq("status", "completed")
-      .gte("created_at", monthStart),
+      .rpc("sales_summary", { p_from: monthStart, p_to: nowISO, p_methods: null })
+      .maybeSingle(),
     supabase
       .from("products")
       .select("id", { count: "exact", head: true })
@@ -64,12 +60,13 @@ export default async function DashboardPage() {
       .lte("stock_quantity", LOW_STOCK_THRESHOLD),
   ]);
 
-  const sumTotals = (rows: { total: number }[] | null): number =>
-    (rows ?? []).reduce((s, r) => s + Number(r.total), 0);
+  type SummaryRow = { gross_total: number; completed_count: number } | null;
+  const today = salesToday.data as SummaryRow;
+  const month = salesMonth.data as SummaryRow;
 
-  const todayRevenue = sumTotals(salesToday.data as { total: number }[] | null);
-  const monthRevenue = sumTotals(salesMonth.data as { total: number }[] | null);
-  const todayCount = salesToday.data?.length ?? 0;
+  const todayRevenue = Number(today?.gross_total ?? 0);
+  const monthRevenue = Number(month?.gross_total ?? 0);
+  const todayCount = Number(today?.completed_count ?? 0);
   const lowStock = lowStockCount.count ?? 0;
 
   const kpis: Kpi[] = [
