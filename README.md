@@ -20,7 +20,7 @@ Cadastro de produtos, frente de caixa e demonstrativos de faturamento — pensad
 <div align="center">
   <img src="docs/screenshots/demo.gif" alt="Demonstração da frente de caixa do Gaveta" width="820" />
 
-  <br/><em>Fluxo de venda (acelerado)</em> · ▶ <a href="assets/demo/Demonstrativo%20Gaveta%20Completo.mp4">ver demonstração completa (60s)</a>
+  <br/><em>Fluxo de venda (acelerado)</em> · ▶ <a href="https://github.com/drizaogythub97/gaveta/releases/download/v1.0.0/demo-gaveta-completo.mp4">ver demonstração completa (60s)</a>
 </div>
 
 ## Sobre o projeto
