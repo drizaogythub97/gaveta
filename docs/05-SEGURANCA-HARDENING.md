@@ -253,4 +253,37 @@ práticas de segurança.
 - ✅ **Fase 7 concluída.** Próximo: Fase 8 (Lighthouse, E2E Playwright, backup do
   banco) e revisão final antes do merge na `main`.
 
-> Próximas entradas serão adicionadas ao concluir cada bloco da Fase 7.
+### 2026-07-03 — Revisão independente pós-v1.0.0 (Claude Fable 5) → v1.0.1
+
+Após o lançamento da v1.0.0, o sistema inteiro passou por uma **revisão
+independente de segurança e desempenho** com o Claude Fable 5 (modelo mais
+avançado da Anthropic — o desenvolvimento havia sido feito com o Opus 4.8).
+Escopo: middleware/CSP/headers, todas as Server Actions, as migrations
+(RLS e RPCs), rotas públicas, upload de arquivos, variáveis de ambiente e
+dependências.
+
+**Veredito:** nenhuma vulnerabilidade explorável de acesso cruzado, vazamento
+de segredo ou bypass de autenticação. Os achados foram melhorias, todas
+corrigidas no **PR #13** (migration `0010_hardening.sql`) e cobertas por teste:
+
+- **KPIs financeiros agregados no banco** (RPCs `sales_summary` /
+  `expenses_summary`): as somas eram feitas no JS sobre linhas retornadas pela
+  API, que corta em 1000 — períodos muito movimentados poderiam subcontar o
+  faturamento em silêncio. A lista de vendas ganhou paginação.
+- **`register_sale` passou a exigir produto do próprio usuário** (a checagem
+  de FK não passa pela RLS; não havia vazamento, mas era indevido).
+- **`search_path` fixado em todas as funções** do banco (alerta do Supabase
+  Security Advisor zerado).
+- **Bucket `brand-logos` com limites no próprio bucket** (2 MB; PNG/JPEG/WebP)
+  — a validação da Server Action podia ser contornada via Storage API direta.
+- **Rate limiting na reautenticação** (trocar senha/e-mail, excluir conta).
+- **Estorno/reativação com erro visível** (toast) em vez de falha silenciosa.
+
+Validação: `lint`, `tsc`, testes unitários, **suíte RLS 34/34** contra o banco
+real (3 testes novos cobrindo o hardening), build, smoke test em Preview e em
+produção. Descartados com justificativa: HSTS `preload` (o domínio
+`vercel.app` já está na preload list do Chrome), índice trigram (a escala não
+exige) e recomputo de `fee_amount` no servidor (afeta apenas os relatórios do
+próprio usuário — design aceito). Release: **v1.0.1**.
+
+> Próximas entradas serão adicionadas conforme novas revisões/melhorias.
