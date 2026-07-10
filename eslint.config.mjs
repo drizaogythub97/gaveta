@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Estudos locais que não fazem parte do app (ver .gitignore).
+    "fiadoapp-study/**",
   ]),
 ]);
 

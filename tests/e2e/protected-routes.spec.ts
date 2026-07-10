@@ -11,6 +11,7 @@ const protectedRoutes = [
   "/financeiro",
   "/produtos",
   "/minha-conta",
+  "/configuracoes",
 ];
 
 for (const route of protectedRoutes) {

@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 import { AppNav } from "@/components/app/app-nav";
 import { LogoutButton } from "@/components/app/logout-button";
 import { PersonalizationTip } from "@/components/app/personalization-tip";
-import { SettingsMenu } from "@/components/app/settings-menu";
 import { Toaster } from "@/components/ui/sonner";
 import { createClient } from "@/lib/supabase/server";
 
@@ -85,7 +84,6 @@ export default async function AppLayout({
             >
               {displayName}
             </span>
-            <SettingsMenu />
             <LogoutButton />
           </div>
         </div>
