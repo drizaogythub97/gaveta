@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Package,
   Receipt,
+  Settings,
   ShoppingCart,
 } from "lucide-react";
 import Link from "next/link";
@@ -18,7 +19,11 @@ const ITEMS = [
   { href: "/produtos", label: "Produtos", Icon: Package },
   { href: "/estoque", label: "Estoque", Icon: Boxes },
   { href: "/financeiro", label: "Financeiro", Icon: Receipt },
+  { href: "/configuracoes", label: "Configurações", Icon: Settings },
 ] as const;
+
+// Rotas de configurações que vivem fora de /configuracoes mas pertencem à aba.
+const CONFIG_ROTAS = ["/preferencias", "/minha-conta"] as const;
 
 export function AppNav() {
   const pathname = usePathname();
@@ -31,7 +36,13 @@ export function AppNav() {
       <ul className="mx-auto flex w-full max-w-5xl flex-wrap items-stretch gap-1 px-2">
         {ITEMS.map(({ href, label, Icon }) => {
           const active =
-            pathname === href || pathname.startsWith(`${href}/`);
+            pathname === href ||
+            pathname.startsWith(`${href}/`) ||
+            (href === "/configuracoes" &&
+              CONFIG_ROTAS.some(
+                (rota) =>
+                  pathname === rota || pathname.startsWith(`${rota}/`),
+              ));
           return (
             <li key={href} className="flex-1 sm:flex-initial">
               <Link
