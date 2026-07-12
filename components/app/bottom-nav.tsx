@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowUpRight,
   Boxes,
   LayoutDashboard,
   Menu,
@@ -15,6 +16,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { LogoutButton } from "@/components/app/logout-button";
+import { FIADOAPP_URL } from "@/lib/ecossistema";
 import { cn } from "@/lib/utils";
 
 const PRINCIPAIS = [
@@ -111,6 +113,17 @@ export function BottomNav({ displayName }: { displayName: string }) {
                 {label}
               </Link>
             ))}
+            {/* App switcher (ecossistema, estágio 1): mesma conta lá. */}
+            <a
+              href={FIADOAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMaisAberto(false)}
+              className="text-foreground hover:bg-muted flex h-12 items-center gap-3 rounded-lg px-3 text-base font-medium"
+            >
+              <ArrowUpRight aria-hidden="true" className="size-5" />
+              Abrir o FiadoApp
+            </a>
             <div className="border-border mt-2 flex flex-col border-t pt-3">
               <LogoutButton />
             </div>

@@ -17,11 +17,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { FIADOAPP_URL } from "@/lib/ecossistema";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Ecossistema" };
-
-const FIADOAPP_URL = "https://fiadoapp.net";
 
 // Pontes dos estágios 2–5 do ecossistema — apresentadas desde já,
 // entregues aos poucos. Toda ponte nasce DESLIGADA e terá liga/desliga

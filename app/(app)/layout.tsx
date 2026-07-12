@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { AppNav } from "@/components/app/app-nav";
+import { AppSwitcher } from "@/components/app/app-switcher";
 import { BottomNav } from "@/components/app/bottom-nav";
 import { LogoutButton } from "@/components/app/logout-button";
 import { ModoChooser } from "@/components/app/modo-chooser";
@@ -91,6 +92,7 @@ export default async function AppLayout({
             >
               {displayName}
             </span>
+            <AppSwitcher />
             <LogoutButton />
           </div>
         </div>
