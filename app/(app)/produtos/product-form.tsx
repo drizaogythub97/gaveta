@@ -267,17 +267,22 @@ export function ProductForm({
         </div>
       ) : null}
 
-      <div className="mt-2 flex flex-col-reverse gap-3 sm:flex-row">
+      {/* Rodapé no padrão do sistema (h-12 text-base, largura natural no
+          desktop) — os h-14 text-lg esticados destoavam das outras telas. */}
+      <div className="mt-2 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Link
           href="/produtos"
           className={cn(
             buttonVariants({ variant: "outline" }),
-            "minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 flex-1 px-6 text-lg",
+            "minimal:max-sm:h-11 minimal:max-sm:text-sm h-12 px-6 text-base",
           )}
         >
           Cancelar
         </Link>
-        <SubmitButton className="flex-1" pendingText={submitPendingLabel}>
+        <SubmitButton
+          className="h-12 px-6 text-base font-semibold sm:w-auto"
+          pendingText={submitPendingLabel}
+        >
           {submitLabel}
         </SubmitButton>
       </div>
