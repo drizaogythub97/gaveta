@@ -17,11 +17,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { FIADOAPP_URL } from "@/lib/ecossistema";
+import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Ecossistema" };
+import { SwitcherToggle } from "./switcher-toggle";
 
-const FIADOAPP_URL = "https://fiadoapp.net";
+export const metadata = { title: "Ecossistema" };
 
 // Pontes dos estágios 2–5 do ecossistema — apresentadas desde já,
 // entregues aos poucos. Toda ponte nasce DESLIGADA e terá liga/desliga
@@ -52,7 +54,18 @@ const PONTES = [
   },
 ] as const;
 
-export default function EcossistemaPage() {
+export default async function EcossistemaPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: prefs } = await supabase
+    .from("ecossistema_prefs")
+    .select("switcher_ativo")
+    .eq("user_id", user?.id ?? "")
+    .maybeSingle();
+  const switcherAtivo = Boolean(prefs?.switcher_ativo);
+
   return (
     <section className="minimal:max-sm:gap-4 flex max-w-2xl flex-col gap-6">
       <header>
@@ -99,6 +112,23 @@ export default function EcossistemaPage() {
             Abrir o FiadoApp
             <ArrowUpRight aria-hidden="true" className="size-5" />
           </a>
+        </CardContent>
+      </Card>
+
+      {/* ── ATALHO (1º toggle real do ecossistema — opt-in) ────────── */}
+      <Card>
+        <CardHeader className="minimal:max-sm:border-b minimal:max-sm:border-border/60 minimal:max-sm:pb-3">
+          <CardTitle className="minimal:max-sm:text-base text-xl">
+            Atalho rápido no menu
+          </CardTitle>
+          <CardDescription className="minimal:max-sm:text-sm text-base">
+            Mostra um botão para abrir o FiadoApp no topo do app (computador)
+            e no menu &quot;Mais&quot; (celular). Vale para a sua conta —
+            aparece nos dois apps. Desativado por padrão.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SwitcherToggle ativoInicial={switcherAtivo} />
         </CardContent>
       </Card>
 

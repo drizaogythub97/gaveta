@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowUpRight,
   Boxes,
   LayoutDashboard,
   Menu,
@@ -15,6 +16,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { LogoutButton } from "@/components/app/logout-button";
+import { FIADOAPP_URL } from "@/lib/ecossistema";
 import { cn } from "@/lib/utils";
 
 const PRINCIPAIS = [
@@ -37,7 +39,14 @@ const CONFIG_ROTAS = ["/preferencias", "/minha-conta"] as const;
  * com data-ui-mode="minimalista" no <html> (variant `minimal` + `max-sm`).
  * No modo Simples e no desktop este componente fica display:none.
  */
-export function BottomNav({ displayName }: { displayName: string }) {
+export function BottomNav({
+  displayName,
+  mostrarSwitcher,
+}: {
+  displayName: string;
+  /** Atalho do ecossistema: opt-in em /ecossistema (estágio 1). */
+  mostrarSwitcher: boolean;
+}) {
   const pathname = usePathname();
   const [maisAberto, setMaisAberto] = useState(false);
 
@@ -111,6 +120,20 @@ export function BottomNav({ displayName }: { displayName: string }) {
                 {label}
               </Link>
             ))}
+            {/* App switcher (ecossistema, estágio 1): opt-in na página
+                /ecossistema — só aparece para quem ligou o atalho. */}
+            {mostrarSwitcher ? (
+              <a
+                href={FIADOAPP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMaisAberto(false)}
+                className="text-foreground hover:bg-muted flex h-12 items-center gap-3 rounded-lg px-3 text-base font-medium"
+              >
+                <ArrowUpRight aria-hidden="true" className="size-5" />
+                Abrir o FiadoApp
+              </a>
+            ) : null}
             <div className="border-border mt-2 flex flex-col border-t pt-3">
               <LogoutButton />
             </div>
