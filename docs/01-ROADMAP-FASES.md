@@ -304,3 +304,22 @@ Fase 0 (você) → Fases 1–4 (Claude Code). Ao fim da Fase 4 já há um sistem
 > Decisão (2026-06-21): templates de e-mail customizados, SMTP próprio e
 > reativação de "Confirm email" estão **fora do escopo**. O app usa os e-mails
 > padrão do Supabase (suficiente para reset de senha).
+
+## Entrega pós-MVP: experiência mobile (2026-07-12)
+
+Padrão mobile do FiadoApp v2 (spec `fiadoapp-v2/docs/05-MOBILE-UI-SPEC.md`)
+replicado e validado pelo dono:
+
+- **PR #16** (merge `05745cd`): modo Simples organizado no mobile (nav em
+  grade 2 colunas), modo **Minimalista opt-in** por aparelho (cookie
+  `gaveta_ui_mode` + variant CSS `minimal` + barra inferior + tela de
+  escolha + seção em Preferências), escala densa validada, e fix do
+  `noopener` (o Fechar do preview de comprovante voltou a funcionar).
+- **PR #17** (merge `96437c8`): comprovante direto no celular — o caixa e o
+  Financeiro perguntam **PDF/Imagem** e geram o arquivo no aparelho com
+  share nativo (`components/receipt/emissor-comprovante.tsx` +
+  `lib/receipt/data.ts` como loader único); compartilhar texto puro foi
+  removido; rodapé do formulário de produto padronizado (h-12 text-base).
+
+Gotcha de lint: `react-hooks/immutability` barra `document.cookie =` dentro
+de componente — içar para função de módulo.
