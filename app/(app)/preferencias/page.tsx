@@ -1,12 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_FEES, type PaymentFees } from "@/lib/preferences/types";
 import type { ReceiptPaper, ReceiptPrefs } from "@/lib/receipt/types";
+import { getUiModeFromCookie } from "@/lib/ui-mode/cookie";
 
 import { BrandSection } from "./sections/brand-section";
 import { FeesSection } from "./sections/fees-section";
 import { LogoSection } from "./sections/logo-section";
 import { ReceiptSection } from "./sections/receipt-section";
 import { ThemeSection } from "./sections/theme-section";
+import { UiModeSection } from "./sections/ui-mode-section";
 
 export const metadata = {
   title: "Preferências",
@@ -23,6 +25,7 @@ type ProfileRow = {
 };
 
 export default async function PreferencesPage() {
+  const uiMode = await getUiModeFromCookie();
   const supabase = await createClient();
   const {
     data: { user },
@@ -69,16 +72,19 @@ export default async function PreferencesPage() {
   };
 
   return (
-    <section className="flex flex-col gap-8">
+    <section className="minimal:max-sm:gap-5 flex flex-col gap-8">
       <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Preferências</h1>
-        <p className="text-muted-foreground mt-2 text-lg">
+        <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">
+          Preferências
+        </h1>
+        <p className="minimal:max-sm:text-sm text-muted-foreground mt-2 text-lg">
           Ajuste a aparência, as taxas das maquininhas e a identidade do seu
           negócio.
         </p>
       </header>
 
       <ThemeSection currentTheme={profileData.theme} />
+      <UiModeSection initialMode={uiMode} />
       <BrandSection initialName={profileData.brand_name ?? ""} />
       <LogoSection initialLogoUrl={initialLogoUrl} />
       <ReceiptSection

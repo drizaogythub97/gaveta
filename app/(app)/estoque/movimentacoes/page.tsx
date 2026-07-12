@@ -59,7 +59,7 @@ export default async function StockMovementsPage({
   const movements = (data ?? []) as unknown as StockMovementRow[];
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
       <header className="flex flex-col gap-3">
         <Link
           href="/estoque"
@@ -68,10 +68,10 @@ export default async function StockMovementsPage({
           <ArrowLeft aria-hidden="true" className="size-5" />
           Voltar ao estoque
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">
           Movimentação de estoque
         </h1>
-        <p className="text-muted-foreground text-lg">
+        <p className="minimal:max-sm:text-sm text-muted-foreground text-lg">
           Entradas e saídas dos seus produtos: vendas, estornos, reposições e
           ajustes. Mostrando os {MOVEMENT_LIMIT} mais recentes.
         </p>
@@ -128,7 +128,7 @@ function MovementRow({ movement }: { movement: StockMovementRow }) {
   const incoming = movement.quantity >= 0;
   const sign = incoming ? "+" : "−";
   return (
-    <li className="ring-foreground/10 bg-card flex items-center justify-between gap-3 rounded-xl p-4 ring-1">
+    <li className="ring-foreground/10 bg-card flex items-center justify-between gap-3 minimal:max-sm:p-3.5 rounded-xl p-4 ring-1">
       <div className="flex flex-col gap-1">
         <span className="text-foreground text-lg font-medium">
           {movement.products?.name ?? "Produto removido"}

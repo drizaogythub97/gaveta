@@ -47,7 +47,7 @@ export function ExpensesClient({
 
       <section className="bg-primary text-primary-foreground flex items-center justify-between rounded-xl p-5">
         <span className="text-base opacity-90">Total de despesas no período</span>
-        <span className="text-3xl font-bold tabular-nums sm:text-4xl">
+        <span className="minimal:max-sm:text-xl text-3xl font-bold tabular-nums sm:text-4xl">
           {formatBRL(total)}
         </span>
       </section>
@@ -101,8 +101,8 @@ function ExpenseForm({ defaultDate }: { defaultDate: string }) {
   }
 
   return (
-    <section className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1">
-      <h2 className="flex items-center gap-2 text-xl font-semibold">
+    <section className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1">
+      <h2 className="minimal:max-sm:text-lg flex items-center gap-2 text-xl font-semibold">
         <Plus aria-hidden="true" className="size-6" />
         Registrar despesa
       </h2>
@@ -134,7 +134,7 @@ function ExpenseForm({ defaultDate }: { defaultDate: string }) {
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="h-14 text-base"
+            className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 text-base"
           />
         </div>
         <div className="flex flex-col gap-2">
@@ -145,7 +145,7 @@ function ExpenseForm({ defaultDate }: { defaultDate: string }) {
             id="expense-category"
             value={category}
             onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
-            className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-14 w-full rounded-lg border px-3 text-base outline-none focus-visible:ring-3"
+            className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 w-full rounded-lg border px-3 text-base outline-none focus-visible:ring-3"
           >
             {EXPENSE_CATEGORIES.map((c) => (
               <option key={c} value={c}>
@@ -165,7 +165,7 @@ function ExpenseForm({ defaultDate }: { defaultDate: string }) {
             value={amountDigits === "" ? "" : digitsToBRL(amountDigits)}
             onChange={(e) => setAmountDigits(sanitizeDigits(e.target.value))}
             placeholder="R$ 0,00"
-            className="h-14 text-base"
+            className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 text-base"
           />
         </div>
         <div className="flex flex-col gap-2">
@@ -178,7 +178,7 @@ function ExpenseForm({ defaultDate }: { defaultDate: string }) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Ex.: conta de luz"
-            className="h-14 text-base"
+            className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 text-base"
             maxLength={280}
           />
         </div>
@@ -189,7 +189,7 @@ function ExpenseForm({ defaultDate }: { defaultDate: string }) {
           onClick={submit}
           disabled={pending}
           aria-busy={pending}
-          className="h-12 px-6 text-base font-semibold"
+          className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-12 px-6 text-base font-semibold"
         >
           {pending ? "Salvando…" : "Salvar despesa"}
         </Button>
@@ -212,7 +212,7 @@ function ExpenseRow({ expense }: { expense: Expense }) {
   }
 
   return (
-    <li className="ring-foreground/10 bg-card flex items-center justify-between gap-3 rounded-xl p-4 ring-1">
+    <li className="ring-foreground/10 bg-card flex items-center justify-between gap-3 minimal:max-sm:p-3.5 rounded-xl p-4 ring-1">
       <div className="flex flex-col gap-1">
         <span className="text-foreground text-lg font-medium">
           {EXPENSE_CATEGORY_LABELS[expense.category]}

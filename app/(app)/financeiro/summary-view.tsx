@@ -64,8 +64,8 @@ export function SummaryView({ data }: { data: SummaryData }) {
         />
       </section>
 
-      <section className="ring-foreground/10 bg-card flex flex-col gap-3 rounded-xl p-5 ring-1">
-        <h2 className="text-xl font-semibold">Despesas por categoria</h2>
+      <section className="ring-foreground/10 bg-card flex flex-col gap-3 minimal:max-sm:p-4 rounded-xl p-5 ring-1">
+        <h2 className="minimal:max-sm:text-lg text-xl font-semibold">Despesas por categoria</h2>
         {data.expensesByCategory.length === 0 ? (
           <p className="text-muted-foreground text-base">
             Nenhuma despesa no período.
@@ -89,8 +89,8 @@ export function SummaryView({ data }: { data: SummaryData }) {
         )}
       </section>
 
-      <section className="ring-foreground/10 bg-card flex flex-col gap-3 rounded-xl p-5 ring-1">
-        <h2 className="text-xl font-semibold">Fechamentos de caixa no período</h2>
+      <section className="ring-foreground/10 bg-card flex flex-col gap-3 minimal:max-sm:p-4 rounded-xl p-5 ring-1">
+        <h2 className="minimal:max-sm:text-lg text-xl font-semibold">Fechamentos de caixa no período</h2>
         {data.closedSessions.length === 0 ? (
           <p className="text-muted-foreground text-base">
             Nenhum caixa fechado no período.
@@ -130,9 +130,9 @@ export function SummaryView({ data }: { data: SummaryData }) {
       </section>
 
       {data.projection ? (
-        <section className="ring-foreground/10 bg-card flex flex-col gap-3 rounded-xl p-5 ring-1">
+        <section className="ring-foreground/10 bg-card flex flex-col gap-3 minimal:max-sm:p-4 rounded-xl p-5 ring-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-semibold">Projeção do mês</h2>
+            <h2 className="minimal:max-sm:text-lg text-xl font-semibold">Projeção do mês</h2>
             <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs font-medium">
               estimativa
             </span>

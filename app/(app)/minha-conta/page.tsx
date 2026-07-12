@@ -27,9 +27,9 @@ export default async function AccountPage() {
     (profile?.privacy_accepted_at as string | null) ?? null;
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
       <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Minha conta</h1>
+        <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">Minha conta</h1>
         <p className="text-muted-foreground mt-2 text-lg">
           Seus dados pessoais. Você pode editar o nome e, se quiser, excluir
           definitivamente a conta.

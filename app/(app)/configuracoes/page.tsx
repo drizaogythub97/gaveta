@@ -22,10 +22,10 @@ const OPCOES = [
 
 export default function ConfiguracoesPage() {
   return (
-    <section className="flex flex-col gap-6">
+    <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
-        <p className="text-muted-foreground mt-1 text-lg">
+        <h1 className="minimal:max-sm:text-xl text-3xl font-bold tracking-tight">Configurações</h1>
+        <p className="minimal:max-sm:text-sm text-muted-foreground mt-1 text-lg">
           Escolha o que você quer ajustar.
         </p>
       </header>
@@ -37,12 +37,12 @@ export default function ConfiguracoesPage() {
             href={href}
             className="focus-visible:ring-ring/50 rounded-xl outline-none focus-visible:ring-3"
           >
-            <Card className="hover:bg-muted/50 h-full gap-3 p-6 transition-colors">
-              <span className="bg-primary/10 text-primary flex size-12 items-center justify-center rounded-full">
+            <Card className="minimal:max-sm:p-4 minimal:max-sm:gap-2 hover:bg-muted/50 h-full gap-3 p-6 transition-colors">
+              <span className="minimal:max-sm:size-10 bg-primary/10 text-primary flex size-12 items-center justify-center rounded-full">
                 <Icon aria-hidden="true" className="size-6" />
               </span>
-              <CardTitle className="text-xl">{titulo}</CardTitle>
-              <CardDescription className="text-base">
+              <CardTitle className="minimal:max-sm:text-base text-xl">{titulo}</CardTitle>
+              <CardDescription className="minimal:max-sm:text-sm text-base">
                 {descricao}
               </CardDescription>
             </Card>

@@ -79,7 +79,7 @@ export function FinancialClient({
   }
 
   return (
-    <div className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1">
+    <div className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1">
       <fieldset className="flex flex-col gap-3">
         <legend className="text-lg font-semibold">Período</legend>
         <div

@@ -33,11 +33,11 @@ export default async function ProductsPage() {
   }));
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Produtos</h1>
-          <p className="text-muted-foreground mt-2 text-lg">
+          <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">Produtos</h1>
+          <p className="minimal:max-sm:text-sm minimal:max-sm:mt-1 text-muted-foreground mt-2 text-lg">
             Cadastre e organize o que você vende.
           </p>
         </div>
@@ -45,7 +45,7 @@ export default async function ProductsPage() {
           href="/produtos/novo"
           className={cn(
             buttonVariants(),
-            "h-14 px-6 text-lg font-medium sm:self-start",
+            "minimal:max-sm:h-11 minimal:max-sm:text-base h-14 px-6 text-lg font-medium sm:self-start",
           )}
         >
           <Plus aria-hidden="true" className="size-5" />
@@ -60,21 +60,21 @@ export default async function ProductsPage() {
       ) : products.length === 0 ? (
         <EmptyState />
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="minimal:max-sm:gap-2 flex flex-col gap-3">
           {products.map((p) => (
             <li
               key={p.id}
-              className="ring-foreground/10 bg-card flex flex-col gap-3 rounded-xl p-4 ring-1 sm:flex-row sm:items-center sm:justify-between"
+              className="minimal:max-sm:gap-2 minimal:max-sm:p-3.5 ring-foreground/10 bg-card flex flex-col gap-3 rounded-xl p-4 ring-1 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-foreground text-xl font-semibold">
+                  <span className="minimal:max-sm:text-base text-foreground text-xl font-semibold">
                     {p.name}
                   </span>
                   <StockBadge product={p} />
                 </div>
-                <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-base">
-                  <span className="text-foreground text-lg font-medium">
+                <div className="minimal:max-sm:text-xs minimal:max-sm:gap-x-3 text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-base">
+                  <span className="minimal:max-sm:text-sm text-foreground text-lg font-medium">
                     {formatBRL(p.price)}
                   </span>
                   {p.barcodes.length > 0 ? (
@@ -92,7 +92,7 @@ export default async function ProductsPage() {
                   href={`/produtos/${p.id}/editar`}
                   className={cn(
                     buttonVariants({ variant: "outline" }),
-                    "h-12 px-4 text-base",
+                    "minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 flex-1 px-4 text-base sm:flex-initial",
                   )}
                   aria-label={`Editar ${p.name}`}
                 >
@@ -115,15 +115,15 @@ export default async function ProductsPage() {
 
 function EmptyState() {
   return (
-    <div className="bg-muted/40 flex flex-col items-center gap-3 rounded-xl p-10 text-center">
+    <div className="minimal:max-sm:p-6 bg-muted/40 flex flex-col items-center gap-3 rounded-xl p-10 text-center">
       <Box aria-hidden="true" className="text-muted-foreground size-10" />
-      <h2 className="text-xl font-medium">Nenhum produto cadastrado ainda</h2>
+      <h2 className="minimal:max-sm:text-base text-xl font-medium">Nenhum produto cadastrado ainda</h2>
       <p className="text-muted-foreground text-base">
         Crie seu primeiro produto para começar a vender.
       </p>
       <Link
         href="/produtos/novo"
-        className={cn(buttonVariants(), "mt-2 h-14 px-6 text-lg font-medium")}
+        className={cn(buttonVariants(), "minimal:max-sm:h-11 minimal:max-sm:text-base mt-2 h-14 px-6 text-lg font-medium")}
       >
         <Plus aria-hidden="true" className="size-5" />
         Cadastrar produto

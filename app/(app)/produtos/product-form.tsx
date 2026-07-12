@@ -105,7 +105,7 @@ export function ProductForm({
           onChange={(e) => setName(e.target.value)}
           aria-invalid={Boolean(state.fieldErrors?.name)}
           aria-describedby={state.fieldErrors?.name ? "name-error" : undefined}
-          className="h-14 text-lg"
+          className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 text-lg"
         />
         {state.fieldErrors?.name ? (
           <p id="name-error" className="text-destructive text-sm" role="alert">
@@ -181,7 +181,7 @@ export function ProductForm({
           initialValue={initialValues?.price ?? null}
           aria-invalid={Boolean(state.fieldErrors?.price)}
           aria-describedby={state.fieldErrors?.price ? "price-error" : undefined}
-          className="h-14 text-lg"
+          className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 text-lg"
         />
         {state.fieldErrors?.price ? (
           <p id="price-error" className="text-destructive text-sm" role="alert">
@@ -204,7 +204,7 @@ export function ProductForm({
               <label
                 key={opt.value}
                 className={cn(
-                  "flex h-14 flex-1 cursor-pointer items-center justify-center rounded-lg border-2 px-4 text-lg font-medium transition-colors",
+                  "minimal:max-sm:h-11 minimal:max-sm:text-sm flex h-14 flex-1 cursor-pointer items-center justify-center rounded-lg border-2 px-4 text-lg font-medium transition-colors",
                   checked
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border text-foreground hover:bg-muted",
@@ -252,7 +252,7 @@ export function ProductForm({
             aria-describedby={
               state.fieldErrors?.stockQuantity ? "stock-error" : undefined
             }
-            className="h-14 text-lg"
+            className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 text-lg"
             placeholder="Ex.: 12"
           />
           {state.fieldErrors?.stockQuantity ? (
@@ -272,7 +272,7 @@ export function ProductForm({
           href="/produtos"
           className={cn(
             buttonVariants({ variant: "outline" }),
-            "h-14 flex-1 px-6 text-lg",
+            "minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 flex-1 px-6 text-lg",
           )}
         >
           Cancelar

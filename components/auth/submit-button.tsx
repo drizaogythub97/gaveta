@@ -20,7 +20,13 @@ export function SubmitButton({
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className={cn("h-14 w-full px-6 text-lg font-medium", className)}
+      className={cn(
+        // As classes minimal ficam depois do override do caller: no
+        // Minimalista (mobile) o CTA acompanha a escala densa (h-11).
+        "h-14 w-full px-6 text-lg font-medium",
+        className,
+        "minimal:max-sm:h-11 minimal:max-sm:text-base",
+      )}
     >
       {pending ? (pendingText ?? "Enviando…") : children}
     </Button>

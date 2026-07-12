@@ -36,10 +36,10 @@ export function ThemeSection({ currentTheme }: Props) {
   return (
     <section
       aria-labelledby="theme-heading"
-      className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
+      className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
     >
       <header>
-        <h2 id="theme-heading" className="text-xl font-semibold">
+        <h2 id="theme-heading" className="minimal:max-sm:text-lg text-xl font-semibold">
           Tema
         </h2>
         <p className="text-muted-foreground text-base">

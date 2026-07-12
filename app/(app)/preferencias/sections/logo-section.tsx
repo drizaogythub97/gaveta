@@ -148,10 +148,10 @@ export function LogoSection({ initialLogoUrl }: Props) {
   return (
     <section
       aria-labelledby="logo-heading"
-      className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
+      className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
     >
       <header>
-        <h2 id="logo-heading" className="text-xl font-semibold">
+        <h2 id="logo-heading" className="minimal:max-sm:text-lg text-xl font-semibold">
           Logo do estabelecimento
         </h2>
         <p className="text-muted-foreground text-base">
@@ -263,7 +263,7 @@ export function LogoSection({ initialLogoUrl }: Props) {
                 setCompletedCrop(null);
               }}
               disabled={pending}
-              className="h-12 px-5 text-base"
+              className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-5 text-base"
             >
               Cancelar
             </Button>
@@ -272,7 +272,7 @@ export function LogoSection({ initialLogoUrl }: Props) {
               onClick={handleSave}
               disabled={pending || !completedCrop}
               aria-busy={pending}
-              className="h-12 px-5 text-base"
+              className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-5 text-base"
             >
               {pending ? "Enviando…" : "Salvar logo"}
             </Button>

@@ -63,10 +63,10 @@ export function ReceiptSection({ initialPrefs, brandName, logoUrl }: Props) {
   return (
     <section
       aria-labelledby="receipt-heading"
-      className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
+      className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
     >
       <header>
-        <h2 id="receipt-heading" className="text-xl font-semibold">
+        <h2 id="receipt-heading" className="minimal:max-sm:text-lg text-xl font-semibold">
           Impressão de comprovante
         </h2>
         <p className="text-muted-foreground text-base">

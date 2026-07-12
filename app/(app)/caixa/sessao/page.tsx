@@ -73,7 +73,7 @@ export default async function CashSessionPage() {
   const closedSessions = (closedRows ?? []) as CashSession[];
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
       <header className="flex flex-col gap-3">
         <Link
           href="/caixa"
@@ -82,10 +82,10 @@ export default async function CashSessionPage() {
           <ArrowLeft aria-hidden="true" className="size-5" />
           Voltar à frente de caixa
         </Link>
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">
           Abertura e fechamento de caixa
         </h1>
-        <p className="text-muted-foreground text-lg">
+        <p className="minimal:max-sm:text-sm text-muted-foreground text-lg">
           Abra o caixa com o troco inicial, registre retiradas (sangria) e
           reforços (suprimento) e, no fim do dia, confira o dinheiro contado com
           o esperado.
