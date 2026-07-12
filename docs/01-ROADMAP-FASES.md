@@ -323,3 +323,29 @@ replicado e validado pelo dono:
 
 Gotcha de lint: `react-hooks/immutability` barra `document.cookie =` dentro
 de componente — içar para função de módulo.
+
+## Ecossistema Gaveta ⇄ FiadoApp (2026-07-12)
+
+Pontes opt-in com o FiadoApp (estratégia aprovada pelo dono; cada ponte
+nasce DESLIGADA, com liga/desliga próprio na página `/ecossistema`). A
+tabela compartilhada `ecossistema_prefs` (criada por migrations do
+FiadoApp, aplicadas ao banco comum) guarda as flags por usuário.
+
+- **Descoberta** (PR #18, merge `6dc2771`): página `/ecossistema` + card em
+  Configurações + anúncio dispensável no Painel (cookie
+  `gaveta_ecossistema_anuncio`).
+- **Estágio 1 — app switcher** (PR #19, merge `4db47fc`): botão/atalho para
+  o FiadoApp no header e no menu "Mais", **opt-in** via toggle
+  `ecossistema_prefs.switcher_ativo`.
+- **Estágio 2 — marca única** (PR #20, merge `0f1472b`): toggle
+  `marca_unica`; com a ponte ligada, salvar nome/logo grava nos dois apps
+  (`profiles` ↔ `fiado_preferencias`, logo = mesmo arquivo do bucket
+  compartilhado). **Política de retorno**: desativar restaura a marca
+  anterior de cada app (backup em `ecossistema_prefs`, guarda
+  `removerLogoSeguro` em `lib/ecossistema-server.ts`).
+
+Componentes reutilizáveis: `app/(app)/ecossistema/eco-toggle.tsx` (toggle
+padrão) e `lib/ecossistema-server.ts` (helpers). Próximos estágios (3
+clientes, 4 venda a prazo no PDV, 5 recebíveis) seguem o mesmo padrão.
+Gotcha: `react-hooks/immutability` barra `document.cookie =` em componente;
+opt-in é regra (nada de atalho fixo sem toggle).
