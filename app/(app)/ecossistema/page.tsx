@@ -142,8 +142,8 @@ export default async function EcossistemaPage() {
           <CardDescription className="minimal:max-sm:text-sm text-base">
             O nome e a logo da sua loja passam a valer nos dois apps,
             editáveis de qualquer um. Ao ativar aqui, a marca configurada no
-            Gaveta é copiada para o FiadoApp. Desativar não apaga nada — cada
-            app volta a valer a própria marca.
+            Gaveta é copiada para o FiadoApp. Ao desativar, cada app volta à
+            marca que tinha antes de ativar.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -152,7 +152,7 @@ export default async function EcossistemaPage() {
             rotulo="Marca única da loja"
             onSalvar={salvarMarcaUnica}
             msgAtivado="Marca única ativada — a marca do Gaveta agora vale nos dois apps."
-            msgDesativado="Marca única desativada."
+            msgDesativado="Marca única desativada — cada app voltou à marca anterior."
           />
         </CardContent>
       </Card>

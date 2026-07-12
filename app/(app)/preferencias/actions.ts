@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
-import { marcaUnicaAtiva } from "@/lib/ecossistema-server";
+import { marcaUnicaAtiva, removerLogoSeguro } from "@/lib/ecossistema-server";
 import { createClient } from "@/lib/supabase/server";
 import { parseDecimalPtBR } from "@/lib/products/format";
 import { THEME_COOKIE, type Theme } from "@/lib/theme/cookie";
@@ -221,32 +221,26 @@ export async function uploadBrandLogo(
   }
 
   // Marca única ligada: o MESMO arquivo passa a valer no FiadoApp (bucket
-  // compartilhado). O arquivo antigo de lá é removido para não ficar órfão.
+  // compartilhado).
+  let anteriorFiado: string | null = null;
   if (await marcaUnicaAtiva(supabase, user.id)) {
     const { data: fiadoPrefs } = await supabase
       .from("fiado_preferencias")
       .select("brand_logo_path")
       .eq("user_id", user.id)
       .maybeSingle();
-    const anteriorFiado =
-      (fiadoPrefs?.brand_logo_path as string | null) ?? null;
+    anteriorFiado = (fiadoPrefs?.brand_logo_path as string | null) ?? null;
     await supabase.from("fiado_preferencias").upsert({
       user_id: user.id,
       brand_logo_path: key,
       updated_at: new Date().toISOString(),
     });
-    if (
-      anteriorFiado &&
-      anteriorFiado !== key &&
-      anteriorFiado !== previousPath
-    ) {
-      await supabase.storage.from("brand-logos").remove([anteriorFiado]);
-    }
   }
 
-  if (previousPath && previousPath !== key) {
-    await supabase.storage.from("brand-logos").remove([previousPath]);
-  }
+  // Apaga os arquivos anteriores só se não estiverem mais em uso (o guarda
+  // protege os que forem backup da marca única, para o "voltar ao anterior").
+  await removerLogoSeguro(supabase, user.id, previousPath);
+  await removerLogoSeguro(supabase, user.id, anteriorFiado);
 
   revalidatePath("/", "layout");
   revalidatePath("/preferencias");
@@ -268,29 +262,34 @@ export async function removeBrandLogo(): Promise<LogoUploadResult> {
   const path = profile?.brand_logo_path as string | null;
   if (!path) return { ok: true };
 
-  await supabase.storage.from("brand-logos").remove([path]);
-  await supabase
-    .from("profiles")
-    .update({ brand_logo_path: null })
-    .eq("id", user.id);
-
   // Marca única ligada: remover também vale nos dois apps.
-  if (await marcaUnicaAtiva(supabase, user.id)) {
+  let doFiado: string | null = null;
+  const unica = await marcaUnicaAtiva(supabase, user.id);
+  if (unica) {
     const { data: fiadoPrefs } = await supabase
       .from("fiado_preferencias")
       .select("brand_logo_path")
       .eq("user_id", user.id)
       .maybeSingle();
-    const doFiado = (fiadoPrefs?.brand_logo_path as string | null) ?? null;
-    if (doFiado && doFiado !== path) {
-      await supabase.storage.from("brand-logos").remove([doFiado]);
-    }
+    doFiado = (fiadoPrefs?.brand_logo_path as string | null) ?? null;
+  }
+
+  // Zera o ponteiro nas tabelas primeiro; depois apaga os arquivos que não
+  // estão mais em uso (o guarda protege backups da marca única).
+  await supabase
+    .from("profiles")
+    .update({ brand_logo_path: null })
+    .eq("id", user.id);
+  if (unica) {
     await supabase.from("fiado_preferencias").upsert({
       user_id: user.id,
       brand_logo_path: null,
       updated_at: new Date().toISOString(),
     });
   }
+
+  await removerLogoSeguro(supabase, user.id, path);
+  await removerLogoSeguro(supabase, user.id, doFiado);
 
   revalidatePath("/", "layout");
   revalidatePath("/preferencias");
