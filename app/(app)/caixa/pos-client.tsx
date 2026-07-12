@@ -4,6 +4,8 @@ import {
   AlertCircle,
   Camera,
   CheckCircle2,
+  FileText,
+  Image as ImageIcon,
   Maximize2,
   Minimize2,
   Minus,
@@ -39,6 +41,10 @@ import {
   BarcodeScanner,
   isBarcodeCameraSupported,
 } from "@/components/app/barcode-scanner";
+import {
+  isDesktop,
+  useEmissorComprovante,
+} from "@/components/receipt/emissor-comprovante";
 import { useClientFlag } from "@/lib/hooks/use-client-flag";
 
 import {
@@ -172,6 +178,13 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
     }
   }, [printSaleId]);
 
+  // Celular: emite o comprovante direto (share nativo de PNG/PDF), sem aba
+  // de preview. Desktop segue abrindo o preview com auto-print.
+  const celular = useClientFlag(() => !isDesktop());
+  const { emitir, node: emissorNode } = useEmissorComprovante({
+    onErro: (mensagem) => setFeedback({ kind: "error", message: mensagem }),
+  });
+
   function closePrintPrompt() {
     setPrintSaleId(null);
     refocus();
@@ -184,6 +197,12 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
       window.open(`/comprovante/${printSaleId}`, "_blank");
     }
     closePrintPrompt();
+  }
+
+  function emitirDoCaixa(formato: "pdf" | "imagem") {
+    const saleId = printSaleId;
+    closePrintPrompt();
+    if (saleId) void emitir(saleId, formato);
   }
 
   function clearManual() {
@@ -938,36 +957,72 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
             <div className="flex flex-col gap-2">
               <h2
                 id="print-prompt-title"
-                className="text-2xl font-semibold tracking-tight"
+                className="minimal:max-sm:text-lg text-2xl font-semibold tracking-tight"
               >
-                Imprimir comprovante?
+                {celular ? "Comprovante para o cliente?" : "Imprimir comprovante?"}
               </h2>
-              <p className="text-muted-foreground text-base">
-                Abre o comprovante da venda para impressão. Você pode ajustar o
-                formato em Preferências.
+              <p className="minimal:max-sm:text-sm text-muted-foreground text-base">
+                {celular
+                  ? "Gera o comprovante da venda e abre o compartilhamento do aparelho."
+                  : "Abre o comprovante da venda para impressão. Você pode ajustar o formato em Preferências."}
               </p>
             </div>
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={closePrintPrompt}
-                className="h-14 px-8 text-lg"
-              >
-                Não
-              </Button>
-              <Button
-                data-print-yes
-                type="button"
-                onClick={confirmPrint}
-                className="h-14 px-8 text-lg font-semibold"
-              >
-                Sim, imprimir
-              </Button>
-            </div>
+            {celular ? (
+              // Celular: escolha do formato aqui mesmo; o arquivo é gerado e
+              // compartilhado direto, sem aba de preview (padrão FiadoApp).
+              <div className="flex flex-col gap-2">
+                <Button
+                  data-print-yes
+                  type="button"
+                  onClick={() => emitirDoCaixa("pdf")}
+                  className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 justify-start gap-3 px-5 text-lg font-medium"
+                >
+                  <FileText aria-hidden="true" className="size-5" />
+                  PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => emitirDoCaixa("imagem")}
+                  className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 justify-start gap-3 px-5 text-lg font-medium"
+                >
+                  <ImageIcon aria-hidden="true" className="size-5" />
+                  Imagem (foto para enviar)
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closePrintPrompt}
+                  className="minimal:max-sm:h-10 minimal:max-sm:text-sm h-12 px-5 text-base"
+                >
+                  Não gerar
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closePrintPrompt}
+                  className="h-14 px-8 text-lg"
+                >
+                  Não
+                </Button>
+                <Button
+                  data-print-yes
+                  type="button"
+                  onClick={confirmPrint}
+                  className="h-14 px-8 text-lg font-semibold"
+                >
+                  Sim, imprimir
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       ) : null}
+
+      {emissorNode}
     </div>
   );
 }

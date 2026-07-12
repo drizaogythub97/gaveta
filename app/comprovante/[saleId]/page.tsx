@@ -1,14 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 
 import { Receipt } from "@/components/receipt/receipt";
-import { buildReceiptText } from "@/lib/receipt/text";
-import { createClient } from "@/lib/supabase/server";
-import {
-  type ReceiptData,
-  type ReceiptPaper,
-  type ReceiptPrefs,
-} from "@/lib/receipt/types";
-import type { PaymentMethod } from "@/app/(app)/caixa/actions";
+import { carregarComprovante } from "@/lib/receipt/data";
+import { type ReceiptPaper } from "@/lib/receipt/types";
 
 import { PrintToolbar } from "./auto-print-client";
 import styles from "./print-page.module.css";
@@ -38,33 +32,6 @@ function buildPrintCss(paper: ReceiptPaper): string {
   ].join("\n");
 }
 
-type ProfileRow = {
-  brand_name: string | null;
-  brand_logo_path: string | null;
-  receipt_paper: ReceiptPaper;
-  receipt_show_logo: boolean;
-  receipt_show_name: boolean;
-  receipt_footer: string | null;
-};
-
-type SaleItemRow = {
-  name_snapshot: string;
-  unit_price: number;
-  quantity: number;
-  line_total: number;
-};
-
-type SaleRow = {
-  id: string;
-  total: number;
-  status: "completed" | "voided";
-  payment_method: PaymentMethod;
-  installments: number | null;
-  discount_amount: number;
-  created_at: string;
-  sale_items: SaleItemRow[];
-};
-
 export default async function ReceiptPage({
   params,
 }: {
@@ -73,87 +40,20 @@ export default async function ReceiptPage({
   const { saleId } = await params;
   if (!UUID_RE.test(saleId)) notFound();
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  // RLS garante que só a venda do próprio usuário é retornada.
-  const { data: saleData } = await supabase
-    .from("sales")
-    .select(
-      "id, total, status, payment_method, installments, discount_amount, created_at, sale_items(name_snapshot, unit_price, quantity, line_total)",
-    )
-    .eq("id", saleId)
-    .maybeSingle();
-
-  if (!saleData) notFound();
-  const sale = saleData as SaleRow;
-
-  const { data: profileData } = await supabase
-    .from("profiles")
-    .select(
-      "brand_name, brand_logo_path, receipt_paper, receipt_show_logo, receipt_show_name, receipt_footer",
-    )
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const profile = (profileData ?? {
-    brand_name: null,
-    brand_logo_path: null,
-    receipt_paper: "80mm",
-    receipt_show_logo: true,
-    receipt_show_name: true,
-    receipt_footer: null,
-  }) as ProfileRow;
-
-  const logoUrl = profile.brand_logo_path
-    ? supabase.storage
-        .from("brand-logos")
-        .getPublicUrl(profile.brand_logo_path).data.publicUrl
-    : null;
-
-  const subtotal =
-    Math.round(
-      sale.sale_items.reduce((sum, it) => sum + Number(it.line_total), 0) * 100,
-    ) / 100;
-  const discount = Math.round(Number(sale.discount_amount) * 100) / 100;
-
-  const data: ReceiptData = {
-    id: sale.id,
-    createdAt: sale.created_at,
-    status: sale.status,
-    paymentMethod: sale.payment_method,
-    installments: sale.installments,
-    subtotal,
-    discount,
-    total: Math.round(Number(sale.total) * 100) / 100,
-    items: sale.sale_items.map((it) => ({
-      name: it.name_snapshot,
-      quantity: Number(it.quantity),
-      unitPrice: Number(it.unit_price),
-      lineTotal: Number(it.line_total),
-    })),
-  };
-
-  const prefs: ReceiptPrefs = {
-    paper: profile.receipt_paper,
-    showLogo: profile.receipt_show_logo,
-    showName: profile.receipt_show_name,
-    footer: profile.receipt_footer,
-  };
-
-  const brand = { name: profile.brand_name, logoUrl };
-  const shareTitle = `Comprovante ${(prefs.showName && brand.name) || "Gaveta"}`;
-  const shareText = buildReceiptText(data, prefs, brand);
+  // Loader único: mesmas queries da server action de emissão direta.
+  const result = await carregarComprovante(saleId);
+  if (!result.ok) {
+    if (result.motivo === "auth") redirect("/login");
+    notFound();
+  }
+  const { data, prefs, brand } = result.comprovante;
 
   return (
     <>
       {/* style-src permite 'unsafe-inline' → @page dinâmico sem nonce. */}
       <style>{buildPrintCss(prefs.paper)}</style>
       <div className={styles.screen}>
-        <PrintToolbar shareTitle={shareTitle} shareText={shareText} />
+        <PrintToolbar />
         {/* Sem largura fixa: no flex centralizado o papel encolhe ao conteúdo
             (80/58 mm) ou ao max-width do A4, imprimindo sem overflow. */}
         <div className={styles.paper}>

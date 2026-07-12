@@ -1,5 +1,6 @@
-import { Printer } from "lucide-react";
 import Link from "next/link";
+
+import { BotaoComprovanteVenda } from "@/components/app/botao-comprovante-venda";
 
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -641,15 +642,9 @@ function SaleCard({ sale }: { sale: SaleRow }) {
           </details>
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
-          <a
-            href={`/comprovante/${sale.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="border-border text-foreground hover:bg-muted flex h-12 items-center justify-center gap-2 rounded-lg border px-5 text-base font-medium"
-          >
-            <Printer aria-hidden="true" className="size-5" />
-            Imprimir venda
-          </a>
+          {/* Desktop: preview p/ imprimir. Celular: PDF/Imagem com share
+              nativo, sem aba (pedido do dono, 2026-07-12). */}
+          <BotaoComprovanteVenda saleId={sale.id} />
           <ToggleSaleStatusButton saleId={sale.id} status={sale.status} />
         </div>
       </div>
