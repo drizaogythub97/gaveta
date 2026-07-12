@@ -7,14 +7,25 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 
-import { salvarSwitcher } from "./actions";
-
 /**
- * Primeiro toggle real do ecossistema (opt-in, nasce desligado): mostra ou
- * esconde o atalho para o outro app no topo (desktop) e no menu "Mais"
- * (celular). Vale para a conta — reflete nos dois apps.
+ * Toggle padrão das pontes do ecossistema (opt-in, nascem desligadas).
+ * Recebe a server action que persiste a escolha; o refresh reflete o
+ * efeito (ex.: atalho aparecer no layout, marca sincronizar).
  */
-export function SwitcherToggle({ ativoInicial }: { ativoInicial: boolean }) {
+export function EcoToggle({
+  ativoInicial,
+  rotulo,
+  onSalvar,
+  msgAtivado,
+  msgDesativado,
+}: {
+  ativoInicial: boolean;
+  /** aria-label do grupo. */
+  rotulo: string;
+  onSalvar: (ativo: boolean) => Promise<{ error?: string }>;
+  msgAtivado: string;
+  msgDesativado: string;
+}) {
   const router = useRouter();
   const [ativo, setAtivo] = useState(ativoInicial);
   const [pending, startTransition] = useTransition();
@@ -22,13 +33,13 @@ export function SwitcherToggle({ ativoInicial }: { ativoInicial: boolean }) {
   function escolher(novo: boolean) {
     if (novo === ativo || pending) return;
     startTransition(async () => {
-      const { error } = await salvarSwitcher(novo);
+      const { error } = await onSalvar(novo);
       if (error) {
         toast.error(error);
         return;
       }
       setAtivo(novo);
-      toast.success(novo ? "Atalho ativado." : "Atalho desativado.");
+      toast.success(novo ? msgAtivado : msgDesativado);
       router.refresh();
     });
   }
@@ -36,7 +47,7 @@ export function SwitcherToggle({ ativoInicial }: { ativoInicial: boolean }) {
   return (
     <div
       role="radiogroup"
-      aria-label="Atalho rápido no menu"
+      aria-label={rotulo}
       className="minimal:max-sm:grid minimal:max-sm:grid-cols-2 flex flex-wrap gap-2"
     >
       <Button

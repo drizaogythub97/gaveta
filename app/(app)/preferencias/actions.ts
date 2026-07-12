@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
+import { marcaUnicaAtiva, removerLogoSeguro } from "@/lib/ecossistema-server";
 import { createClient } from "@/lib/supabase/server";
 import { parseDecimalPtBR } from "@/lib/products/format";
 import { THEME_COOKIE, type Theme } from "@/lib/theme/cookie";
@@ -112,6 +113,16 @@ export async function saveBrandName(
     .eq("id", user.id);
 
   if (error) return { error: "Não foi possível salvar." };
+
+  // Marca única ligada (ecossistema): o nome também vale no FiadoApp.
+  if (await marcaUnicaAtiva(supabase, user.id)) {
+    await supabase.from("fiado_preferencias").upsert({
+      user_id: user.id,
+      brand_name: raw.length === 0 ? null : raw,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
   revalidatePath("/", "layout");
   return { ok: true };
 }
@@ -129,6 +140,14 @@ export async function removeBrandName(): Promise<BrandFormState> {
     .eq("id", user.id);
 
   if (error) return { error: "Não foi possível remover." };
+
+  if (await marcaUnicaAtiva(supabase, user.id)) {
+    await supabase.from("fiado_preferencias").upsert({
+      user_id: user.id,
+      brand_name: null,
+      updated_at: new Date().toISOString(),
+    });
+  }
   revalidatePath("/", "layout");
   revalidatePath("/preferencias");
   return { ok: true };
@@ -201,9 +220,27 @@ export async function uploadBrandLogo(
     return { ok: false, error: "Não foi possível salvar a referência." };
   }
 
-  if (previousPath && previousPath !== key) {
-    await supabase.storage.from("brand-logos").remove([previousPath]);
+  // Marca única ligada: o MESMO arquivo passa a valer no FiadoApp (bucket
+  // compartilhado).
+  let anteriorFiado: string | null = null;
+  if (await marcaUnicaAtiva(supabase, user.id)) {
+    const { data: fiadoPrefs } = await supabase
+      .from("fiado_preferencias")
+      .select("brand_logo_path")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    anteriorFiado = (fiadoPrefs?.brand_logo_path as string | null) ?? null;
+    await supabase.from("fiado_preferencias").upsert({
+      user_id: user.id,
+      brand_logo_path: key,
+      updated_at: new Date().toISOString(),
+    });
   }
+
+  // Apaga os arquivos anteriores só se não estiverem mais em uso (o guarda
+  // protege os que forem backup da marca única, para o "voltar ao anterior").
+  await removerLogoSeguro(supabase, user.id, previousPath);
+  await removerLogoSeguro(supabase, user.id, anteriorFiado);
 
   revalidatePath("/", "layout");
   revalidatePath("/preferencias");
@@ -225,11 +262,34 @@ export async function removeBrandLogo(): Promise<LogoUploadResult> {
   const path = profile?.brand_logo_path as string | null;
   if (!path) return { ok: true };
 
-  await supabase.storage.from("brand-logos").remove([path]);
+  // Marca única ligada: remover também vale nos dois apps.
+  let doFiado: string | null = null;
+  const unica = await marcaUnicaAtiva(supabase, user.id);
+  if (unica) {
+    const { data: fiadoPrefs } = await supabase
+      .from("fiado_preferencias")
+      .select("brand_logo_path")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    doFiado = (fiadoPrefs?.brand_logo_path as string | null) ?? null;
+  }
+
+  // Zera o ponteiro nas tabelas primeiro; depois apaga os arquivos que não
+  // estão mais em uso (o guarda protege backups da marca única).
   await supabase
     .from("profiles")
     .update({ brand_logo_path: null })
     .eq("id", user.id);
+  if (unica) {
+    await supabase.from("fiado_preferencias").upsert({
+      user_id: user.id,
+      brand_logo_path: null,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  await removerLogoSeguro(supabase, user.id, path);
+  await removerLogoSeguro(supabase, user.id, doFiado);
 
   revalidatePath("/", "layout");
   revalidatePath("/preferencias");
