@@ -123,12 +123,12 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <section className="flex flex-col gap-8">
+    <section className="minimal:max-sm:gap-5 flex flex-col gap-8">
       <header>
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">
           Olá, {greeting}!
         </h1>
-        <p className="text-muted-foreground mt-2 text-lg">
+        <p className="minimal:max-sm:text-sm minimal:max-sm:mt-1 text-muted-foreground mt-2 text-lg">
           Veja como o seu negócio está hoje.
         </p>
       </header>
@@ -140,23 +140,27 @@ export default async function DashboardPage() {
         <h2 id="kpis-heading" className="sr-only">
           Indicadores
         </h2>
-        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Minimalista (mobile): KPIs em grade 2×2 compacta, sem o texto de
+            apoio — mais informação na primeira dobra. */}
+        <ul className="minimal:max-sm:grid-cols-2 minimal:max-sm:gap-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map(({ label, value, hint, Icon, tone }) => (
             <li
               key={label}
               className={cn(
-                "ring-foreground/10 bg-card flex flex-col gap-2 rounded-xl p-5 ring-1",
+                "minimal:max-sm:p-3.5 minimal:max-sm:gap-1 ring-foreground/10 bg-card flex flex-col gap-2 rounded-xl p-5 ring-1",
                 tone === "warning"
                   ? "ring-warning/30 bg-warning/5"
                   : undefined,
               )}
             >
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-base">{label}</span>
+                <span className="minimal:max-sm:text-sm text-muted-foreground text-base">
+                  {label}
+                </span>
                 <Icon
                   aria-hidden="true"
                   className={cn(
-                    "size-5",
+                    "minimal:max-sm:hidden size-5",
                     tone === "warning"
                       ? "text-warning"
                       : "text-muted-foreground",
@@ -165,22 +169,24 @@ export default async function DashboardPage() {
               </div>
               <p
                 className={cn(
-                  "text-3xl font-bold tabular-nums",
+                  "minimal:max-sm:text-xl text-3xl font-bold tabular-nums",
                   tone === "warning" ? "text-warning" : "text-foreground",
                 )}
               >
                 {value}
               </p>
               {hint ? (
-                <p className="text-muted-foreground text-sm">{hint}</p>
+                <p className="minimal:max-sm:hidden text-muted-foreground text-sm">
+                  {hint}
+                </p>
               ) : null}
             </li>
           ))}
         </ul>
       </section>
 
-      <section aria-labelledby="shortcuts-heading" className="flex flex-col gap-4">
-        <h2 id="shortcuts-heading" className="text-xl font-semibold">
+      <section aria-labelledby="shortcuts-heading" className="minimal:max-sm:gap-3 flex flex-col gap-4">
+        <h2 id="shortcuts-heading" className="minimal:max-sm:text-lg text-xl font-semibold">
           Atalhos rápidos
         </h2>
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -189,7 +195,7 @@ export default async function DashboardPage() {
               <Link
                 href={href}
                 className={cn(
-                  "flex h-full items-center gap-4 rounded-xl p-5 transition-colors",
+                  "minimal:max-sm:p-3.5 minimal:max-sm:gap-3 flex h-full items-center gap-4 rounded-xl p-5 transition-colors",
                   featured
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
                     : "ring-foreground/10 bg-card hover:bg-muted ring-1",
@@ -197,23 +203,25 @@ export default async function DashboardPage() {
               >
                 <span
                   className={cn(
-                    "flex size-12 shrink-0 items-center justify-center rounded-full",
+                    "minimal:max-sm:size-10 flex size-12 shrink-0 items-center justify-center rounded-full",
                     featured ? "bg-primary-foreground/15" : "bg-primary/10",
                   )}
                 >
                   <Icon
                     aria-hidden="true"
                     className={cn(
-                      "size-6",
+                      "minimal:max-sm:size-5 size-6",
                       featured ? "text-primary-foreground" : "text-primary",
                     )}
                   />
                 </span>
                 <span className="flex flex-col">
-                  <span className="text-xl font-semibold">{label}</span>
+                  <span className="minimal:max-sm:text-base text-xl font-semibold">
+                    {label}
+                  </span>
                   <span
                     className={cn(
-                      "text-base",
+                      "minimal:max-sm:text-sm text-base",
                       featured
                         ? "text-primary-foreground/85"
                         : "text-muted-foreground",

@@ -70,7 +70,7 @@ export function InventoryClient({ products }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
-      <fieldset className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1">
+      <fieldset className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1">
         <legend className="text-lg font-semibold">Filtros</legend>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div className="flex flex-col gap-2">
@@ -242,7 +242,7 @@ function StockRow({ product }: { product: Product }) {
   return (
     <li
       className={cn(
-        "ring-foreground/10 bg-card flex flex-col gap-3 rounded-xl p-4 ring-1",
+        "ring-foreground/10 bg-card flex flex-col gap-3 minimal:max-sm:p-3.5 rounded-xl p-4 ring-1",
         low ? "ring-warning/30 bg-warning/5" : undefined,
       )}
     >
@@ -264,7 +264,7 @@ function StockRow({ product }: { product: Product }) {
               type="button"
               variant="outline"
               onClick={() => openMode("set")}
-              className="h-12 px-4 text-base"
+              className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-4 text-base"
             >
               <Pencil aria-hidden="true" className="size-4" />
               Atualizar quantidade
@@ -272,7 +272,7 @@ function StockRow({ product }: { product: Product }) {
             <Button
               type="button"
               onClick={() => openMode("add")}
-              className="h-12 px-4 text-base"
+              className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-4 text-base"
             >
               <PackagePlus aria-hidden="true" className="size-4" />
               Receber entrada
@@ -356,7 +356,7 @@ function StockRow({ product }: { product: Product }) {
               variant="outline"
               onClick={cancel}
               disabled={pending}
-              className="h-12 px-5 text-base"
+              className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-5 text-base"
             >
               <X aria-hidden="true" className="size-4" />
               Cancelar
@@ -366,7 +366,7 @@ function StockRow({ product }: { product: Product }) {
               onClick={submit}
               disabled={pending}
               aria-busy={pending}
-              className="h-12 px-5 text-base"
+              className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-5 text-base"
             >
               <Check aria-hidden="true" className="size-4" />
               {pending ? "Salvando…" : "Salvar"}

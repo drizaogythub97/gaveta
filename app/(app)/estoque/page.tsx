@@ -23,11 +23,11 @@ export default async function InventoryPage() {
   const products = (data ?? []) as Product[];
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Estoque</h1>
-          <p className="text-muted-foreground mt-2 text-lg">
+          <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">Estoque</h1>
+          <p className="minimal:max-sm:text-sm minimal:max-sm:mt-1 text-muted-foreground mt-2 text-lg">
             Atualize quantidades e registre entradas dos produtos que você
             controla por estoque. Itens sob demanda ficam em{" "}
             <span className="text-foreground font-medium">Produtos</span>.

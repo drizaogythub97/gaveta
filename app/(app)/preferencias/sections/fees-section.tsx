@@ -65,10 +65,10 @@ export function FeesSection({ initialFees }: Props) {
   return (
     <section
       aria-labelledby="fees-heading"
-      className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
+      className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
     >
       <header>
-        <h2 id="fees-heading" className="text-xl font-semibold">
+        <h2 id="fees-heading" className="minimal:max-sm:text-lg text-xl font-semibold">
           Taxas das maquininhas
         </h2>
         <p className="text-muted-foreground text-base">

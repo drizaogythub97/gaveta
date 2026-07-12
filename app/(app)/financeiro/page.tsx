@@ -132,10 +132,10 @@ export default async function FinancialPage({
   const { from, to } = rangeForPeriod(period, fromParam, toParam);
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
       <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Financeiro</h1>
-        <p className="text-muted-foreground mt-2 text-lg">
+        <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">Financeiro</h1>
+        <p className="minimal:max-sm:text-sm minimal:max-sm:mt-1 text-muted-foreground mt-2 text-lg">
           Acompanhe as vendas, registre despesas e veja o resumo do período.
         </p>
       </header>
@@ -287,7 +287,7 @@ async function VendasTab({
           <div>
             <p className="text-sm opacity-80">Bruto</p>
             <p
-              className="text-3xl font-bold tabular-nums sm:text-4xl"
+              className="minimal:max-sm:text-xl text-3xl font-bold tabular-nums sm:text-4xl"
               aria-live="polite"
             >
               {formatBRL(grossRevenue)}
@@ -295,13 +295,13 @@ async function VendasTab({
           </div>
           <div>
             <p className="text-sm opacity-80">Taxas</p>
-            <p className="text-3xl font-bold tabular-nums sm:text-4xl">
+            <p className="minimal:max-sm:text-xl text-3xl font-bold tabular-nums sm:text-4xl">
               − {formatBRL(feesTotal)}
             </p>
           </div>
           <div>
             <p className="text-sm opacity-80">Líquido</p>
-            <p className="text-3xl font-bold tabular-nums sm:text-4xl">
+            <p className="minimal:max-sm:text-xl text-3xl font-bold tabular-nums sm:text-4xl">
               {formatBRL(netRevenue)}
             </p>
           </div>
@@ -570,8 +570,8 @@ function SaleCard({ sale }: { sale: SaleRow }) {
     <li
       className={
         voided
-          ? "ring-foreground/10 bg-muted/40 rounded-xl p-4 ring-1"
-          : "ring-foreground/10 bg-card rounded-xl p-4 ring-1"
+          ? "ring-foreground/10 bg-muted/40 minimal:max-sm:p-3.5 rounded-xl p-4 ring-1"
+          : "ring-foreground/10 bg-card minimal:max-sm:p-3.5 rounded-xl p-4 ring-1"
       }
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

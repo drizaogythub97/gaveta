@@ -179,7 +179,9 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
 
   function confirmPrint() {
     if (printSaleId) {
-      window.open(`/comprovante/${printSaleId}`, "_blank", "noopener");
+      // SEM "noopener": o botão Fechar do preview usa window.close(), que
+      // exige opener (mesma origem; bug corrigido igual no FiadoApp).
+      window.open(`/comprovante/${printSaleId}`, "_blank");
     }
     closePrintPrompt();
   }
@@ -468,11 +470,11 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
         <div className="flex flex-col gap-6">
           <section
             aria-labelledby="add-item-heading"
-            className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
+            className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
           >
             <h2
               id="add-item-heading"
-              className="flex items-center gap-2 text-xl font-semibold"
+              className="minimal:max-sm:text-lg flex items-center gap-2 text-xl font-semibold"
             >
               <ScanBarcode aria-hidden="true" className="size-6" />
               Adicionar item
@@ -608,14 +610,14 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
                       clearManual();
                       refocus();
                     }}
-                    className="h-12 px-5 text-base"
+                    className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-5 text-base"
                   >
                     Cancelar
                   </Button>
                   <Button
                     type="button"
                     onClick={handleManualSubmit}
-                    className="h-12 px-5 text-base"
+                    className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-5 text-base"
                   >
                     Adicionar avulso
                   </Button>
@@ -626,9 +628,9 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
 
           <section
             aria-labelledby="payment-heading"
-            className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
+            className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
           >
-            <h2 id="payment-heading" className="text-xl font-semibold">
+            <h2 id="payment-heading" className="minimal:max-sm:text-lg text-xl font-semibold">
               Forma de pagamento
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -734,9 +736,9 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
         <div className="flex flex-col gap-6">
           <section
             aria-labelledby="cart-heading"
-            className="ring-foreground/10 bg-card flex flex-col gap-4 rounded-xl p-5 ring-1"
+            className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
           >
-            <h2 id="cart-heading" className="text-xl font-semibold">
+            <h2 id="cart-heading" className="minimal:max-sm:text-lg text-xl font-semibold">
               Itens da venda
             </h2>
             {cart.length === 0 ? (
