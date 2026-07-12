@@ -7,7 +7,10 @@ import {
   Receipt,
   ShoppingCart,
 } from "lucide-react";
+import { cookies } from "next/headers";
 import Link from "next/link";
+
+import { EcossistemaAnuncio } from "@/components/app/ecossistema-anuncio";
 
 import { formatBRL } from "@/lib/products/format";
 import {
@@ -31,6 +34,9 @@ type Kpi = {
 };
 
 export default async function DashboardPage() {
+  // Anúncio único do ecossistema: o servidor nem renderiza depois de
+  // dispensado (cookie), então não há flash no carregamento.
+  const mostrarAnuncio = !(await cookies()).get("gaveta_ecossistema_anuncio");
   const supabase = await createClient();
   const {
     data: { user },
@@ -235,6 +241,9 @@ export default async function DashboardPage() {
           ))}
         </ul>
       </section>
+
+      {/* Anúncio único do ecossistema: some para sempre ao dispensar. */}
+      {mostrarAnuncio ? <EcossistemaAnuncio /> : null}
     </section>
   );
 }

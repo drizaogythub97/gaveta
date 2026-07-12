@@ -1,4 +1,4 @@
-import { Sliders, User } from "lucide-react";
+import { Blocks, Sliders, User } from "lucide-react";
 import Link from "next/link";
 
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,14 @@ const OPCOES = [
     titulo: "Minha conta",
     descricao: "Seus dados pessoais, e-mail, senha e exclusão da conta.",
     Icon: User,
+  },
+  // Descoberta do ecossistema: card PERMANENTE — integração é opt-in.
+  {
+    href: "/ecossistema",
+    titulo: "Ecossistema",
+    descricao:
+      "Conheça o FiadoApp, o app de vendas a prazo que usa a mesma conta.",
+    Icon: Blocks,
   },
 ] as const;
 
