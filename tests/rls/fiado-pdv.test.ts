@@ -243,3 +243,111 @@ describe("financeiro reflete o fiado (base caixa)", () => {
     }
   });
 });
+
+/**
+ * Exclusão consistente (F6, Fase 3): excluir_venda_fiado remove os dois lados
+ * (a-receber no FiadoApp + venda no Gaveta) e devolve o estoque.
+ */
+describe("excluir_venda_fiado (exclusão consistente)", () => {
+  it("remove os dois lados e estorna o estoque", async () => {
+    const u = await createTestUser("fiado-del");
+    try {
+      const app = userClient(u.accessToken);
+      await app.from("ecossistema_prefs").upsert({
+        user_id: u.id,
+        fiado_pdv_ativo: true,
+        updated_at: new Date().toISOString(),
+      });
+
+      // Produto com estoque 10 (controla quantidade).
+      const { data: prod } = await app
+        .from("products")
+        .insert({
+          user_id: u.id,
+          name: "Produto Del",
+          price: 5,
+          stock_quantity: 10,
+          track_stock: true,
+        })
+        .select("id")
+        .single();
+      const prodId = (prod as { id: string }).id;
+
+      // Venda a prazo de 3 unidades → estoque 10 - 3 = 7.
+      const { data: reg } = await app.rpc("registrar_venda_fiado", {
+        p_items: [
+          { product_id: prodId, name: "Produto Del", unit_price: 5, quantity: 3 },
+        ],
+        p_itens_fiado: [
+          { descricao: "3 × Produto Del", quantidade: 1, valor_unitario: 15 },
+        ],
+        p_cliente_id: null,
+        p_cliente: {
+          nome: "Del",
+          sobrenome: null,
+          referencia: null,
+          telefone: null,
+        },
+        p_data_vencimento: null,
+        p_observacao: null,
+      });
+      const { venda_id, sale_id } = reg as {
+        venda_id: string;
+        sale_id: string;
+      };
+
+      const { data: estoqueAntes } = await app
+        .from("products")
+        .select("stock_quantity")
+        .eq("id", prodId)
+        .single();
+      expect(Number((estoqueAntes as { stock_quantity: number }).stock_quantity)).toBe(7);
+
+      // Um pagamento parcial, para provar que o histórico some junto.
+      const { data: venda } = await app
+        .from("fiado_vendas")
+        .select("cliente_id")
+        .eq("id", venda_id)
+        .single();
+      await app.rpc("fiado_registrar_pagamento", {
+        p_cliente_id: (venda as { cliente_id: string }).cliente_id,
+        p_valor: 5,
+      });
+
+      // Exclui a venda a prazo (pela RPC-ponte).
+      const { error } = await app.rpc("excluir_venda_fiado", {
+        p_venda_id: venda_id,
+      });
+      expect(error).toBeNull();
+
+      // FiadoApp: venda e pagamentos sumiram.
+      const { data: vendaDepois } = await app
+        .from("fiado_vendas")
+        .select("id")
+        .eq("id", venda_id)
+        .maybeSingle();
+      expect(vendaDepois).toBeNull();
+      const { count: pagamentos } = await app
+        .from("fiado_pagamentos")
+        .select("id", { count: "exact", head: true })
+        .eq("venda_id", venda_id);
+      expect(pagamentos ?? 0).toBe(0);
+
+      // Gaveta: venda sumiu e o estoque voltou a 10.
+      const { data: saleDepois } = await app
+        .from("sales")
+        .select("id")
+        .eq("id", sale_id)
+        .maybeSingle();
+      expect(saleDepois).toBeNull();
+      const { data: estoqueDepois } = await app
+        .from("products")
+        .select("stock_quantity")
+        .eq("id", prodId)
+        .single();
+      expect(Number((estoqueDepois as { stock_quantity: number }).stock_quantity)).toBe(10);
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+});
