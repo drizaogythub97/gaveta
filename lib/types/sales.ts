@@ -31,3 +31,18 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   credito_parcelado: "Crédito parcelado",
   vale: "Vale alim./refeição",
 };
+
+/**
+ * Formas de pagamento de CAIXA (dinheiro na mão / cartão / pix / vale).
+ * Não inclui 'fiado' (venda a prazo = a receber, não faturamento de caixa):
+ * passar esta lista ao sales_summary exclui o fiado dos totais. Fonte única
+ * para financeiro e dashboard — ver Ecossistema F6, Fase 2.
+ */
+export const CAIXA_PAYMENT_METHODS: PaymentMethod[] = [
+  "dinheiro",
+  "pix",
+  "debito",
+  "credito_avista",
+  "credito_parcelado",
+  "vale",
+];

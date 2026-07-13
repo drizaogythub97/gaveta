@@ -19,6 +19,7 @@ import {
   todayStartISO,
 } from "@/lib/dashboard/dates";
 import { createClient } from "@/lib/supabase/server";
+import { CAIXA_PAYMENT_METHODS } from "@/lib/types/sales";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
@@ -54,10 +55,19 @@ export default async function DashboardPage() {
   // milhares de vendas no período (o PostgREST cortaria linhas em 1000).
   const [salesToday, salesMonth, lowStockCount] = await Promise.all([
     supabase
-      .rpc("sales_summary", { p_from: todayStart, p_to: nowISO, p_methods: null })
+      .rpc("sales_summary", {
+        p_from: todayStart,
+        p_to: nowISO,
+        // Exclui 'fiado' do faturamento (venda a prazo = a receber).
+        p_methods: CAIXA_PAYMENT_METHODS,
+      })
       .maybeSingle(),
     supabase
-      .rpc("sales_summary", { p_from: monthStart, p_to: nowISO, p_methods: null })
+      .rpc("sales_summary", {
+        p_from: monthStart,
+        p_to: nowISO,
+        p_methods: CAIXA_PAYMENT_METHODS,
+      })
       .maybeSingle(),
     supabase
       .from("products")
