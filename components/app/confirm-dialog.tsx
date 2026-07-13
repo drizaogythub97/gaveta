@@ -33,17 +33,23 @@ export function ConfirmDialog({
 }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Foca o botão de cancelar UMA vez, quando o diálogo abre (default seguro
+  // para ações destrutivas). Depende só de `open`: se rodasse a cada
+  // re-render (ex.: por `onClose`/`pending`), digitar num campo do diálogo
+  // devolveria o foco ao Cancelar a cada tecla.
   useEffect(() => {
     if (!open) return;
-
-    // Foca o botão de cancelar (default seguro para ações destrutivas).
-    setTimeout(() => {
-      const cancelBtn = panelRef.current?.querySelector<HTMLButtonElement>(
-        "[data-dialog-cancel]",
-      );
-      cancelBtn?.focus();
+    const id = setTimeout(() => {
+      panelRef.current
+        ?.querySelector<HTMLButtonElement>("[data-dialog-cancel]")
+        ?.focus();
     }, 0);
+    return () => clearTimeout(id);
+  }, [open]);
 
+  // Escape fecha e o scroll do fundo fica travado enquanto aberto.
+  useEffect(() => {
+    if (!open) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !pending) onClose();
     };
