@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { removerLogoSeguro } from "@/lib/ecossistema-server";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 const ativoSchema = z.boolean();
@@ -74,6 +75,76 @@ export async function salvarFiadoPdv(
   revalidatePath("/ecossistema");
   revalidatePath("/caixa");
   return {};
+}
+
+/**
+ * Desativa a ponte "Venda a prazo no caixa" (Fase 4) com REAUTENTICAÇÃO por
+ * senha (registros financeiros) e escolha do que fazer com as vendas a prazo
+ * já lançadas: "manter" (só desliga a opção) ou "excluir" (remove todas as
+ * vendas de origem Gaveta pelos dois lados, via RPC-ponte, e estorna estoque).
+ */
+export async function desativarFiadoPdv(
+  senha: string,
+  modo: "manter" | "excluir",
+): Promise<{ ok: boolean; error?: string }> {
+  if (modo !== "manter" && modo !== "excluir") {
+    return { ok: false, error: "Opção inválida." };
+  }
+  if (!senha) return { ok: false, error: "Informe sua senha." };
+
+  const rate = await checkRateLimit("reauth");
+  if (!rate.ok) return { ok: false, error: rate.message };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || !user.email) {
+    return { ok: false, error: "Sessão expirada. Entre de novo." };
+  }
+
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: senha,
+  });
+  if (signInError) {
+    if (/rate limit|too many/i.test(signInError.message)) {
+      return { ok: false, error: "Muitas tentativas. Aguarde alguns minutos." };
+    }
+    return { ok: false, error: "Senha incorreta." };
+  }
+
+  if (modo === "excluir") {
+    const { data: vendas } = await supabase
+      .from("fiado_vendas")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("origem", "gaveta");
+    for (const v of vendas ?? []) {
+      const { error } = await supabase.rpc("excluir_venda_fiado", {
+        p_venda_id: (v as { id: string }).id,
+      });
+      if (error) {
+        return {
+          ok: false,
+          error: "Não foi possível excluir as vendas. Tente de novo.",
+        };
+      }
+    }
+  }
+
+  const { error } = await supabase.from("ecossistema_prefs").upsert({
+    user_id: user.id,
+    fiado_pdv_ativo: false,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) {
+    return { ok: false, error: "Não foi possível salvar. Tente de novo." };
+  }
+
+  revalidatePath("/ecossistema");
+  revalidatePath("/caixa");
+  return { ok: true };
 }
 
 /**
