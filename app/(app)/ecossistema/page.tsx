@@ -5,7 +5,6 @@ import {
   Landmark,
   NotebookPen,
   ShoppingCart,
-  Users,
 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
@@ -20,7 +19,7 @@ import { FIADOAPP_URL } from "@/lib/ecossistema";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
-import { salvarMarcaUnica, salvarSwitcher } from "./actions";
+import { salvarFiadoPdv, salvarMarcaUnica, salvarSwitcher } from "./actions";
 import { EcoToggle } from "./eco-toggle";
 
 export const metadata = { title: "Ecossistema" };
@@ -29,17 +28,6 @@ export const metadata = { title: "Ecossistema" };
 // entregues aos poucos. Toda ponte nasce DESLIGADA e terá liga/desliga
 // próprio (opt-in).
 const PONTES = [
-  {
-    titulo: "Clientes compartilhados",
-    descricao: "O mesmo caderno de clientes no caixa e no fiado.",
-    Icon: Users,
-  },
-  {
-    titulo: "Venda a prazo direto do caixa",
-    descricao:
-      "Uma venda \"a prazo\" aqui no caixa já registrada no FiadoApp, sem digitar de novo.",
-    Icon: ShoppingCart,
-  },
   {
     titulo: "Recebimentos no financeiro",
     descricao:
@@ -55,11 +43,12 @@ export default async function EcossistemaPage() {
   } = await supabase.auth.getUser();
   const { data: prefs } = await supabase
     .from("ecossistema_prefs")
-    .select("switcher_ativo, marca_unica")
+    .select("switcher_ativo, marca_unica, fiado_pdv_ativo")
     .eq("user_id", user?.id ?? "")
     .maybeSingle();
   const switcherAtivo = Boolean(prefs?.switcher_ativo);
   const marcaUnica = Boolean(prefs?.marca_unica);
+  const fiadoPdv = Boolean(prefs?.fiado_pdv_ativo);
 
   return (
     <section className="minimal:max-sm:gap-4 flex max-w-2xl flex-col gap-6">
@@ -153,6 +142,32 @@ export default async function EcossistemaPage() {
             onSalvar={salvarMarcaUnica}
             msgAtivado="Marca única ativada — a marca do Gaveta agora vale nos dois apps."
             msgDesativado="Marca única desativada — cada app voltou à marca anterior."
+          />
+        </CardContent>
+      </Card>
+
+      {/* ── VENDA A PRAZO NO CAIXA (Fase 1 — opt-in) ───────────────── */}
+      <Card>
+        <CardHeader className="minimal:max-sm:border-b minimal:max-sm:border-border/60 minimal:max-sm:pb-3">
+          <CardTitle className="minimal:max-sm:text-base flex items-center gap-2 text-xl">
+            <ShoppingCart aria-hidden="true" className="text-primary size-5" />
+            Venda a prazo no caixa
+          </CardTitle>
+          <CardDescription className="minimal:max-sm:text-sm text-base">
+            Libera a forma de pagamento &quot;Venda a Prazo (Fiado)&quot; aqui
+            no caixa. Você escolhe o cliente (ou cadastra na hora) e a venda já
+            entra como fiado a receber no FiadoApp — sem digitar de novo. O
+            valor só conta no seu financeiro quando for pago no FiadoApp.
+            Desativado por padrão.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EcoToggle
+            ativoInicial={fiadoPdv}
+            rotulo="Venda a prazo no caixa"
+            onSalvar={salvarFiadoPdv}
+            msgAtivado="Venda a prazo liberada no caixa."
+            msgDesativado="Venda a prazo desativada no caixa."
           />
         </CardContent>
       </Card>

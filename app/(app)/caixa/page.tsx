@@ -17,11 +17,22 @@ export default async function CaixaPage() {
   const fees: PaymentFees = dbFees ?? DEFAULT_FEES;
 
   const supabase = await createClient();
-  const { data: openSession } = await supabase
-    .from("cash_sessions")
-    .select("id, opened_at")
-    .eq("status", "open")
-    .maybeSingle();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const [{ data: openSession }, { data: prefs }] = await Promise.all([
+    supabase
+      .from("cash_sessions")
+      .select("id, opened_at")
+      .eq("status", "open")
+      .maybeSingle(),
+    supabase
+      .from("ecossistema_prefs")
+      .select("fiado_pdv_ativo")
+      .eq("user_id", user?.id ?? "")
+      .maybeSingle(),
+  ]);
+  const fiadoPdvAtivo = Boolean(prefs?.fiado_pdv_ativo);
 
   return (
     <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
@@ -36,7 +47,7 @@ export default async function CaixaPage() {
 
       <CashSessionBanner open={Boolean(openSession)} />
 
-      <PosClient fees={fees} />
+      <PosClient fees={fees} fiadoPdvAtivo={fiadoPdvAtivo} />
       <CaixaFullscreenTip />
     </section>
   );

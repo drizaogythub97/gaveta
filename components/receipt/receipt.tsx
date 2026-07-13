@@ -34,7 +34,12 @@ function paymentLabel(data: ReceiptData): string {
   if (data.paymentMethod === "credito_parcelado" && data.installments) {
     return `Crédito ${data.installments}x`;
   }
-  return PAYMENT_METHOD_LABELS[data.paymentMethod];
+  // Venda a prazo (ponte FiadoApp): não é forma de caixa, por isso fica fora
+  // do tipo PaymentMethod — rotulada à parte.
+  if ((data.paymentMethod as string) === "fiado") {
+    return "Venda a prazo (Fiado)";
+  }
+  return PAYMENT_METHOD_LABELS[data.paymentMethod] ?? "—";
 }
 
 /**
