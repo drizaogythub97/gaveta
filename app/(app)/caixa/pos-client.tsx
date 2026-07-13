@@ -53,6 +53,11 @@ import {
   registerSale,
   searchProductsByName,
 } from "./actions";
+import { registrarVendaFiado, type FiadoCliente } from "./fiado-actions";
+import { FiadoClienteCombobox } from "./fiado-cliente-combobox";
+
+/** Forma de pagamento do caixa + a venda a prazo (ponte FiadoApp, opt-in). */
+type PosPaymentMethod = PaymentMethod | "fiado";
 
 type CartItem = {
   key: string;
@@ -92,7 +97,13 @@ function toItem(product: Product): CartItem {
   };
 }
 
-export function PosClient({ fees }: { fees: PaymentFees }) {
+export function PosClient({
+  fees,
+  fiadoPdvAtivo = false,
+}: {
+  fees: PaymentFees;
+  fiadoPdvAtivo?: boolean;
+}) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -100,8 +111,10 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
   const [manualName, setManualName] = useState<string | null>(null);
   const [manualPriceDigits, setManualPriceDigits] = useState("");
   const [manualQty, setManualQty] = useState("1");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("dinheiro");
+  const [paymentMethod, setPaymentMethod] =
+    useState<PosPaymentMethod>("dinheiro");
   const [installments, setInstallments] = useState<number>(2);
+  const [fiadoCliente, setFiadoCliente] = useState<FiadoCliente | null>(null);
   const [paidDigits, setPaidDigits] = useState("");
   const [discountDigits, setDiscountDigits] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -353,23 +366,39 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
 
   const isCash = paymentMethod === "dinheiro";
   const isInstallment = paymentMethod === "credito_parcelado";
+  const isFiado = paymentMethod === "fiado";
   const paidAmount = isCash ? digitsToNumber(paidDigits) : 0;
   const changeAmount = Math.round((paidAmount - total) * 100) / 100;
   const showChange = isCash && paidDigits.length > 0 && cart.length > 0;
   const enoughCash = !isCash || paidAmount >= total || cart.length === 0;
 
   const effectiveInstallments = isInstallment ? installments : null;
-  const feeAmount = computeFeeAmount(
-    total,
-    paymentMethod,
-    effectiveInstallments,
-    fees,
-  );
+  // Venda a prazo não tem taxa de cartão — o dinheiro entra depois, no fiado.
+  const feeAmount = isFiado
+    ? 0
+    : computeFeeAmount(
+        total,
+        paymentMethod as PaymentMethod,
+        effectiveInstallments,
+        fees,
+      );
   const netAmount = Math.round((total - feeAmount) * 100) / 100;
   const installmentValue =
     isInstallment && installments > 0
       ? Math.round((total / installments) * 100) / 100
       : 0;
+
+  function resetVenda() {
+    setCart([]);
+    setQuery("");
+    clearManual();
+    setSuggestions([]);
+    setPaymentMethod("dinheiro");
+    setInstallments(2);
+    setPaidDigits("");
+    setDiscountDigits("");
+    setFiadoCliente(null);
+  }
 
   function handleRegister() {
     if (cart.length === 0) {
@@ -379,6 +408,40 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
       });
       return;
     }
+    const items: SaleItemInput[] = cart.map((it) => ({
+      product_id: it.product_id,
+      name: it.name,
+      unit_price: it.unit_price,
+      quantity: Math.round(it.quantity * 1000) / 1000,
+    }));
+
+    // ── Venda a prazo (Fiado) ─────────────────────────────────────────
+    if (isFiado) {
+      if (!fiadoCliente) {
+        setFeedback({
+          kind: "error",
+          message: "Escolha o cliente da venda a prazo.",
+        });
+        return;
+      }
+      startRegister(async () => {
+        const result = await registrarVendaFiado(items, fiadoCliente.id, null);
+        if (result.ok) {
+          const nome = fiadoCliente.nome;
+          resetVenda();
+          setFeedback({
+            kind: "success",
+            message: `Venda a prazo de ${nome} registrada no FiadoApp! Total ${formatBRL(total)}.`,
+          });
+          setPrintSaleId(result.saleId);
+        } else {
+          setFeedback({ kind: "error", message: result.error });
+        }
+      });
+      return;
+    }
+
+    // ── Venda normal do caixa ─────────────────────────────────────────
     if (isCash && paidAmount < total) {
       setFeedback({
         kind: "error",
@@ -386,12 +449,6 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
       });
       return;
     }
-    const items: SaleItemInput[] = cart.map((it) => ({
-      product_id: it.product_id,
-      name: it.name,
-      unit_price: it.unit_price,
-      quantity: Math.round(it.quantity * 1000) / 1000,
-    }));
     const changeMessage =
       isCash && changeAmount > 0
         ? ` Troco: ${formatBRL(changeAmount)}.`
@@ -399,20 +456,13 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
     startRegister(async () => {
       const result = await registerSale(
         items,
-        paymentMethod,
+        paymentMethod as PaymentMethod,
         effectiveInstallments,
         feeAmount,
         discount,
       );
       if (result.ok) {
-        setCart([]);
-        setQuery("");
-        clearManual();
-        setSuggestions([]);
-        setPaymentMethod("dinheiro");
-        setInstallments(2);
-        setPaidDigits("");
-        setDiscountDigits("");
+        resetVenda();
         const feeMessage =
           feeAmount > 0
             ? ` Taxa: ${formatBRL(feeAmount)}. Líquido: ${formatBRL(netAmount)}.`
@@ -661,9 +711,10 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
                   id="payment-method"
                   value={paymentMethod}
                   onChange={(e) => {
-                    const next = e.target.value as PaymentMethod;
+                    const next = e.target.value as PosPaymentMethod;
                     setPaymentMethod(next);
                     if (next !== "dinheiro") setPaidDigits("");
+                    if (next !== "fiado") setFiadoCliente(null);
                   }}
                   className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-14 w-full rounded-lg border px-3 text-lg outline-none focus-visible:ring-3"
                 >
@@ -672,9 +723,12 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
                       {m.label}
                     </option>
                   ))}
+                  {fiadoPdvAtivo ? (
+                    <option value="fiado">Venda a Prazo (Fiado)</option>
+                  ) : null}
                 </select>
               </div>
-              {isInstallment ? (
+              {isFiado ? null : isInstallment ? (
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="installments" className="text-base">
                     Número de parcelas
@@ -735,6 +789,28 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
                 </div>
               )}
             </div>
+            {isFiado ? (
+              <div className="border-primary/30 bg-primary/5 flex flex-col gap-3 rounded-lg border p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-base font-medium">
+                    Cliente da venda a prazo
+                  </Label>
+                  <span className="bg-primary/10 text-primary inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                    <FileText aria-hidden="true" className="size-3.5" />
+                    Integração FiadoApp
+                  </span>
+                </div>
+                <FiadoClienteCombobox
+                  value={fiadoCliente}
+                  onChange={setFiadoCliente}
+                  disabled={isRegistering}
+                />
+                <p className="text-muted-foreground text-sm">
+                  A venda entra como fiado a receber no FiadoApp. Vencimento em
+                  30 dias; o dinheiro só conta no financeiro quando for pago lá.
+                </p>
+              </div>
+            ) : null}
             {feeAmount > 0 && cart.length > 0 ? (
               <p className="text-muted-foreground text-sm">
                 Taxa estimada:{" "}
@@ -903,11 +979,20 @@ export function PosClient({ fees }: { fees: PaymentFees }) {
               <Button
                 type="button"
                 onClick={handleRegister}
-                disabled={isRegistering || cart.length === 0 || !enoughCash}
+                disabled={
+                  isRegistering ||
+                  cart.length === 0 ||
+                  !enoughCash ||
+                  (isFiado && !fiadoCliente)
+                }
                 aria-busy={isRegistering}
                 className="bg-background text-primary hover:bg-background/90 h-16 px-8 text-xl font-semibold"
               >
-                {isRegistering ? "Registrando…" : "Registrar venda"}
+                {isRegistering
+                  ? "Registrando…"
+                  : isFiado
+                    ? "Registrar venda a prazo"
+                    : "Registrar venda"}
               </Button>
             </div>
             {showChange ? (
