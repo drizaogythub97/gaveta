@@ -36,6 +36,7 @@ import { computeFeeAmount, type PaymentFees } from "@/lib/preferences/types";
 import type { Product, SaleItemInput } from "@/lib/types/db";
 import { cn } from "@/lib/utils";
 
+import { FiadoappBadge } from "@/components/app/fiadoapp-badge";
 import loaderStyles from "@/components/app/gaveta-loader.module.css";
 import {
   BarcodeScanner,
@@ -795,10 +796,7 @@ export function PosClient({
                   <Label className="text-base font-medium">
                     Cliente da venda a prazo
                   </Label>
-                  <span className="bg-primary/10 text-primary inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium">
-                    <FileText aria-hidden="true" className="size-3.5" />
-                    Integração FiadoApp
-                  </span>
+                  <FiadoappBadge />
                 </div>
                 <FiadoClienteCombobox
                   value={fiadoCliente}
@@ -965,7 +963,7 @@ export function PosClient({
               </div>
             ) : null}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
+              <div className="min-w-0">
                 <p id="total-heading" className="text-base opacity-90">
                   Total da venda
                 </p>
@@ -986,12 +984,12 @@ export function PosClient({
                   (isFiado && !fiadoCliente)
                 }
                 aria-busy={isRegistering}
-                className="bg-background text-primary hover:bg-background/90 h-16 px-8 text-xl font-semibold"
+                className="bg-background text-primary hover:bg-background/90 h-16 shrink-0 px-8 text-xl font-semibold whitespace-nowrap"
               >
                 {isRegistering
                   ? "Registrando…"
                   : isFiado
-                    ? "Registrar venda a prazo"
+                    ? "Registrar a prazo"
                     : "Registrar venda"}
               </Button>
             </div>
