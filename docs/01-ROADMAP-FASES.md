@@ -344,8 +344,32 @@ FiadoApp, aplicadas ao banco comum) guarda as flags por usuário.
   anterior de cada app (backup em `ecossistema_prefs`, guarda
   `removerLogoSeguro` em `lib/ecossistema-server.ts`).
 
-Componentes reutilizáveis: `app/(app)/ecossistema/eco-toggle.tsx` (toggle
-padrão) e `lib/ecossistema-server.ts` (helpers). Próximos estágios (3
-clientes, 4 venda a prazo no PDV, 5 recebíveis) seguem o mesmo padrão.
-Gotcha: `react-hooks/immutability` barra `document.cookie =` em componente;
-opt-in é regra (nada de atalho fixo sem toggle).
+- **Integração "Fiado no PDV"** (2026-07-13) — **fundiu os Estágios 3+4+5**
+  num fluxo só (sem tela de "caderno" isolada; o seletor de cliente vive no
+  bloco de venda a prazo do caixa). Entregue em 5 fases:
+  - **Fase 1** (PR #21, merge `8e27f36`): forma de pagamento "Venda a Prazo
+    (Fiado)" no caixa (opt-in via `fiado_pdv_ativo`), combobox de clientes do
+    FiadoApp + cadastro inline; migration 0011 (`'fiado'` no `payment_method`,
+    `sales.fiado_venda_id`, RPC-ponte `registrar_venda_fiado` — cria o
+    a-receber no FiadoApp + a venda `'fiado'` com baixa de estoque, atômico).
+  - **Fase 2** (PR #22, merge `2017e50`): financeiro reflete o fiado (sem
+    migration). `sales_summary` exclui `'fiado'` via `CAIXA_PAYMENT_METHODS`
+    (financeiro E dashboard — corrige double-count); bloco "A receber via
+    FiadoApp" (badge + link); realização por pagamento (`pago_em`).
+  - **Fase 3** (PR #23, merge `0eeaddd`): exclusão consistente. RPC-ponte
+    `excluir_venda_fiado` (migration 0012) remove os dois lados e estorna
+    estoque (reusa `set_sale_status`); botão de excluir no bloco a-receber.
+  - **Fase 4** (PR #24, merge `74f5a61`): desativar a ponte pede senha
+    (reauth) + Manter/Excluir as vendas a prazo. Sem migration.
+
+Componentes reutilizáveis: `eco-toggle.tsx`, `fiado-pdv-toggle.tsx` (toggle
+com desativação protegida), `lib/ecossistema-server.ts` e
+`lib/financeiro/fiado.ts` (leituras do fiado no financeiro). **As RPCs-ponte
+que escrevem em `sales`/`fiado_vendas` vivem nas migrations do GAVETA**
+(0011, 0012); o FiadoApp é dono de `ecossistema_prefs`/`fiado_*`. Contábil:
+venda a prazo = a receber, entra no faturamento só quando paga no FiadoApp
+(base caixa, projeção em tempo de leitura). Gotchas: `react-hooks/immutability`
+barra `document.cookie =` em componente; opt-in é regra; **o `useEffect` de
+foco do `ConfirmDialog` não pode ter `onClose`/`pending` nas deps** (rouba o
+foco de campos ao digitar — corrigido, depende só de `[open]`). Badges de
+referência ao FiadoApp = vermelho/coral + logo (`FiadoappBadge`).
