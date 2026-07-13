@@ -5,6 +5,8 @@ import { FIADOAPP_URL } from "@/lib/ecossistema";
 import type { FiadoAReceber } from "@/lib/financeiro/fiado";
 import { formatBRL } from "@/lib/products/format";
 
+import { FiadoAReceberDeleteButton } from "./fiado-receber-actions-button";
+
 function formatVencimento(iso: string | null): string {
   if (!iso) return "Sem vencimento";
   const [y, m, d] = iso.split("-");
@@ -68,15 +70,22 @@ export function FiadoAReceberBlock({ vendas }: { vendas: FiadoAReceber[] }) {
                   </span>
                 ) : null}
               </span>
-              <a
-                href={`${FIADOAPP_URL}/vendas/${v.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary inline-flex items-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
-              >
-                Ver no FiadoApp
-                <ArrowUpRight aria-hidden="true" className="size-4" />
-              </a>
+              <div className="flex items-center gap-2">
+                <a
+                  href={`${FIADOAPP_URL}/vendas/${v.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary inline-flex items-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
+                >
+                  Ver no FiadoApp
+                  <ArrowUpRight aria-hidden="true" className="size-4" />
+                </a>
+                <FiadoAReceberDeleteButton
+                  vendaId={v.id}
+                  cliente={v.cliente}
+                  temPagamento={v.valorPago > 0}
+                />
+              </div>
             </div>
           </li>
         ))}
