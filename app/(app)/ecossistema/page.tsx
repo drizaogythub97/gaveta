@@ -19,8 +19,11 @@ import { FIADOAPP_URL } from "@/lib/ecossistema";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
-import { salvarFiadoPdv, salvarMarcaUnica, salvarSwitcher } from "./actions";
+import { resumoFiadoPdv } from "@/lib/ecossistema-server";
+
+import { salvarMarcaUnica, salvarSwitcher } from "./actions";
 import { EcoToggle } from "./eco-toggle";
+import { FiadoPdvToggle } from "./fiado-pdv-toggle";
 
 export const metadata = { title: "Ecossistema" };
 
@@ -49,6 +52,7 @@ export default async function EcossistemaPage() {
   const switcherAtivo = Boolean(prefs?.switcher_ativo);
   const marcaUnica = Boolean(prefs?.marca_unica);
   const fiadoPdv = Boolean(prefs?.fiado_pdv_ativo);
+  const resumoPdv = await resumoFiadoPdv(supabase, user?.id ?? "");
 
   return (
     <section className="minimal:max-sm:gap-4 flex max-w-2xl flex-col gap-6">
@@ -162,13 +166,7 @@ export default async function EcossistemaPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <EcoToggle
-            ativoInicial={fiadoPdv}
-            rotulo="Venda a prazo no caixa"
-            onSalvar={salvarFiadoPdv}
-            msgAtivado="Venda a prazo liberada no caixa."
-            msgDesativado="Venda a prazo desativada no caixa."
-          />
+          <FiadoPdvToggle ativoInicial={fiadoPdv} resumo={resumoPdv} />
         </CardContent>
       </Card>
 
