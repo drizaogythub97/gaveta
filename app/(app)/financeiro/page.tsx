@@ -13,12 +13,21 @@ import { formatBRL } from "@/lib/products/format";
 import type { CashSession } from "@/lib/types/cash";
 import type { Expense, ExpenseCategory } from "@/lib/types/expenses";
 import { EXPENSE_CATEGORIES } from "@/lib/types/expenses";
-import { PAYMENT_METHOD_LABELS, type SaleRow } from "@/lib/types/sales";
+import {
+  CAIXA_PAYMENT_METHODS,
+  PAYMENT_METHOD_LABELS,
+  type SaleRow,
+} from "@/lib/types/sales";
 import type { PaymentMethod } from "@/app/(app)/caixa/actions";
 import { cn } from "@/lib/utils";
 
 import { SALE_SORTS, type SaleSort } from "@/lib/financeiro/sort";
+import {
+  listarAReceberViaFiado,
+  recebidoViaFiadoNoPeriodo,
+} from "@/lib/financeiro/fiado";
 
+import { FiadoAReceberBlock } from "./fiado-a-receber";
 import { ExpensesClient } from "./expenses-client";
 import { ToggleSaleStatusButton } from "./toggle-sale-status-button";
 import { FinancialClient } from "./financial-client";
@@ -57,14 +66,9 @@ const SORT_ORDER: Record<
   low: { column: "total", ascending: true },
 };
 
-const ALL_METHODS: PaymentMethod[] = [
-  "dinheiro",
-  "pix",
-  "debito",
-  "credito_avista",
-  "credito_parcelado",
-  "vale",
-];
+// Métodos de caixa (exclui 'fiado'): passar ao sales_summary tira a venda a
+// prazo dos totais de faturamento. Fonte única em lib/types/sales.
+const ALL_METHODS = CAIXA_PAYMENT_METHODS;
 
 // Vendas por página na listagem. Os totais do período NÃO dependem disso:
 // são agregados no banco (RPC sales_summary), imunes ao corte de 1000
@@ -241,7 +245,9 @@ async function VendasTab({
     .rpc("sales_summary", {
       p_from: from,
       p_to: to,
-      p_methods: methods.length > 0 ? methods : null,
+      // Exclui 'fiado' do faturamento: venda a prazo é a receber, não caixa.
+      // (ALL_METHODS são os 6 métodos de caixa — 'fiado' fica de fora.)
+      p_methods: methods.length > 0 ? methods : ALL_METHODS,
     })
     .maybeSingle();
   const summary = (summaryData ?? EMPTY_SUMMARY) as SalesSummaryRow;
@@ -267,6 +273,9 @@ async function VendasTab({
   if (methods.length > 0) {
     query = query.in("payment_method", methods);
   }
+  // Vendas a prazo (fiado) não entram na lista normal de vendas do caixa —
+  // aparecem no bloco próprio "A receber via FiadoApp".
+  query = query.neq("payment_method", "fiado");
   const order = SORT_ORDER[sort];
   query = query.order(order.column, { ascending: order.ascending });
   // Desempate estável quando ordenado por valor.
@@ -277,6 +286,16 @@ async function VendasTab({
   const { data, error: listError } = await query;
   const sales = (data ?? []) as SaleRow[];
   const error = summaryError ?? listError;
+
+  // Ecossistema (Fase 2): o que foi REALMENTE recebido de vendas a prazo no
+  // período entra no faturamento; o que ainda está em aberto vai no bloco
+  // segregado "A receber via FiadoApp".
+  const [recebidoFiado, aReceberFiado] = await Promise.all([
+    recebidoViaFiadoNoPeriodo(supabase, from, to),
+    listarAReceberViaFiado(supabase),
+  ]);
+  const totalRecebido =
+    Math.round((netRevenue + recebidoFiado) * 100) / 100;
 
   return (
     <>
@@ -315,7 +334,25 @@ async function VendasTab({
             : ""}
           .
         </p>
+        {recebidoFiado > 0 ? (
+          <div className="border-primary-foreground/20 flex flex-col gap-1 border-t pt-3 text-base">
+            <div className="flex items-center justify-between">
+              <span className="opacity-90">+ Recebido a prazo (FiadoApp)</span>
+              <span className="font-semibold tabular-nums">
+                {formatBRL(recebidoFiado)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="opacity-90">Total recebido no período</span>
+              <span className="font-semibold tabular-nums">
+                {formatBRL(totalRecebido)}
+              </span>
+            </div>
+          </div>
+        ) : null}
       </section>
+
+      <FiadoAReceberBlock vendas={aReceberFiado} />
 
       {error ? (
         <p className="text-destructive text-base" role="alert">
@@ -452,7 +489,7 @@ async function ResumoTab({
   // milhares de linhas no período; só as sessões fechadas vêm como lista.
   const [salesRes, expensesRes, closedRes] = await Promise.all([
     supabase
-      .rpc("sales_summary", { p_from: from, p_to: to, p_methods: null })
+      .rpc("sales_summary", { p_from: from, p_to: to, p_methods: ALL_METHODS })
       .maybeSingle(),
     supabase.rpc("expenses_summary", { p_from: fromDate, p_to: toDate }),
     supabase
@@ -485,7 +522,11 @@ async function ResumoTab({
     Math.round(
       Array.from(byCat.values()).reduce((s, v) => s + v, 0) * 100,
     ) / 100;
-  const result = Math.round((netRevenue - expensesTotal) * 100) / 100;
+  // Ecossistema (Fase 2): o recebido de vendas a prazo (origem Gaveta) no
+  // período é income realizado — entra no resultado, junto da receita líquida.
+  const recebidoFiado = await recebidoViaFiadoNoPeriodo(supabase, from, to);
+  const result =
+    Math.round((netRevenue + recebidoFiado - expensesTotal) * 100) / 100;
 
   const closedSessions = (closedRes.data ?? []) as CashSession[];
 
@@ -504,7 +545,7 @@ async function ResumoTab({
     .rpc("sales_summary", {
       p_from: monthStart,
       p_to: new Date().toISOString(),
-      p_methods: null,
+      p_methods: ALL_METHODS,
     })
     .maybeSingle();
   const monthSummary = (monthSummaryData ?? EMPTY_SUMMARY) as SalesSummaryRow;
@@ -528,6 +569,7 @@ async function ResumoTab({
     grossRevenue,
     feesTotal,
     netRevenue,
+    recebidoFiado,
     expensesByCategory,
     expensesTotal,
     result,

@@ -11,6 +11,8 @@ export type SummaryData = {
   grossRevenue: number;
   feesTotal: number;
   netRevenue: number;
+  /** Recebido de vendas a prazo (FiadoApp) no período — income realizado. */
+  recebidoFiado: number;
   expensesByCategory: { category: ExpenseCategory; total: number }[];
   expensesTotal: number;
   result: number;
@@ -56,9 +58,19 @@ export function SummaryView({ data }: { data: SummaryData }) {
         <Card label="Receita bruta" value={formatBRL(data.grossRevenue)} />
         <Card label="Taxas de pagamento" value={`− ${formatBRL(data.feesTotal)}`} />
         <Card label="Receita líquida" value={formatBRL(data.netRevenue)} />
+        {data.recebidoFiado > 0 ? (
+          <Card
+            label="Recebido a prazo (FiadoApp)"
+            value={formatBRL(data.recebidoFiado)}
+          />
+        ) : null}
         <Card label="Despesas" value={`− ${formatBRL(data.expensesTotal)}`} />
         <Card
-          label="Resultado (líquida − despesas)"
+          label={
+            data.recebidoFiado > 0
+              ? "Resultado (líquida + a prazo − despesas)"
+              : "Resultado (líquida − despesas)"
+          }
           value={formatBRL(data.result)}
           tone={resultPositive ? "good" : "bad"}
         />

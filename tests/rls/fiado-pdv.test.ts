@@ -131,3 +131,115 @@ describe("RPC registrar_venda_fiado (ponte Fiado no PDV)", () => {
     }
   });
 });
+
+/**
+ * Financeiro (F6, Fase 2): a venda a prazo NÃO conta no faturamento de caixa
+ * (base caixa) e o valor pago no FiadoApp é projetado como recebido no
+ * período, pela data do pagamento.
+ */
+describe("financeiro reflete o fiado (base caixa)", () => {
+  const CAIXA = [
+    "dinheiro",
+    "pix",
+    "debito",
+    "credito_avista",
+    "credito_parcelado",
+    "vale",
+  ];
+
+  async function somaRecebidoGaveta(
+    app: ReturnType<typeof userClient>,
+    fromISO: string,
+    toISO: string,
+  ): Promise<number> {
+    const { data } = await app
+      .from("fiado_pagamentos")
+      .select("valor_pago, fiado_vendas!inner(origem)")
+      .eq("fiado_vendas.origem", "gaveta")
+      .gte("pago_em", fromISO)
+      .lte("pago_em", toISO);
+    return ((data ?? []) as { valor_pago: number }[]).reduce(
+      (s, p) => s + Number(p.valor_pago),
+      0,
+    );
+  }
+
+  it("fiado fica fora do faturamento; pago entra como recebido no período", async () => {
+    const u = await createTestUser("fiado-fin");
+    try {
+      const app = userClient(u.accessToken);
+      await app.from("ecossistema_prefs").upsert({
+        user_id: u.id,
+        fiado_pdv_ativo: true,
+        updated_at: new Date().toISOString(),
+      });
+
+      const { data: reg } = await app.rpc("registrar_venda_fiado", {
+        p_items: [
+          { product_id: null, name: "Item", unit_price: 100, quantity: 1 },
+        ],
+        p_itens_fiado: [
+          { descricao: "Item", quantidade: 1, valor_unitario: 100 },
+        ],
+        p_cliente_id: null,
+        p_cliente: {
+          nome: "Financeiro",
+          sobrenome: null,
+          referencia: null,
+          telefone: null,
+        },
+        p_data_vencimento: null,
+        p_observacao: null,
+      });
+      const { venda_id } = reg as { venda_id: string; sale_id: string };
+      const { data: venda } = await app
+        .from("fiado_vendas")
+        .select("cliente_id")
+        .eq("id", venda_id)
+        .single();
+
+      const from = new Date(Date.now() - 3_600_000).toISOString();
+      const to = new Date(Date.now() + 3_600_000).toISOString();
+
+      // Faturamento de CAIXA não inclui a venda a prazo.
+      const { data: sumCaixa } = await app
+        .rpc("sales_summary", { p_from: from, p_to: to, p_methods: CAIXA })
+        .maybeSingle();
+      expect(Number((sumCaixa as { gross_total: number }).gross_total)).toBe(0);
+
+      // Mas a venda 'fiado' EXISTE (se somada isolada, aparece — prova que a
+      // exclusão é o que a tira do faturamento).
+      const { data: sumFiado } = await app
+        .rpc("sales_summary", {
+          p_from: from,
+          p_to: to,
+          p_methods: ["fiado"],
+        })
+        .maybeSingle();
+      expect(Number((sumFiado as { gross_total: number }).gross_total)).toBe(
+        100,
+      );
+
+      // Antes de pagar: recebido a prazo = 0.
+      expect(await somaRecebidoGaveta(app, from, to)).toBe(0);
+
+      // Paga R$40 (parcial) no FiadoApp.
+      await app.rpc("fiado_registrar_pagamento", {
+        p_cliente_id: venda?.cliente_id,
+        p_valor: 40,
+      });
+
+      // Agora o recebido no período reflete os R$40 — e o faturamento de
+      // caixa continua 0 (a venda segue a receber, não realizada no caixa).
+      expect(await somaRecebidoGaveta(app, from, to)).toBe(40);
+      const { data: sumCaixa2 } = await app
+        .rpc("sales_summary", { p_from: from, p_to: to, p_methods: CAIXA })
+        .maybeSingle();
+      expect(
+        Number((sumCaixa2 as { gross_total: number }).gross_total),
+      ).toBe(0);
+    } finally {
+      await deleteTestUser(u);
+    }
+  });
+});
