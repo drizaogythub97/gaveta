@@ -11,6 +11,7 @@ import {
   ShoppingCart,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -130,8 +131,20 @@ export function BottomNav({
                 onClick={() => setMaisAberto(false)}
                 className="text-foreground hover:bg-muted flex h-12 items-center gap-3 rounded-lg px-3 text-base font-medium"
               >
-                <ArrowUpRight aria-hidden="true" className="size-5" />
+                <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-white p-0.5">
+                  <Image
+                    src="/fiadoapp-logo.png"
+                    alt=""
+                    width={24}
+                    height={24}
+                    className="size-full object-contain"
+                  />
+                </span>
                 Abrir o FiadoApp
+                <ArrowUpRight
+                  aria-hidden="true"
+                  className="text-muted-foreground ml-auto size-4"
+                />
               </a>
             ) : null}
             <div className="border-border mt-2 flex flex-col border-t pt-3">
