@@ -264,7 +264,7 @@ function StockRow({ product }: { product: Product }) {
               type="button"
               variant="outline"
               onClick={() => openMode("set")}
-              className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-4 text-base"
+              className="minimal:max-sm:h-10 minimal:max-sm:text-sm h-12 flex-1 px-4 text-base sm:flex-initial"
             >
               <Pencil aria-hidden="true" className="size-4" />
               Atualizar quantidade
@@ -272,7 +272,7 @@ function StockRow({ product }: { product: Product }) {
             <Button
               type="button"
               onClick={() => openMode("add")}
-              className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-4 text-base"
+              className="minimal:max-sm:h-10 minimal:max-sm:text-sm h-12 flex-1 px-4 text-base sm:flex-initial"
             >
               <PackagePlus aria-hidden="true" className="size-4" />
               Receber entrada
