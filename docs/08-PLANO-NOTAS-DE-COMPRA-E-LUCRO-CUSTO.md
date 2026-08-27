@@ -165,11 +165,16 @@ Despesas gerais (aluguel, salários…) não participam da divisão diária — 
 |---|---|---|
 | **G1 — Fundação de custo** ✅ ENTREGUE (0013_cost_price.sql) | `cost_price` em products (+ edição no cadastro), `unit_cost` snapshot em sale_items (**último custo** — ver 1.3), preenchimento manual dos produtos atuais | — |
 | **G2a — Núcleo de compras (manual)** ⬅ PRÓXIMA | Tabelas purchases/purchase_items, RPC transacional (compra+estoque+último custo+despesa automática), tela de entrada manual, histórico | G1 |
+| **G2a.1 — Estorno de compra** ⚠ NOVO | Cancelar uma compra lançada por engano: reverte estoque (movimento `void`), remove/estorna o gasto em `expenses`, marca a nota como cancelada (não apaga histórico). Exige política de UPDATE/soft-delete em `purchases`. **Motivo: hoje não há como corrigir erro de digitação — em uso diário isso acontece.** | G2a |
 | **G2b — Extração gratuita (PDF-texto + XML)** | Upload → parser determinístico open source → motor de match (EAN→nome→novo) → mesma tela vira conferência | G2a |
 | **G3 — Fechamento Lucro × Custo** | Card do dia + filtros + cobertura + regra fiado/taxas | G1 (melhor após G2) |
 | **G2c — OCR local (opcional)** | Tesseract.js no navegador para PDF-imagem/foto; só se G2b não cobrir | G2b |
 
-Ordem decidida: **G1 ✅ → G2a → G2b → G3 → (G2c opcional)**.
+Ordem decidida: **G1 ✅ → G2a ✅ → G2a.1 (estorno) → G2b → G3 → (G2c opcional)**.
+
+> ⚠️ **Regra de merge (CLAUDE.md):** cada fase é mesclada na `main` após aprovação do
+> preview — não acumular branches. As migrations já são aplicadas no banco compartilhado
+> antes do push, então a `main` não deve ficar atrás do banco por muito tempo.
 
 ## 4. Decisões (TODAS FECHADAS — jul/2026)
 1. ✅ Formato real das notas: **PDF/espelho/papel** → via IA é a principal; XML suportado.

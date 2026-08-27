@@ -410,3 +410,31 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
   (grava tudo junto, produto novo com código, nota duplicada recusada, falha
   atômica não deixa rastro, isolamento por usuário). A extração de PDF/XML é a
   G2b.
+
+### Validação da G2a (protocolo `docs/09-PROTOCOLO-DE-VALIDACAO.md`)
+
+Sessão de 2026-08-27, sem implementar funcionalidade nova:
+
+- **Funcional** (`tests/e2e/compras.spec.ts`, 11 testes): roda logado como
+  **usuário descartável** (criado no `auth.setup.ts`, apagado no
+  `auth.teardown.ts` — nunca a conta do dono) e confere **na UI e no banco**:
+  navegação Estoque → nota, data futura e chave <44 dígitos recusadas pelo
+  servidor, chave colada com espaços aceita, item existente por nome e por
+  código já com o último custo, produto novo exigindo preço de venda,
+  quantidade inválida barrada, total recalculando, resumo da confirmação,
+  os **quatro efeitos** (estoque somado, `cost_price` da nota,
+  `stock_movements` tipo `purchase`, `expenses` em `insumos` na data),
+  nota duplicada recusada, histórico/detalhe, e a **regressão do PDV**
+  (venda à vista e venda a prazo via ponte FiadoApp, com o snapshot
+  `unit_cost` vindo do custo da nota).
+- **Visual** (`tests/e2e/compras-visual.spec.ts`): projetos `desktop`
+  (Desktop Chrome) e `mobile` (Pixel 7), nos modos Simples e Minimalista —
+  sem rolagem horizontal, alvos ≥44px no conteúdo e regressão de screenshot
+  (`toHaveScreenshot`) com estado semeado fixo.
+- **Infra**: `playwright.config.ts` aceita `BASE_URL` (sem ela, sobe o
+  `npm run dev`; com ela, usa o alvo externo e desliga o webServer) e
+  `VERCEL_AUTOMATION_BYPASS_SECRET` para Previews com Vercel Authentication.
+  Rodar contra o Preview:
+  `BASE_URL=https://... VERCEL_AUTOMATION_BYPASS_SECRET=... npm run test:e2e`.
+  Os baselines de screenshot têm sufixo de plataforma (`-win32`): outro SO
+  gera o seu próprio na primeira execução.
