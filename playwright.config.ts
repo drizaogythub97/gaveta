@@ -93,7 +93,9 @@ export default defineConfig({
         command: "npm run dev",
         url: baseURL,
         reuseExistingServer: !process.env.CI,
-        timeout: 120_000,
+        // Primeira subida depois de um `npm run build` recompila tudo do
+        // zero; 2 minutos ficavam apertados.
+        timeout: 240_000,
       }
     : undefined,
 });

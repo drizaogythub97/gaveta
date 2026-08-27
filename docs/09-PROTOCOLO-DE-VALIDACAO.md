@@ -47,3 +47,33 @@ Ao terminar, responder com:
 - Antes de fechar: `npm run lint`, `npx tsc --noEmit`, `npm run test`,
   `npm run test:rls` (se mexeu em banco) e `npm run build`.
 - Merge por fase, após aprovação do preview — não acumular para o fim.
+
+## 5. Como rodar os testes (local e contra o Preview)
+
+```bash
+npm run lint && npx tsc --noEmit && npm run test && npm run test:rls && npm run build
+npm run test:e2e            # e2e local (o Playwright sobe o npm run dev sozinho)
+npm run test:e2e:preview    # o MESMO suíte contra o Preview da branch atual
+```
+
+- `playwright.config.ts` aceita `BASE_URL`: sem ela, roda em `localhost` e sobe
+  o servidor de desenvolvimento; com ela, aponta para o alvo externo e desliga
+  o `webServer`.
+- `scripts/e2e-preview.mjs` descobre a URL do Preview da branch (Vercel CLI e,
+  se ela não estiver autenticada, o alias determinístico da branch), confere se
+  o alvo responde e só então roda o suíte.
+- **Proteção do Preview**: com "Vercel Authentication" ligada, nenhum teste
+  automatizado entra. Duas saídas, ambas em *Vercel → Project → Settings →
+  Deployment Protection*:
+  1. **Protection Bypass for Automation** (recomendado — mantém o Preview
+     privado): gere o segredo e exporte
+     `VERCEL_AUTOMATION_BYPASS_SECRET=<segredo>`; o `playwright.config.ts` já
+     envia o cabeçalho `x-vercel-protection-bypass`;
+  2. desligar a proteção dos Previews (a URL passa a abrir para quem tiver o
+     link — os dados seguem protegidos por login e RLS).
+- Contas de teste: sempre **descartáveis** (`tests/e2e/auth.setup.ts` cria,
+  `auth.teardown.ts` apaga). Como o banco é compartilhado com o FiadoApp e é o
+  mesmo de produção, rodar contra o Preview NÃO muda o risco: os dados de teste
+  nascem e morrem dentro da execução.
+- Acessibilidade: `tests/e2e/a11y.ts` calcula contraste AA (WCAG 2.1) e tamanho
+  de alvo direto no navegador, sem dependência externa.

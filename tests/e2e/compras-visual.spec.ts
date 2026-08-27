@@ -2,6 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { STATE_VISUAL } from "../../playwright.config";
 
+import { esperaContrasteAA } from "./a11y";
+
 import { loadUsers } from "./helpers";
 
 /**
@@ -103,6 +105,7 @@ test("entrada por nota: layout, alvos e regressão visual", async ({ page }) => 
 
   await semRolagemHorizontal(page);
   await alvosGrandes(page);
+  await esperaContrasteAA(page);
 
   // O botão principal fica desabilitado até haver item — e a tela explica
   // que o valor vira gasto no Financeiro.
@@ -129,6 +132,7 @@ test("histórico de notas: layout, alvos e regressão visual", async ({
 
   await semRolagemHorizontal(page);
   await alvosGrandes(page);
+  await esperaContrasteAA(page);
   await escondeOverlayDoNext(page);
 
   await expect(page).toHaveScreenshot("nota-historico.png", {
@@ -148,6 +152,7 @@ test("detalhe da nota: layout e regressão visual", async ({ page }) => {
 
   await semRolagemHorizontal(page);
   await alvosGrandes(page);
+  await esperaContrasteAA(page);
   await escondeOverlayDoNext(page);
 
   await expect(page).toHaveScreenshot("nota-detalhe.png", { fullPage: true });
@@ -171,6 +176,7 @@ test("celular no modo Minimalista mantém o padrão", async ({ page }) => {
   );
   await semRolagemHorizontal(page);
   await alvosGrandes(page);
+  await esperaContrasteAA(page);
   await expect(page).toHaveScreenshot("nota-nova-minimalista.png", {
     fullPage: true,
   });
