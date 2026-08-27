@@ -7,6 +7,8 @@
 /coverage
 /playwright-report
 /test-results
+# Sessões e contas descartáveis do e2e (geradas a cada execução)
+/tests/e2e/.auth
 
 # Next.js
 /.next/

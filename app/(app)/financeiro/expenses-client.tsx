@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatDateOnly } from "@/lib/dashboard/dates";
 import {
   digitsToBRL,
   digitsToDecimalString,
@@ -24,13 +25,6 @@ import { cn } from "@/lib/utils";
 import { addExpense, deleteExpense } from "./expenses-actions";
 
 type Feedback = { kind: "success" | "error"; message: string } | null;
-
-/** Formata "YYYY-MM-DD" como "DD/MM/YYYY" sem conversão de fuso. */
-function formatDateOnly(value: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return value;
-  return `${m[3]}/${m[2]}/${m[1]}`;
-}
 
 export function ExpensesClient({
   expenses,

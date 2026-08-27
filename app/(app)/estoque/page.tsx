@@ -1,4 +1,4 @@
-import { History } from "lucide-react";
+import { FileText, History } from "lucide-react";
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
@@ -33,13 +33,22 @@ export default async function InventoryPage() {
             <span className="text-foreground font-medium">Produtos</span>.
           </p>
         </div>
-        <Link
-          href="/estoque/movimentacoes"
-          className="border-border hover:bg-muted inline-flex h-12 w-fit shrink-0 items-center gap-2 rounded-lg border px-4 text-base font-medium transition-colors"
-        >
-          <History aria-hidden="true" className="size-5" />
-          Ver movimentação
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/estoque/compras/nova"
+            className="border-border hover:bg-muted inline-flex h-12 w-fit shrink-0 flex-1 items-center justify-center gap-2 rounded-lg border px-4 text-base font-medium transition-colors sm:flex-initial"
+          >
+            <FileText aria-hidden="true" className="size-5" />
+            Entrada por nota
+          </Link>
+          <Link
+            href="/estoque/movimentacoes"
+            className="border-border hover:bg-muted inline-flex h-12 w-fit shrink-0 flex-1 items-center justify-center gap-2 rounded-lg border px-4 text-base font-medium transition-colors sm:flex-initial"
+          >
+            <History aria-hidden="true" className="size-5" />
+            Ver movimentação
+          </Link>
+        </div>
       </header>
       <InventoryClient products={products} />
     </section>

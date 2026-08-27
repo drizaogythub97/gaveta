@@ -1,4 +1,9 @@
-export type StockMovementType = "sale" | "void" | "restock" | "adjust";
+export type StockMovementType =
+  | "sale"
+  | "void"
+  | "restock"
+  | "adjust"
+  | "purchase";
 
 export type StockMovementRow = {
   id: string;
@@ -15,4 +20,5 @@ export const STOCK_MOVEMENT_LABELS: Record<StockMovementType, string> = {
   void: "Estorno",
   restock: "Reposição",
   adjust: "Ajuste",
+  purchase: "Entrada por nota",
 };

@@ -1,0 +1,775 @@
+"use client";
+
+import {
+  Camera,
+  Package,
+  PackagePlus,
+  ScanBarcode,
+  Trash2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
+
+import {
+  BarcodeScanner,
+  isBarcodeCameraSupported,
+} from "@/components/app/barcode-scanner";
+import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { ErrorAlert } from "@/components/auth/form-feedback";
+import loaderStyles from "@/components/app/gaveta-loader.module.css";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useClientFlag } from "@/lib/hooks/use-client-flag";
+import {
+  digitsToBRL,
+  digitsToNumber,
+  formatBRL,
+  numberToDigits,
+  parseDecimalPtBR,
+  sanitizeDigits,
+} from "@/lib/products/format";
+import type { Product } from "@/lib/types/db";
+
+// A busca de produto é a MESMA da frente de caixa (por nome ou por código
+// de barras) — sem duplicar lógica de busca.
+import { findProductByCode, searchProductsByName } from "../../caixa/actions";
+
+import { registrarCompra } from "./actions";
+
+type NotaItem = {
+  key: string;
+  productId: string | null;
+  isNew: boolean;
+  name: string;
+  barcode: string;
+  quantity: string;
+  costDigits: string;
+  salePriceDigits: string;
+  trackStock: boolean;
+};
+
+function makeKey() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function hoje(): string {
+  const agora = new Date();
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  const dia = String(agora.getDate()).padStart(2, "0");
+  return `${agora.getFullYear()}-${mes}-${dia}`;
+}
+
+function lineTotal(item: NotaItem): number {
+  const qty = parseDecimalPtBR(item.quantity);
+  const cost = digitsToNumber(item.costDigits);
+  if (!Number.isFinite(qty) || qty <= 0) return 0;
+  return Math.round(qty * cost * 100) / 100;
+}
+
+export function NotaForm() {
+  const router = useRouter();
+
+  const [supplier, setSupplier] = useState("");
+  const [issuedOn, setIssuedOn] = useState(hoje);
+  const [accessKey, setAccessKey] = useState("");
+
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [novoNome, setNovoNome] = useState<string | null>(null);
+  const [novoBarcode, setNovoBarcode] = useState("");
+  const [novoCustoDigits, setNovoCustoDigits] = useState("");
+  const [novoPrecoDigits, setNovoPrecoDigits] = useState("");
+  const [novoQtd, setNovoQtd] = useState("1");
+
+  const [items, setItems] = useState<NotaItem[]>([]);
+  const [erro, setErro] = useState<string | null>(null);
+  const [showScanner, setShowScanner] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [isSaving, startSaving] = useTransition();
+
+  const scannerSupported = useClientFlag(isBarcodeCameraSupported);
+  const queryRef = useRef<HTMLInputElement>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchSeq = useRef(0);
+  const novoCustoId = useId();
+  const novoPrecoId = useId();
+  const novoQtdId = useId();
+  const novoCodigoId = useId();
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, []);
+
+  const total = items.reduce((soma, item) => soma + lineTotal(item), 0);
+  const novos = items.filter((i) => i.isNew).length;
+  const existentes = items.length - novos;
+
+  function refocus() {
+    setTimeout(() => queryRef.current?.focus(), 0);
+  }
+
+  function limparNovo() {
+    setNovoNome(null);
+    setNovoBarcode("");
+    setNovoCustoDigits("");
+    setNovoPrecoDigits("");
+    setNovoQtd("1");
+  }
+
+  function adicionarExistente(product: Product) {
+    setItems((prev) => [
+      ...prev,
+      {
+        key: makeKey(),
+        productId: product.id,
+        isNew: false,
+        name: product.name,
+        barcode: "",
+        quantity: "1",
+        // Já vem com o último custo conhecido: normalmente é só conferir.
+        costDigits: numberToDigits(product.cost_price),
+        salePriceDigits: "",
+        trackStock: product.track_stock,
+      },
+    ]);
+    setQuery("");
+    setSuggestions([]);
+    setIsSearching(false);
+    limparNovo();
+    setErro(null);
+    refocus();
+  }
+
+  function handleQueryChange(value: string) {
+    setQuery(value);
+    setErro(null);
+    if (novoNome !== null) limparNovo();
+
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    const term = value.trim();
+    if (term.length === 0) {
+      setSuggestions([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    const seq = ++fetchSeq.current;
+    debounceTimer.current = setTimeout(async () => {
+      const result = await searchProductsByName(term);
+      if (seq === fetchSeq.current) {
+        setSuggestions(result);
+        setIsSearching(false);
+      }
+    }, 220);
+  }
+
+  async function submitTermo(rawTerm: string) {
+    const term = rawTerm.trim();
+    if (term.length === 0) return;
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    fetchSeq.current++;
+    setIsSearching(true);
+
+    const product = await findProductByCode(term);
+    setIsSearching(false);
+    if (product) {
+      adicionarExistente(product);
+      return;
+    }
+
+    // Não achou: o item da nota vira um produto novo. Se o termo era um
+    // código de barras, ele já entra preenchido no campo do código.
+    const pareceCodigo = /^\d{8,14}$/.test(term);
+    setQuery(term);
+    setSuggestions([]);
+    setNovoNome(pareceCodigo ? "" : term);
+    setNovoBarcode(pareceCodigo ? term : "");
+    setNovoCustoDigits("");
+    setNovoPrecoDigits("");
+    setNovoQtd("1");
+    setErro(null);
+  }
+
+  function adicionarNovo() {
+    const nome = (novoNome ?? "").trim();
+    const qty = parseDecimalPtBR(novoQtd);
+    const custo = digitsToNumber(novoCustoDigits);
+    const preco = digitsToNumber(novoPrecoDigits);
+
+    if (nome.length === 0) {
+      setErro("Informe o nome do produto novo.");
+      return;
+    }
+    if (!Number.isFinite(qty) || qty <= 0) {
+      setErro("Informe quantas unidades chegaram.");
+      return;
+    }
+    if (novoCustoDigits.length === 0 || custo < 0) {
+      setErro("Informe quanto você pagou por unidade.");
+      return;
+    }
+    if (novoPrecoDigits.length === 0 || preco <= 0) {
+      setErro("Informe por quanto você vai vender este produto.");
+      return;
+    }
+
+    setItems((prev) => [
+      ...prev,
+      {
+        key: makeKey(),
+        productId: null,
+        isNew: true,
+        name: nome,
+        barcode: novoBarcode.trim(),
+        quantity: novoQtd,
+        costDigits: novoCustoDigits,
+        salePriceDigits: novoPrecoDigits,
+        trackStock: true,
+      },
+    ]);
+    setQuery("");
+    limparNovo();
+    setErro(null);
+    refocus();
+  }
+
+  function atualizarItem(key: string, patch: Partial<NotaItem>) {
+    setItems((prev) =>
+      prev.map((item) => (item.key === key ? { ...item, ...patch } : item)),
+    );
+    setErro(null);
+  }
+
+  function removerItem(key: string) {
+    setItems((prev) => prev.filter((item) => item.key !== key));
+    setErro(null);
+  }
+
+  function abrirConfirmacao() {
+    if (items.length === 0) {
+      setErro("Adicione ao menos um item à nota.");
+      return;
+    }
+    for (const item of items) {
+      const qty = parseDecimalPtBR(item.quantity);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        setErro(`Confira a quantidade de "${item.name}".`);
+        return;
+      }
+      if (item.costDigits.length === 0) {
+        setErro(`Informe quanto custou "${item.name}".`);
+        return;
+      }
+      if (item.isNew && digitsToNumber(item.salePriceDigits) <= 0) {
+        setErro(`Informe o preço de venda de "${item.name}".`);
+        return;
+      }
+    }
+    setErro(null);
+    setConfirmOpen(true);
+  }
+
+  function lancarNota() {
+    startSaving(async () => {
+      const resultado = await registrarCompra({
+        supplierName: supplier,
+        accessKey,
+        issuedOn,
+        source: "manual",
+        items: items.map((item) => ({
+          productId: item.productId,
+          isNew: item.isNew,
+          description: item.name,
+          barcode: item.barcode,
+          quantity: parseDecimalPtBR(item.quantity),
+          unitCost: digitsToNumber(item.costDigits),
+          salePrice: item.isNew ? digitsToNumber(item.salePriceDigits) : null,
+          trackStock: item.trackStock,
+        })),
+      });
+
+      setConfirmOpen(false);
+      if (!resultado.ok) {
+        setErro(resultado.error);
+        return;
+      }
+      router.push(`/estoque/compras/${resultado.purchaseId}?lancada=1`);
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {erro ? <ErrorAlert message={erro} /> : null}
+
+      {/* ---------- Dados da nota ---------- */}
+      <section
+        aria-labelledby="nota-dados"
+        className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1"
+      >
+        <h2
+          id="nota-dados"
+          className="minimal:max-sm:text-lg text-xl font-semibold"
+        >
+          Dados da nota
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="supplier" className="text-base">
+              Fornecedor{" "}
+              <span className="text-muted-foreground font-normal">
+                (opcional)
+              </span>
+            </Label>
+            <Input
+              id="supplier"
+              type="text"
+              autoComplete="off"
+              value={supplier}
+              onChange={(e) => setSupplier(e.target.value)}
+              placeholder="Ex.: Atacadão do Bairro"
+              className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 text-lg"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="issuedOn" className="text-base">
+              Data da compra
+            </Label>
+            <Input
+              id="issuedOn"
+              type="date"
+              value={issuedOn}
+              max={hoje()}
+              onChange={(e) => setIssuedOn(e.target.value)}
+              className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 text-lg"
+            />
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="accessKey" className="text-base">
+            Chave da nota fiscal{" "}
+            <span className="text-muted-foreground font-normal">
+              (opcional)
+            </span>
+          </Label>
+          <p id="accessKey-hint" className="text-muted-foreground text-sm">
+            São os 44 números impressos na nota. Se você informar, o sistema
+            avisa caso tente lançar a mesma nota de novo.
+          </p>
+          <Input
+            id="accessKey"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            value={accessKey}
+            onChange={(e) => setAccessKey(e.target.value)}
+            aria-describedby="accessKey-hint"
+            placeholder="Ex.: 3526 0812 3456 …"
+            className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 font-mono text-lg"
+          />
+        </div>
+      </section>
+
+      {/* ---------- Adicionar item ---------- */}
+      <section
+        aria-labelledby="nota-adicionar"
+        className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1"
+      >
+        <h2
+          id="nota-adicionar"
+          className="minimal:max-sm:text-lg flex items-center gap-2 text-xl font-semibold"
+        >
+          <ScanBarcode aria-hidden="true" className="size-6" />
+          Adicionar item da nota
+        </h2>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="nota-query" className="text-base">
+            Bipe o código de barras ou digite o nome do produto
+          </Label>
+          <Input
+            ref={queryRef}
+            id="nota-query"
+            type="text"
+            autoComplete="off"
+            value={query}
+            onChange={(e) => handleQueryChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void submitTermo(query);
+              }
+            }}
+            aria-describedby="nota-query-hint"
+            placeholder="Ex.: 7891234567890 ou Arroz"
+            className="minimal:max-sm:h-12 minimal:max-sm:text-base h-16 text-xl"
+            disabled={isSaving}
+          />
+          <p id="nota-query-hint" className="text-muted-foreground text-sm">
+            Se o produto ainda não existe no Gaveta, você poderá cadastrá-lo
+            aqui mesmo.
+          </p>
+          {isSearching && novoNome === null ? (
+            <p
+              role="status"
+              aria-live="polite"
+              className="text-muted-foreground flex items-center text-sm"
+            >
+              <span aria-hidden="true" className={loaderStyles.dots}>
+                Buscando produto<span>.</span>
+                <span>.</span>
+                <span>.</span>
+              </span>
+              <span className="sr-only">Buscando produto…</span>
+            </p>
+          ) : null}
+        </div>
+
+        {scannerSupported ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setShowScanner(true)}
+            className="h-12 gap-2 self-start px-4 text-base"
+          >
+            <Camera aria-hidden="true" className="size-5" />
+            Escanear com a câmera
+          </Button>
+        ) : null}
+
+        {suggestions.length > 0 && novoNome === null ? (
+          <ul
+            role="listbox"
+            aria-label="Sugestões de produtos"
+            className="flex flex-col gap-1"
+          >
+            {suggestions.map((p) => (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  onClick={() => adicionarExistente(p)}
+                  className="hover:bg-muted focus-visible:bg-muted flex w-full items-center justify-between gap-3 rounded-md px-3 py-3 text-left text-base outline-none"
+                >
+                  <span className="text-foreground font-medium">{p.name}</span>
+                  <span className="text-muted-foreground text-sm">
+                    {p.cost_price === null
+                      ? "sem custo cadastrado"
+                      : `custo atual ${formatBRL(p.cost_price)}`}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {novoNome !== null ? (
+          <div className="border-border flex flex-col gap-3 rounded-lg border border-dashed p-4">
+            <p className="flex items-center gap-2 text-base">
+              <PackagePlus aria-hidden="true" className="size-5 shrink-0" />
+              Produto ainda não cadastrado. Cadastre agora com os dados da
+              nota:
+            </p>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="novo-nome" className="text-sm">
+                Nome do produto
+              </Label>
+              <Input
+                id="novo-nome"
+                type="text"
+                autoComplete="off"
+                value={novoNome}
+                onChange={(e) => setNovoNome(e.target.value)}
+                placeholder="Como está escrito na nota"
+                className="h-12 text-base"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor={novoCodigoId} className="text-sm">
+                  Código de barras (opcional)
+                </Label>
+                <Input
+                  id={novoCodigoId}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={novoBarcode}
+                  onChange={(e) => setNovoBarcode(e.target.value)}
+                  className="h-12 font-mono text-base"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor={novoQtdId} className="text-sm">
+                  Quantidade que chegou
+                </Label>
+                <Input
+                  id={novoQtdId}
+                  type="text"
+                  inputMode="decimal"
+                  value={novoQtd}
+                  onChange={(e) => setNovoQtd(e.target.value)}
+                  className="h-12 text-base"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor={novoCustoId} className="text-sm">
+                  Custo por unidade
+                </Label>
+                <Input
+                  id={novoCustoId}
+                  type="text"
+                  inputMode="numeric"
+                  value={
+                    novoCustoDigits === "" ? "" : digitsToBRL(novoCustoDigits)
+                  }
+                  onChange={(e) =>
+                    setNovoCustoDigits(sanitizeDigits(e.target.value))
+                  }
+                  placeholder="R$ 0,00"
+                  className="h-12 text-base"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor={novoPrecoId} className="text-sm">
+                  Preço de venda
+                </Label>
+                <Input
+                  id={novoPrecoId}
+                  type="text"
+                  inputMode="numeric"
+                  value={
+                    novoPrecoDigits === "" ? "" : digitsToBRL(novoPrecoDigits)
+                  }
+                  onChange={(e) =>
+                    setNovoPrecoDigits(sanitizeDigits(e.target.value))
+                  }
+                  placeholder="R$ 0,00"
+                  className="h-12 text-base"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  limparNovo();
+                  refocus();
+                }}
+                className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-5 text-base"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={adicionarNovo}
+                className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-5 text-base"
+              >
+                Adicionar à nota
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      {/* ---------- Itens da nota ---------- */}
+      <section
+        aria-labelledby="nota-itens"
+        className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1"
+      >
+        <h2
+          id="nota-itens"
+          className="minimal:max-sm:text-lg text-xl font-semibold"
+        >
+          Itens da nota{items.length > 0 ? ` (${items.length})` : ""}
+        </h2>
+
+        {items.length === 0 ? (
+          <p className="text-muted-foreground text-base">
+            Nenhum item ainda. Use o campo acima para ir somando os produtos da
+            nota.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {items.map((item) => (
+              <li
+                key={item.key}
+                className="border-border flex flex-col gap-3 rounded-lg border p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="minimal:max-sm:text-base text-foreground text-lg font-semibold">
+                      {item.name}
+                    </span>
+                    <span
+                      className={
+                        item.isNew
+                          ? "inline-flex w-fit items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-sm font-medium text-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
+                          : "bg-primary/10 text-primary inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-sm font-medium"
+                      }
+                    >
+                      {item.isNew ? (
+                        <PackagePlus aria-hidden="true" className="size-4" />
+                      ) : (
+                        <Package aria-hidden="true" className="size-4" />
+                      )}
+                      {item.isNew ? "Produto novo" : "Já cadastrado"}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => removerItem(item.key)}
+                    aria-label={`Remover ${item.name} da nota`}
+                    className="size-12 shrink-0 p-0"
+                  >
+                    <Trash2 aria-hidden="true" className="size-5" />
+                  </Button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="flex flex-col gap-1">
+                    <Label
+                      htmlFor={`qtd-${item.key}`}
+                      className="text-sm"
+                    >
+                      Quantidade
+                    </Label>
+                    <Input
+                      id={`qtd-${item.key}`}
+                      type="text"
+                      inputMode="decimal"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        atualizarItem(item.key, { quantity: e.target.value })
+                      }
+                      className="h-12 text-base"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label
+                      htmlFor={`custo-${item.key}`}
+                      className="text-sm"
+                    >
+                      Custo por unidade
+                    </Label>
+                    <Input
+                      id={`custo-${item.key}`}
+                      type="text"
+                      inputMode="numeric"
+                      value={
+                        item.costDigits === ""
+                          ? ""
+                          : digitsToBRL(item.costDigits)
+                      }
+                      onChange={(e) =>
+                        atualizarItem(item.key, {
+                          costDigits: sanitizeDigits(e.target.value),
+                        })
+                      }
+                      placeholder="R$ 0,00"
+                      className="h-12 text-base"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium">Total do item</span>
+                    <span className="flex h-12 items-center text-lg font-semibold tabular-nums">
+                      {formatBRL(lineTotal(item))}
+                    </span>
+                  </div>
+                </div>
+
+                {item.isNew ? (
+                  <p className="text-muted-foreground text-sm">
+                    Vai ser cadastrado com preço de venda de{" "}
+                    <strong className="text-foreground font-medium">
+                      {formatBRL(digitsToNumber(item.salePriceDigits))}
+                    </strong>
+                    {item.barcode ? (
+                      <>
+                        {" "}
+                        e código{" "}
+                        <span className="font-mono">{item.barcode}</span>
+                      </>
+                    ) : null}
+                    , controlando estoque.
+                  </p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* ---------- Total e confirmação ---------- */}
+      <div className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1">
+        <div className="flex items-center justify-between gap-3">
+          <span className="minimal:max-sm:text-base text-lg font-medium">
+            Total da nota
+          </span>
+          <span className="minimal:max-sm:text-xl text-2xl font-semibold tabular-nums">
+            {formatBRL(total)}
+          </span>
+        </div>
+        <p className="text-muted-foreground text-sm">
+          Este valor também entra como gasto de{" "}
+          <strong className="text-foreground font-medium">
+            insumos / mercadorias
+          </strong>{" "}
+          no Financeiro, na data da compra.
+        </p>
+        <Button
+          type="button"
+          onClick={abrirConfirmacao}
+          disabled={isSaving || items.length === 0}
+          className="minimal:max-sm:h-12 minimal:max-sm:text-base h-14 text-lg font-semibold"
+        >
+          Conferir e lançar nota
+        </Button>
+      </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Conferir a nota antes de lançar"
+        confirmLabel="Lançar nota"
+        cancelLabel="Voltar e revisar"
+        pending={isSaving}
+        onConfirm={lancarNota}
+        description={
+          <span className="flex flex-col gap-2 text-base">
+            <span>
+              {existentes > 0
+                ? `${existentes} ${existentes === 1 ? "produto será atualizado" : "produtos serão atualizados"}`
+                : "Nenhum produto já cadastrado"}
+              {novos > 0
+                ? `, ${novos} ${novos === 1 ? "produto novo será criado" : "produtos novos serão criados"}`
+                : ""}
+              .
+            </span>
+            <span>
+              O estoque entra na hora e o custo de cada produto passa a ser o
+              desta nota.
+            </span>
+            <span>
+              <strong className="font-semibold">{formatBRL(total)}</strong> será
+              lançado como gasto em insumos / mercadorias.
+            </span>
+          </span>
+        }
+      />
+
+      {showScanner ? (
+        <BarcodeScanner
+          onDetect={(code) => {
+            setShowScanner(false);
+            void submitTermo(code);
+          }}
+          onClose={() => setShowScanner(false)}
+        />
+      ) : null}
+    </div>
+  );
+}

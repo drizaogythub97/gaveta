@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps chromium",
-    "test:rls": "vitest run --config vitest.rls.config.ts"
+    "test:rls": "vitest run --config vitest.rls.config.ts",
+    "test:e2e:preview": "node scripts/e2e-preview.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

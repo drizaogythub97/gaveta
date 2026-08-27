@@ -34,28 +34,33 @@ O que falta (tudo aditivo, padrão do repo):
 
 ### 1.1 As três vias possíveis (e a recomendação)
 
-**Realidade do dono (decisão 1, jul/2026): as notas chegam como PDF (DANFE ou
-espelho do pedido) e papel — raramente XML.** Portanto a via por IA é a PRINCIPAL.
+**Realidade do dono: as notas chegam como PDF (DANFE ou espelho do pedido) e papel.**
+**Restrição nova (decisão 7, jul/2026): CUSTO ZERO — nada de API paga. Extração por IA
+paga foi REMOVIDA do roadmap.**
 
 | Via | Como funciona | Confiabilidade | Custo | Veredicto |
 |---|---|---|---|---|
-| **A) PDF/foto com IA (extração)** | Upload do PDF ou foto → servidor extrai texto do PDF (DANFEs têm camada de texto) e/ou envia à API de visão (Claude) → JSON de itens → tela de conferência. Mesmo pipeline para PDF, foto e espelho de pedido. | ~92–98% (PDF texto ≈ topo da faixa); conferência humana sempre | Centavos por nota (API) | **Via principal — fase G2** |
-| **B) XML da NF-e (modelo 55)** | Se o XML existir (fornecedor é obrigado a fornecer se pedido), parse direto e 100% preciso. | 100% | Zero | Suporte incluído na G2 (barato de adicionar); vale pedir o XML aos fornecedores maiores |
-| **C) QR/chave da NFC-e (consulta SEFAZ)** | Ler QR do cupom → portal SEFAZ do estado. | Baixa (varia por estado, captcha, instável) | Zero | **Não prometer** — estudo futuro |
+| **A) PDF com camada de texto** | DANFE/espelho gerado digitalmente carrega o texto embutido. Biblioteca Node (`pdf-parse`/`pdfjs-dist`) lê o texto no servidor e um parser determinístico reconhece o bloco de itens (descrição, EAN, qtd, vl. unit., total) e a chave de 44 dígitos. | **Alta** (é texto real, não adivinhação) | **R$ 0** — biblioteca open source | **Via principal — G2b** |
+| **B) XML da NF-e** | Parse direto quando o fornecedor mandar o XML (vale pedir aos maiores). | 100% | **R$ 0** | Incluída na G2b (barato de somar) |
+| **C) OCR local (Tesseract.js)** | PDF-imagem ou foto → OCR **no próprio navegador** do usuário, sem servidor e sem API. | Média/baixa em foto de papel amassado; melhor em digitalização limpa | **R$ 0** | **Opcional (G2c)** — só se A e B não bastarem |
+| **D) IA de visão (API paga)** | — | — | centavos/nota | ❌ **REMOVIDA** (decisão 7) |
+| **E) QR/chave via SEFAZ** | Portais estaduais instáveis, captcha, muitos exigem certificado. | Baixa | R$ 0 | ❌ Não prometer |
 
-Nota técnica da via A: 1) tenta extrair a camada de texto do PDF (grátis,
-determinístico); 2) se o texto for suficiente, o próprio LLM estrutura os itens a
-partir dele (barato); 3) se for PDF-imagem ou foto, vai como imagem para a visão.
-A **chave de acesso de 44 dígitos** impressa na DANFE é extraída e usada para
-bloquear nota duplicada. Chave da API só no servidor.
+**Como saber se a via A cobre o seu dia a dia (teste de 10 segundos):** abra um PDF de
+nota que você recebeu e tente **selecionar o texto com o mouse**. Se o texto selecionar
+(vira azul) → tem camada de texto → **a extração gratuita funciona**. Se não selecionar
+nada (é uma imagem escaneada) → só a via C (OCR) ou digitação manual.
 
-### 1.2 Fluxo (idêntico para PDF/foto/XML — muda só o extrator)
+**Fallback permanente:** a entrada **manual** (G2a) sempre existe e é o caminho garantido —
+qualquer nota, qualquer formato, zero dependência externa.
 
-1. **Upload do PDF/foto/XML** (ou vários) na tela "Estoque → Entrada por nota".
+### 1.2 Fluxo (idêntico para manual/PDF/XML — muda só a origem dos dados)
+
+1. **Origem dos itens**: digitação manual (G2a) **ou** upload de PDF-texto/XML (G2b).
 2. **Extração no servidor** (validação Zod no resultado): chave de acesso quando
    houver (rejeita duplicada), fornecedor, itens (EAN quando presente, descrição,
-   quantidade, valor unitário), total. Extrator = parser XML OU pipeline
-   PDF-texto/visão (mesma saída JSON).
+   quantidade, valor unitário), total. Extrator = parser XML OU parser de PDF-texto —
+   ambos determinísticos, gratuitos e offline. Mesma saída JSON em todos os casos.
 3. **Motor de correspondência**, nesta ordem por item:
    - a) `cEAN` bate com `product_barcodes` → **produto reconhecido**;
    - b) sem EAN ou sem match → busca por similaridade de nome (trigram/`ilike`)
@@ -82,12 +87,16 @@ reposição correto, sobretudo com preços subindo. O histórico de custos de ca
 compra fica preservado em `purchase_items` (permite migrar para médio ponderado
 no futuro sem perda, se um dia fizer sentido).
 
-### 1.4 Observações da via principal (IA)
+### 1.4 Observações
 
-- LGPD ok (nota de compra não tem dado de consumidor final).
-- Custo por nota: centavos (API); prever contador de uso simples.
-- Espelho de pedido (não fiscal) passa pelo mesmo pipeline — sem chave de acesso,
-  o sistema usa fornecedor+data+total como proteção contra duplicidade.
+- **Nada sai da nossa infraestrutura**: parse de PDF e XML roda no servidor do próprio
+  app (biblioteca open source), sem enviar documento para terceiros. Melhor para
+  privacidade e custo (R$ 0).
+- Layout de DANFE varia por emissor: o parser deve ser **tolerante** — extrai o que
+  reconhece com confiança e deixa o resto para o usuário completar na conferência.
+  Nunca "chutar" valores.
+- Espelho de pedido (não fiscal) passa pelo mesmo caminho — sem chave de acesso,
+  a proteção contra duplicidade usa fornecedor+data+total.
 - A tela de conferência é o seguro de qualidade: NADA entra sem confirmação.
 
 ---
@@ -154,12 +163,18 @@ Despesas gerais (aluguel, salários…) não participam da divisão diária — 
 
 | Fase | Entrega | Dependências |
 |---|---|---|
-| **G1 — Fundação de custo** | `cost_price` em products (+ edição no cadastro), `unit_cost` snapshot em sale_items, cálculo do médio ponderado, backfill manual dos produtos atuais | — |
-| **G2 — Entrada por nota (PDF/foto/XML)** | Extrator (PDF-texto → visão IA → XML), motor de match (EAN→nome→novo), tela de conferência, RPC transacional (compra+estoque+custo+despesa opcional) | G1 |
+| **G1 — Fundação de custo** ✅ ENTREGUE (0013_cost_price.sql) | `cost_price` em products (+ edição no cadastro), `unit_cost` snapshot em sale_items (**último custo** — ver 1.3), preenchimento manual dos produtos atuais | — |
+| **G2a — Núcleo de compras (manual)** ⬅ PRÓXIMA | Tabelas purchases/purchase_items, RPC transacional (compra+estoque+último custo+despesa automática), tela de entrada manual, histórico | G1 |
+| **G2a.1 — Estorno de compra** ⚠ NOVO | Cancelar uma compra lançada por engano: reverte estoque (movimento `void`), remove/estorna o gasto em `expenses`, marca a nota como cancelada (não apaga histórico). Exige política de UPDATE/soft-delete em `purchases`. **Motivo: hoje não há como corrigir erro de digitação — em uso diário isso acontece.** | G2a |
+| **G2b — Extração gratuita (PDF-texto + XML)** | Upload → parser determinístico open source → motor de match (EAN→nome→novo) → mesma tela vira conferência | G2a |
 | **G3 — Fechamento Lucro × Custo** | Card do dia + filtros + cobertura + regra fiado/taxas | G1 (melhor após G2) |
-| **G4 — Refinos da extração** | Melhorias de precisão, múltiplas notas em lote, QR NFC-e (se viável) | G2 |
+| **G2c — OCR local (opcional)** | Tesseract.js no navegador para PDF-imagem/foto; só se G2b não cobrir | G2b |
 
-Ordem decidida (dono, jul/2026): **G1 → G2 → G3 → G4** (ordem lógica).
+Ordem decidida: **G1 ✅ → G2a ✅ → G2a.1 (estorno) → G2b → G3 → (G2c opcional)**.
+
+> ⚠️ **Regra de merge (CLAUDE.md):** cada fase é mesclada na `main` após aprovação do
+> preview — não acumular branches. As migrations já são aplicadas no banco compartilhado
+> antes do push, então a `main` não deve ficar atrás do banco por muito tempo.
 
 ## 4. Decisões (TODAS FECHADAS — jul/2026)
 1. ✅ Formato real das notas: **PDF/espelho/papel** → via IA é a principal; XML suportado.
@@ -170,5 +185,8 @@ Ordem decidida (dono, jul/2026): **G1 → G2 → G3 → G4** (ordem lógica).
    atalho "informar custo agora").
 6. ✅ Fiado: estoque baixa na venda; **Lucro × Custo só na quitação** (proporcional em
    parciais) — coerente com a regra F6 existente (seção 2.2.1).
+7. ✅ **Custo zero obrigatório**: extração por IA paga REMOVIDA. Só recursos gratuitos
+   (parser de PDF-texto e XML open source, rodando na própria infra; OCR local opcional).
+   Entrada manual é o fallback permanente.
 
 **Status: plano pronto para execução no Claude Code (G1 → G2 → G3 → G4).**

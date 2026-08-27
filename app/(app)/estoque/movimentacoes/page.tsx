@@ -21,6 +21,7 @@ const FILTERS: ReadonlyArray<{ value: "todos" | StockMovementType; label: string
   { value: "sale", label: "Vendas" },
   { value: "void", label: "Estornos" },
   { value: "restock", label: "Reposições" },
+  { value: "purchase", label: "Notas" },
   { value: "adjust", label: "Ajustes" },
 ];
 
@@ -39,6 +40,7 @@ export default async function StockMovementsPage({
     "sale",
     "void",
     "restock",
+    "purchase",
     "adjust",
   ]);
   const activeType =
@@ -72,8 +74,9 @@ export default async function StockMovementsPage({
           Movimentação de estoque
         </h1>
         <p className="minimal:max-sm:text-sm text-muted-foreground text-lg">
-          Entradas e saídas dos seus produtos: vendas, estornos, reposições e
-          ajustes. Mostrando os {MOVEMENT_LIMIT} mais recentes.
+          Entradas e saídas dos seus produtos: vendas, estornos, reposições,
+          entradas por nota e ajustes. Mostrando os {MOVEMENT_LIMIT} mais
+          recentes.
         </p>
       </header>
 
