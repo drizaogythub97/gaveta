@@ -23,6 +23,7 @@ type Props = {
     name?: string;
     barcodes?: string[];
     price?: number;
+    costPrice?: number | null;
     trackStock?: "true" | "false";
     stockQuantity?: string;
   };
@@ -186,6 +187,38 @@ export function ProductForm({
         {state.fieldErrors?.price ? (
           <p id="price-error" className="text-destructive text-sm" role="alert">
             {state.fieldErrors.price}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="costPrice" className="text-base">
+          Preço de custo{" "}
+          <span className="text-muted-foreground font-normal">(opcional)</span>
+        </Label>
+        <p id="costPrice-hint" className="text-muted-foreground text-sm">
+          Quanto você paga por este produto. Serve para saber, depois, quanto
+          da venda é lucro. Pode deixar em branco.
+        </p>
+        <CurrencyInput
+          id="costPrice"
+          name="costPrice"
+          initialValue={initialValues?.costPrice ?? null}
+          aria-invalid={Boolean(state.fieldErrors?.costPrice)}
+          aria-describedby={
+            state.fieldErrors?.costPrice
+              ? "costPrice-hint costPrice-error"
+              : "costPrice-hint"
+          }
+          className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 text-lg"
+        />
+        {state.fieldErrors?.costPrice ? (
+          <p
+            id="costPrice-error"
+            className="text-destructive text-sm"
+            role="alert"
+          >
+            {state.fieldErrors.costPrice}
           </p>
         ) : null}
       </div>

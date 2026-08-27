@@ -12,7 +12,12 @@ export type ProductFormState = {
   error?: string;
   fieldErrors?: Partial<
     Record<
-      "name" | "barcodes" | "price" | "trackStock" | "stockQuantity",
+      | "name"
+      | "barcodes"
+      | "price"
+      | "costPrice"
+      | "trackStock"
+      | "stockQuantity",
       string
     >
   >;
@@ -20,6 +25,7 @@ export type ProductFormState = {
     name?: string;
     barcodes?: string[];
     price?: string;
+    costPrice?: string;
     trackStock?: "true" | "false";
     stockQuantity?: string;
   };
@@ -30,6 +36,7 @@ function readForm(formData: FormData) {
     name: String(formData.get("name") ?? ""),
     barcodes: formData.getAll("barcodes").map((v) => String(v)),
     price: String(formData.get("price") ?? ""),
+    costPrice: String(formData.get("costPrice") ?? ""),
     trackStock: String(formData.get("trackStock") ?? ""),
     stockQuantity: String(formData.get("stockQuantity") ?? ""),
   };
@@ -40,6 +47,7 @@ function rawValues(raw: ReturnType<typeof readForm>) {
     name: raw.name,
     barcodes: raw.barcodes,
     price: raw.price,
+    costPrice: raw.costPrice,
     trackStock:
       raw.trackStock === "true" || raw.trackStock === "false"
         ? (raw.trackStock as "true" | "false")
@@ -56,6 +64,7 @@ function collectFieldErrors(issues: ZodIssue[]): ProductFormState["fieldErrors"]
       key === "name" ||
       key === "barcodes" ||
       key === "price" ||
+      key === "costPrice" ||
       key === "trackStock" ||
       key === "stockQuantity"
     ) {
@@ -72,6 +81,9 @@ function dbErrorToPortuguese(message: string | undefined): string {
   }
   if (/products_stock_qty_when_tracked/i.test(message)) {
     return "Informe a quantidade quando o estoque é controlado.";
+  }
+  if (/products_cost_price_non_negative/i.test(message)) {
+    return "O preço de custo não pode ser negativo.";
   }
   return "Não foi possível salvar. Tente novamente.";
 }
@@ -130,6 +142,7 @@ export async function createProduct(
       user_id: user.id,
       name: parsed.data.name,
       price: parsed.data.price,
+      cost_price: parsed.data.costPrice,
       track_stock: tracks,
       stock_quantity: tracks ? (parsed.data.stockQuantity ?? 0) : null,
     })
@@ -190,6 +203,7 @@ export async function updateProduct(
     .update({
       name: parsed.data.name,
       price: parsed.data.price,
+      cost_price: parsed.data.costPrice,
       track_stock: tracks,
       stock_quantity: tracks ? (parsed.data.stockQuantity ?? 0) : null,
       updated_at: new Date().toISOString(),

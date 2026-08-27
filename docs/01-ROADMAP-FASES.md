@@ -373,3 +373,19 @@ barra `document.cookie =` em componente; opt-in é regra; **o `useEffect` de
 foco do `ConfirmDialog` não pode ter `onClose`/`pending` nas deps** (rouba o
 foco de campos ao digitar — corrigido, depende só de `[open]`). Badges de
 referência ao FiadoApp = vermelho/coral + logo (`FiadoappBadge`).
+
+## Nota de compra + Lucro × Custo (plano `docs/08-PLANO-NOTAS-DE-COMPRA-E-LUCRO-CUSTO.md`)
+
+Ordem decidida pelo dono: **G1 → G2 → G3 → G4**.
+
+- **G1 — Fundação de custo** (2026-08-27): migration **0013**
+  (`products.cost_price`, `sale_items.unit_cost`, ambas aditivas e opcionais,
+  com check `>= 0`) + `register_sale` gravando o **snapshot** do custo em cada
+  item vendido com `product_id` (item avulso → null). A venda a prazo herda o
+  snapshot de graça: `registrar_venda_fiado` chama `register_sale`. Método de
+  custo = **último custo** (decisão 3 do plano). UI: campo "Preço de custo
+  (opcional)" no cadastro/edição de produto (`CurrencyInput`, vazio = custo não
+  informado) e exibição discreta na lista de produtos. Testes:
+  `tests/product-cost-price.test.ts` (Zod) e `tests/rls/cost-snapshot.test.ts`
+  (snapshot à vista/fiado, imutabilidade histórica, isolamento por usuário).
+  Nada de relatório aqui — o fechamento Lucro × Custo é a G3.

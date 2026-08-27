@@ -6,7 +6,7 @@ import type { Product, SaleItemInput } from "@/lib/types/db";
 const SEARCH_LIMIT = 8;
 
 const PRODUCT_COLUMNS =
-  "id, user_id, name, price, track_stock, stock_quantity, created_at, updated_at";
+  "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at";
 
 export async function searchProductsByName(query: string): Promise<Product[]> {
   const term = query.trim();

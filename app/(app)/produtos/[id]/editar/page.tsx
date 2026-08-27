@@ -20,7 +20,7 @@ export default async function EditProductPage({
   const { data } = await supabase
     .from("products")
     .select(
-      "id, user_id, name, price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode)",
+      "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -58,6 +58,7 @@ export default async function EditProductPage({
           name: product.name,
           barcodes: product.barcodes,
           price: product.price,
+          costPrice: product.cost_price,
           trackStock: product.track_stock ? "true" : "false",
           stockQuantity:
             product.stock_quantity === null
