@@ -102,6 +102,17 @@ const DATETIME_FMT = new Intl.DateTimeFormat("pt-BR", {
   minute: "2-digit",
 });
 
+/**
+ * Formata uma data pura ("YYYY-MM-DD") como "DD/MM/YYYY" SEM passar por
+ * Date — `new Date("2026-08-20")` é meia-noite UTC e, no fuso do Brasil,
+ * voltaria um dia.
+ */
+export function formatDateOnly(value: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return value;
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
 export function formatDate(iso: string): string {
   return DATE_FMT.format(new Date(iso));
 }

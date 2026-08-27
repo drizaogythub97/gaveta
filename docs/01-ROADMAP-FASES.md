@@ -376,7 +376,8 @@ referência ao FiadoApp = vermelho/coral + logo (`FiadoappBadge`).
 
 ## Nota de compra + Lucro × Custo (plano `docs/08-PLANO-NOTAS-DE-COMPRA-E-LUCRO-CUSTO.md`)
 
-Ordem decidida pelo dono: **G1 → G2 → G3 → G4**.
+Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
+**G1 → G2a → G2b → G3 → (G2c opcional)**.
 
 - **G1 — Fundação de custo** (2026-08-27): migration **0013**
   (`products.cost_price`, `sale_items.unit_cost`, ambas aditivas e opcionais,
@@ -389,3 +390,23 @@ Ordem decidida pelo dono: **G1 → G2 → G3 → G4**.
   `tests/product-cost-price.test.ts` (Zod) e `tests/rls/cost-snapshot.test.ts`
   (snapshot à vista/fiado, imutabilidade histórica, isolamento por usuário).
   Nada de relatório aqui — o fechamento Lucro × Custo é a G3.
+
+- **G2a — Núcleo de compras (entrada manual)** (2026-08-27): migration **0014**
+  — tabelas `purchases` (índice único parcial em `(user_id, access_key)` →
+  mesma nota não entra duas vezes) e `purchase_items` (custo daquela compra
+  preservado), tipo `'purchase'` em `stock_movements` e a RPC transacional
+  **`registrar_compra(p_purchase, p_itens)`**: numa única transação grava a
+  nota + itens, entra o estoque, aplica o **último custo** em
+  `products.cost_price`, cria produtos novos (com `product_barcodes`) e lança
+  o **gasto automático** em `expenses`/`insumos` na data da compra (decisão 4).
+  Qualquer erro → nada é gravado. UI: `/estoque/compras/nova` (cabeçalho da
+  nota + busca de produto **reusando as actions do PDV** + cadastro do produto
+  novo na hora + confirmação com resumo), histórico em `/estoque/compras` e
+  detalhe em `/estoque/compras/[id]`. Sem edição/exclusão de nota nesta fase —
+  por isso `purchases`/`purchase_items` têm só políticas de SELECT e INSERT
+  (**gotcha**: sem política de UPDATE, a RPC precisa somar o total ANTES de
+  inserir a nota; um `update` pós-insert é silenciosamente ignorado pela RLS).
+  Testes: `tests/purchase-validation.test.ts` (Zod) e `tests/rls/compras.test.ts`
+  (grava tudo junto, produto novo com código, nota duplicada recusada, falha
+  atômica não deixa rastro, isolamento por usuário). A extração de PDF/XML é a
+  G2b.
