@@ -27,6 +27,28 @@ const priceField = z
     return Math.round(n * 100) / 100;
   });
 
+const costPriceField = z
+  .string()
+  .optional()
+  .transform((v, ctx) => {
+    // Campo opcional: vazio significa "custo não informado" (null no banco),
+    // e não zero — quem não sabe o custo ainda não pode ter lucro calculado.
+    if (v === undefined || v.trim() === "") return null;
+    const n = parseDecimalPtBR(v);
+    if (!Number.isFinite(n)) {
+      ctx.addIssue({ code: "custom", message: "Preço de custo inválido." });
+      return z.NEVER;
+    }
+    if (n < 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: "O preço de custo não pode ser negativo.",
+      });
+      return z.NEVER;
+    }
+    return Math.round(n * 100) / 100;
+  });
+
 const stockField = z
   .string()
   .optional()
@@ -80,6 +102,7 @@ export const productSchema = z
     name,
     barcodes: barcodesField,
     price: priceField,
+    costPrice: costPriceField,
     trackStock: z.enum(["true", "false"], {
       error: "Escolha se controla estoque.",
     }),

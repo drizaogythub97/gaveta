@@ -3,6 +3,8 @@ export type Product = {
   user_id: string;
   name: string;
   price: number;
+  /** Preço de custo (último custo pago). Null = não informado. */
+  cost_price: number | null;
   track_stock: boolean;
   stock_quantity: number | null;
   created_at: string;

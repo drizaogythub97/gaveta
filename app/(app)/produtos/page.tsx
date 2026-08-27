@@ -19,7 +19,7 @@ export default async function ProductsPage() {
   const { data, error } = await supabase
     .from("products")
     .select(
-      "id, user_id, name, price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode)",
+      "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode)",
     )
     .order("created_at", { ascending: false });
 
@@ -77,6 +77,11 @@ export default async function ProductsPage() {
                   <span className="minimal:max-sm:text-sm text-foreground text-lg font-medium">
                     {formatBRL(p.price)}
                   </span>
+                  {p.cost_price !== null ? (
+                    <span aria-label={`Preço de custo ${formatBRL(p.cost_price)}`}>
+                      Custo: {formatBRL(p.cost_price)}
+                    </span>
+                  ) : null}
                   {p.barcodes.length > 0 ? (
                     <span aria-label={`Códigos de barras ${p.barcodes.join(", ")}`}>
                       {p.barcodes.length === 1 ? "Código: " : "Códigos: "}
