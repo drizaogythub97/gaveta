@@ -412,6 +412,30 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
   atômica não deixa rastro, isolamento por usuário). A extração de PDF/XML é a
   G2b.
 
+- **G2a.1 — Estorno de compra** (2026-08-28, PR #29, merge `MERGE_G2A1`;
+  migration **0015**): cancelar a nota lançada por engano sem apagar o
+  histórico. `purchases` ganha `voided_at` (null = ativa) e `expense_id` — o
+  vínculo com o gasto automático em `insumos`, que antes não existia (com
+  backfill das notas já lançadas quando o casamento é inequívoco); por isso a
+  `registrar_compra` passou a inserir o gasto **antes** da nota, para o id
+  entrar já no insert. RPC **`estornar_compra(p_purchase_id)`**: numa única
+  transação tira o estoque que entrou (movimento `'void'` com quantidade
+  negativa), devolve o **último custo** ao da compra ativa anterior, remove o
+  gasto e marca a nota. Regras de borda: se parte da mercadoria já saiu, o
+  estoque baixa só até zerar (`stock_quantity >= 0`) e o retorno sinaliza
+  `estoque_parcial`; custo digitado à mão depois da nota é respeitado;
+  produtos criados pela nota **não** são apagados (podem já ter venda).
+  A tabela ganhou política de UPDATE — necessária para a RPC — e, junto,
+  um **trigger** (`purchases_guard_update`) que só deixa mudar o
+  cancelamento e exige que ele venha da RPC (GUC local à transação): sem
+  isso um `PATCH` direto na API marcaria a nota como cancelada deixando
+  estoque e financeiro intactos. O índice único da chave de acesso passou a
+  valer só entre notas **ativas**, então cancelar a nota errada libera
+  relançar a mesma nota corrigida. UI: botão "Cancelar esta nota" no detalhe,
+  com diálogo explicando os três efeitos, e selo "Cancelada" no detalhe e na
+  lista (total riscado). Testes: `tests/rls/estorno-compra.test.ts` (9 casos)
+  + 2 e2e funcionais e 2 visuais (desktop e celular).
+
 ### Validação da G2a (protocolo `docs/09-PROTOCOLO-DE-VALIDACAO.md`)
 
 Sessão de 2026-08-27 (PRs #27 e #28, merge `00330f8`), sem funcionalidade nova:
