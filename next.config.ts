@@ -29,6 +29,15 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      // A importação de nota (G2b) envia o PDF/XML por Server Action. O
+      // padrão do Next é 1 MB; um DANFE passa disso com folga quando traz
+      // muitas páginas. O teto real de 8 MB é conferido no servidor
+      // (lib/compras/tipos.ts) — aqui só cabe deixar o corpo chegar.
+      bodySizeLimit: "10mb",
+    },
+  },
   async headers() {
     return [
       {

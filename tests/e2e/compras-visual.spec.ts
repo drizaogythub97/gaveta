@@ -83,6 +83,10 @@ async function alvosGrandes(page: Page) {
       .filter((el) => {
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) return false; // invisível
+        // Elementos só para leitor de tela (ex.: o input[type=file] atrás do
+        // botão "Escolher arquivo da nota") não recebem toque: quem é alvo
+        // de ponteiro é o botão visível, e esse sim é medido aqui.
+        if (el.className.includes("sr-only")) return false;
         // Links de texto corrido (ex.: "Voltar ao estoque") não são alvos
         // de bloco; a regra de 44px vale para botões e campos.
         const ehLinkDeTexto =
@@ -116,6 +120,55 @@ test("entrada por nota: layout, alvos e regressão visual", async ({ page }) => 
   await expect(page.getByText("insumos / mercadorias")).toBeVisible();
 
   await expect(page).toHaveScreenshot("nota-nova.png", { fullPage: true });
+});
+
+/**
+ * XML de NF-e com valores FIXOS, batendo com o catálogo semeado do usuário
+ * visual: um item casa pelo código de barras, um pelo nome e um é novo — os
+ * três estados da conferência da G2b numa foto só.
+ */
+const XML_FIXO = `<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc versao="4.00"><NFe><infNFe Id="NFe${"3526081234567890123455001000012341000123".padEnd(44, "7")}">
+  <ide><dhEmi>2026-08-20T09:00:00-03:00</dhEmi></ide>
+  <emit><xNome>Distribuidora Modelo LTDA</xNome></emit>
+  <det nItem="1"><prod><cEAN>7890000000017</cEAN><xProd>CAFE TORRADO 500G</xProd>
+    <qCom>10.0000</qCom><vUnCom>9.9000</vUnCom><vProd>99.00</vProd></prod></det>
+  <det nItem="2"><prod><cEAN>SEM GTIN</cEAN><xProd>CHA DE CAMOMILA 20G</xProd>
+    <qCom>5.0000</qCom><vUnCom>4.4000</vUnCom><vProd>22.00</vProd></prod></det>
+  <det nItem="3"><prod><cEAN>SEM GTIN</cEAN><xProd>BISCOITO MAIZENA 200G</xProd>
+    <qCom>8.0000</qCom><vUnCom>3.5000</vUnCom><vProd>28.00</vProd></prod></det>
+  <total><ICMSTot><vNF>149.00</vNF></ICMSTot></total>
+</infNFe></NFe></nfeProc>`;
+
+test("conferência da nota importada: layout, alvos e regressão visual", async ({
+  page,
+}) => {
+  if (ehMobile()) await usarModo(page, "simples");
+
+  await page.goto("/estoque/compras/nova");
+  await page.locator("#nota-arquivo").setInputFiles({
+    name: "nota.xml",
+    mimeType: "text/xml",
+    buffer: Buffer.from(XML_FIXO, "utf8"),
+  });
+
+  const itens = page.locator('section[aria-labelledby="nota-itens"] li');
+  await expect(itens).toHaveCount(3);
+  // Os três estados aparecem, cada um com o seu selo.
+  await expect(itens.filter({ hasText: "Já cadastrado" })).toHaveCount(1);
+  await expect(itens.filter({ hasText: "Parecido — confira" })).toHaveCount(1);
+  await expect(itens.filter({ hasText: "Produto novo" })).toHaveCount(1);
+
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await escondeOverlayDoNext(page);
+
+  await semRolagemHorizontal(page);
+  await alvosGrandes(page);
+  await esperaContrasteAA(page);
+
+  await expect(page).toHaveScreenshot("nota-conferencia.png", {
+    fullPage: true,
+  });
 });
 
 test("histórico de notas: layout, alvos e regressão visual", async ({
