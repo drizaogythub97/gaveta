@@ -437,7 +437,7 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
   + 2 e2e funcionais e 2 visuais (desktop e celular).
 
 - **G2b — Extração gratuita (PDF-texto + XML)** (2026-08-28, PR #30,
-  merge `MERGE_G2B`; **sem migration**): a nota entra por arquivo e a tela da
+  merge `59562eb`; **sem migration**): a nota entra por arquivo e a tela da
   G2a vira a **tela de conferência**. Custo zero, tudo no próprio servidor —
   o documento não é enviado para nenhum serviço de terceiros (decisão 7).
   - `lib/compras/nfe-xml.ts` (via exata): `fast-xml-parser` sobre
