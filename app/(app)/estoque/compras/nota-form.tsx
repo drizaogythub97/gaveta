@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangle,
   Camera,
   HelpCircle,
   Package,
@@ -438,18 +439,46 @@ export function NotaForm() {
       <ImportarNota onImportar={receberImportacao} desabilitado={isSaving} />
 
       {notaImportada && items.length > 0 ? (
-        <p
-          role="status"
-          className="border-primary/30 bg-primary/5 minimal:max-sm:p-3.5 minimal:max-sm:text-sm rounded-xl border p-4 text-base"
-        >
-          Li {items.length} {items.length === 1 ? "item" : "itens"} do arquivo.
-          <strong className="text-foreground font-medium">
-            {" "}
-            Confira item a item
-          </strong>{" "}
-          — principalmente os marcados como “parecido” — e ajuste o que precisar
-          antes de lançar.
-        </p>
+        notaImportada.origem === "foto" ? (
+          // Leitura de imagem é a via mais fraca das três: o aviso precisa
+          // ser explícito, senão a pessoa confia num resultado incompleto.
+          <div
+            role="status"
+            className="border-warning/40 bg-warning/10 minimal:max-sm:p-4 flex flex-col gap-2 rounded-xl border p-5"
+          >
+            <p className="text-warning flex items-center gap-2 text-base font-semibold">
+              <AlertTriangle aria-hidden="true" className="size-5 shrink-0" />
+              Li a foto, mas só os nomes
+            </p>
+            <p className="text-foreground minimal:max-sm:text-sm text-base">
+              Reconheci {items.length}{" "}
+              {items.length === 1 ? "produto" : "produtos"}. Em foto de papel os{" "}
+              <strong>números não saem confiáveis</strong>, então{" "}
+              <strong>quantidade e custo ficaram em branco</strong> — preencha
+              olhando a nota. Confira também os nomes: podem vir com letras
+              trocadas.
+            </p>
+            <p className="text-muted-foreground text-sm">
+              Sempre que tiver o{" "}
+              <strong className="text-foreground">PDF</strong> ou o{" "}
+              <strong className="text-foreground">XML</strong> da nota, prefira:
+              nesses formatos o Gaveta lê nomes, quantidades e valores.
+            </p>
+          </div>
+        ) : (
+          <p
+            role="status"
+            className="border-primary/30 bg-primary/5 minimal:max-sm:p-3.5 minimal:max-sm:text-sm rounded-xl border p-4 text-base"
+          >
+            Li {items.length} {items.length === 1 ? "item" : "itens"} do arquivo.
+            <strong className="text-foreground font-medium">
+              {" "}
+              Confira item a item
+            </strong>{" "}
+            — principalmente os marcados como “parecido” — e ajuste o que
+            precisar antes de lançar.
+          </p>
+        )
       ) : null}
 
       {/* ---------- Dados da nota ---------- */}

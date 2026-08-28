@@ -60,18 +60,19 @@ export function ImportarNota({
         Envie o <strong className="text-foreground font-medium">PDF</strong> da
         nota ou o arquivo{" "}
         <strong className="text-foreground font-medium">XML</strong> e o Gaveta
-        preenche os itens para você conferir. Se preferir, pode digitar tudo à
-        mão abaixo.
+        preenche os itens para você conferir. Também dá para enviar uma{" "}
+        <strong className="text-foreground font-medium">foto</strong> da nota de
+        papel — com menos precisão. Se preferir, pode digitar tudo à mão abaixo.
       </p>
 
       <Label htmlFor="nota-arquivo" className="sr-only">
-        Arquivo da nota (PDF ou XML)
+        Arquivo da nota (PDF, XML ou foto)
       </Label>
       <input
         ref={inputRef}
         id="nota-arquivo"
         type="file"
-        accept=".pdf,.xml,application/pdf,text/xml,application/xml"
+        accept=".pdf,.xml,.jpg,.jpeg,.png,.webp,application/pdf,text/xml,application/xml,image/jpeg,image/png,image/webp"
         disabled={desabilitado || pendente}
         onChange={(event) => {
           const arquivo = event.target.files?.[0];

@@ -29,6 +29,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // O tesseract.js (leitura de nota por foto, G2c) resolve o caminho do
+  // próprio worker a partir do disco. Empacotado, ele procura num caminho
+  // reescrito pelo bundler e não se acha ("Cannot find module
+  // .../worker-script/node/index.js"). Fora do pacote, a resolução do Node
+  // volta a valer.
+  serverExternalPackages: ["tesseract.js"],
   experimental: {
     serverActions: {
       // A importação de nota (G2b) envia o PDF/XML por Server Action. O

@@ -280,9 +280,10 @@ describe("extrairNota (escolhe o parser pelo conteúdo)", () => {
     }
   });
 
-  it("explica em português quando o arquivo não serve", async () => {
-    const imagem = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a]);
-    const resultado = await extrairNota(imagem);
+  it("explica em português quando o formato não é reconhecido", async () => {
+    // Nem PDF, nem XML, nem assinatura de imagem conhecida.
+    const desconhecido = new Uint8Array([0x00, 0x01, 0x02, 0x03, 0x04, 0x05]);
+    const resultado = await extrairNota(desconhecido);
     expect(resultado.ok).toBe(false);
     if (!resultado.ok) expect(resultado.erro).toContain("PDF da nota");
 
@@ -290,7 +291,18 @@ describe("extrairNota (escolhe o parser pelo conteúdo)", () => {
     expect(vazio.ok).toBe(false);
   });
 
-  it("avisa que PDF sem texto (foto/digitalização) não dá para ler", async () => {
+  it("arquivo que finge ser imagem vira mensagem, não exceção", async () => {
+    // Começa com a assinatura de PNG mas está truncado: o decodificador não
+    // abre. Antes isso subia como exceção solta e derrubava a requisição.
+    const falso = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a]);
+    const resultado = await extrairNota(falso);
+    expect(resultado.ok).toBe(false);
+    if (!resultado.ok) expect(resultado.erro).toContain("abrir esta imagem");
+  }, 60_000);
+
+  it("PDF COM texto mas sem itens não é tratado como digitalização", async () => {
+    // Tem camada de texto, então não adianta gastar OCR nele: a mensagem
+    // fala em reconhecer itens, não em foto.
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     doc.text("nada de tabela aqui", 40, 60);
     const resultado = await extrairNota(
@@ -298,7 +310,8 @@ describe("extrairNota (escolhe o parser pelo conteúdo)", () => {
     );
     expect(resultado.ok).toBe(false);
     if (!resultado.ok) {
-      expect(resultado.erro).toContain("digitalização");
+      expect(resultado.erro).toContain("reconhecer os itens deste PDF");
+      expect(resultado.erro).not.toContain("digitalização");
     }
   });
 
