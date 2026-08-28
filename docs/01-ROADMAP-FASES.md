@@ -475,6 +475,35 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
     `tests/e2e/importar-nota.spec.ts` (5) com conferência no banco, mais o
     visual da tela de conferência em desktop e celular.
 
+- **G3 — Fechamento Lucro × Custo** (2026-08-28, PR #31, merge `MERGE_G3`;
+  migration **0016**, só de LEITURA): a pergunta que motivou toda a linha de
+  custo — do dinheiro que ENTROU, quanto guardar para repor a mercadoria e
+  quanto é lucro. Regime caixa.
+  - `lucro_custo_summary(from, to, methods)` e `produtos_sem_custo(...)`:
+    agregação no banco, no padrão de `sales_summary`/`expenses_summary`
+    (exatas com qualquer volume). Leem `fiado_*` só com `select`, como o
+    `lib/financeiro/fiado.ts` já fazia — nada em fiado_* é escrito.
+  - Regras (cada uma com teste): **taxa de cartão e desconto saem do LUCRO,
+    nunca do custo** (o valor de recompra é intocável); **item sem custo não
+    entra no split** — é sinalizado, não chutado, e a tela avisa que o lucro
+    está por cima; **venda a prazo entra no dia da QUITAÇÃO**, rateada pelo
+    que foi pago (o rateio é por venda, não por pagamento, então a soma das
+    parcelas fecha exata); venda estornada sai do fechamento.
+  - UI: aba **Fechamento** no Financeiro com o filtro de período existente,
+    dois números grandes em linguagem direta (sem "CMV" nem "margem bruta" —
+    há teste), lista do "informar custo" ligando ao cadastro do produto, e
+    atalho a partir do fechamento de caixa. Cada bloco é uma `region`
+    nomeada: melhora o leitor de tela e é por esse nome que o teste acha o
+    valor.
+  - **Decisão de conteúdo**: a linha informativa de despesas EXCLUI as
+    compras de mercadoria (`insumos`) e explica isso — somá-las descontaria
+    o mesmo dinheiro duas vezes (uma como custo de recompra, outra como
+    gasto).
+  - Testes: `tests/lucro-custo.test.ts` (8), `tests/rls/lucro-custo.test.ts`
+    (12, incluindo o rateio do fiado), `tests/e2e/fechamento.spec.ts` (6,
+    medindo a VARIAÇÃO que cada venda causa na tela) e
+    `tests/e2e/fechamento-visual.spec.ts` (3: desktop, celular e Minimalista).
+
 ### Validação da G2a (protocolo `docs/09-PROTOCOLO-DE-VALIDACAO.md`)
 
 Sessão de 2026-08-27 (PRs #27 e #28, merge `00330f8`), sem funcionalidade nova:

@@ -76,6 +76,57 @@ setup("cria usuários descartáveis e faz login", async ({ browser }) => {
   });
   expect(voidError).toBeNull();
 
+  // ── Vendas semeadas do usuário visual (G3): valores escolhidos para a
+  //    tela de fechamento mostrar o estado mais informativo — o split de
+  //    recompra × lucro E o aviso de cobertura incompleta.
+  //    O café veio da nota semeada acima, com custo de R$ 9,90.
+  const { data: cafe } = await app
+    .from("products")
+    .select("id")
+    .eq("name", "Café torrado 500g")
+    .single();
+  const cafeId = (cafe as { id: string }).id;
+
+  const { data: bolo, error: boloError } = await app
+    .from("products")
+    .insert({
+      user_id: visual.id,
+      name: "Bolo caseiro",
+      price: 30,
+      cost_price: null, // de propósito: é ele que derruba a cobertura
+      track_stock: true,
+      stock_quantity: 10,
+    })
+    .select("id")
+    .single();
+  expect(boloError).toBeNull();
+
+  const { error: vendaCafeError } = await app.rpc("register_sale", {
+    items: [
+      {
+        product_id: cafeId,
+        name: "Café torrado 500g",
+        unit_price: 16.5,
+        quantity: 2,
+      },
+    ],
+    payment_method: "dinheiro",
+  });
+  expect(vendaCafeError).toBeNull();
+
+  const { error: vendaBoloError } = await app.rpc("register_sale", {
+    items: [
+      {
+        product_id: (bolo as { id: string }).id,
+        name: "Bolo caseiro",
+        unit_price: 30,
+        quantity: 1,
+      },
+    ],
+    payment_method: "dinheiro",
+  });
+  expect(vendaBoloError).toBeNull();
+
   saveUsers({ funcional, visual, visualPurchaseId, visualVoidedPurchaseId });
 
   for (const [user, state] of [
