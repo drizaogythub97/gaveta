@@ -1,10 +1,11 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { SuccessAlert } from "@/components/auth/form-feedback";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-import { formatDateOnly } from "@/lib/dashboard/dates";
+import { formatDate, formatDateOnly } from "@/lib/dashboard/dates";
 import { formatBRL, formatQuantity } from "@/lib/products/format";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -12,6 +13,9 @@ import {
   type Purchase,
   type PurchaseItem,
 } from "@/lib/types/purchases";
+
+import { EstornoNotaButton } from "../estorno-nota-button";
+import { NotaCanceladaBadge } from "../nota-cancelada-badge";
 
 export const metadata = {
   title: "Nota lançada",
@@ -32,7 +36,7 @@ export default async function CompraDetalhePage({
   const { data } = await supabase
     .from("purchases")
     .select(
-      "id, supplier_name, access_key, issued_on, total, source, created_at",
+      "id, supplier_name, access_key, issued_on, total, source, created_at, voided_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -51,6 +55,8 @@ export default async function CompraDetalhePage({
     .order("description_snapshot", { ascending: true });
 
   const itens = (itensData ?? []) as PurchaseItem[];
+  const cancelada = compra.voided_at !== null;
+  const fornecedor = compra.supplier_name ?? "fornecedor não informado";
 
   return (
     <section className="minimal:max-sm:gap-4 mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -62,9 +68,12 @@ export default async function CompraDetalhePage({
           <ArrowLeft aria-hidden="true" className="size-5" />
           Voltar às notas
         </Link>
-        <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">
-          {compra.supplier_name ?? "Fornecedor não informado"}
-        </h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">
+            {compra.supplier_name ?? "Fornecedor não informado"}
+          </h1>
+          {cancelada ? <NotaCanceladaBadge /> : null}
+        </div>
         <p className="minimal:max-sm:text-sm text-muted-foreground text-lg">
           Compra de {formatDateOnly(compra.issued_on)} ·{" "}
           {PURCHASE_SOURCE_LABELS[compra.source]} · {itens.length}{" "}
@@ -72,8 +81,22 @@ export default async function CompraDetalhePage({
         </p>
       </header>
 
-      {recemLancada ? (
+      {recemLancada && !cancelada ? (
         <SuccessAlert message="Nota lançada. O estoque já entrou, o custo dos produtos foi atualizado e o valor virou um gasto em insumos / mercadorias." />
+      ) : null}
+
+      {cancelada ? (
+        <Alert
+          role="status"
+          className="border-destructive/40 bg-destructive/10 text-destructive"
+        >
+          <Undo2 aria-hidden="true" />
+          <AlertDescription className="text-destructive text-base">
+            Esta nota foi cancelada em {formatDate(compra.voided_at!)}. A
+            mercadoria saiu do estoque e o gasto foi removido do financeiro. Ela
+            continua aqui como histórico.
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       <ul className="minimal:max-sm:gap-2 flex flex-col gap-3">
@@ -87,8 +110,8 @@ export default async function CompraDetalhePage({
                 {item.description_snapshot}
               </span>
               <span className="minimal:max-sm:text-xs text-muted-foreground text-base">
-                {formatQuantity(item.quantity)} ×{" "}
-                {formatBRL(item.unit_cost)} de custo
+                {formatQuantity(item.quantity)} × {formatBRL(item.unit_cost)} de
+                custo
                 {item.barcode ? (
                   <>
                     {" · "}
@@ -122,6 +145,16 @@ export default async function CompraDetalhePage({
           <span className="font-mono break-all">{compra.access_key}</span>
         </p>
       ) : null}
+
+      {cancelada ? null : (
+        <div className="border-border flex flex-col gap-2 border-t pt-6">
+          <p className="text-muted-foreground minimal:max-sm:text-sm text-base">
+            Lançou esta nota por engano? Cancele para desfazer a entrada de
+            estoque, o custo e o gasto.
+          </p>
+          <EstornoNotaButton purchaseId={compra.id} fornecedor={fornecedor} />
+        </div>
+      )}
     </section>
   );
 }

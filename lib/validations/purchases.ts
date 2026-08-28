@@ -118,3 +118,11 @@ export const purchaseSchema = z.object({
 
 export type PurchaseInput = z.input<typeof purchaseSchema>;
 export type PurchaseParsed = z.output<typeof purchaseSchema>;
+
+/**
+ * Estorno de nota (fase G2a.1). O identificador vem da URL, então o
+ * servidor confere que é mesmo um uuid antes de chamar a RPC.
+ */
+export const voidPurchaseSchema = z.object({
+  purchaseId: z.uuid("Nota inválida."),
+});

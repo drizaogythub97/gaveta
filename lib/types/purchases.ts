@@ -10,6 +10,8 @@ export type Purchase = {
   total: number;
   source: PurchaseSource;
   created_at: string;
+  /** Quando a nota foi cancelada (estorno). Null = nota ativa. */
+  voided_at: string | null;
 };
 
 export type PurchaseItem = {

@@ -250,7 +250,9 @@ test("6+7. resumo confere e a nota grava os quatro efeitos no banco", async ({
   await expect(dialogo).toContainText("1 produto novo será criado");
   await expect(dialogo).toContainText("R$ 120,00");
 
-  await dialogo.getByRole("button", { name: "Lançar nota", exact: true }).click();
+  await dialogo
+    .getByRole("button", { name: "Lançar nota", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/estoque\/compras\/[0-9a-f-]+/);
   await expect(page.getByText("O estoque já entrou")).toBeVisible();
 
@@ -271,7 +273,9 @@ test("6+7. resumo confere e a nota grava os quatro efeitos no banco", async ({
     .select("stock_quantity, cost_price")
     .eq("id", produtoId)
     .single();
-  expect(Number((produto as { stock_quantity: number }).stock_quantity)).toBe(16);
+  expect(Number((produto as { stock_quantity: number }).stock_quantity)).toBe(
+    16,
+  );
   expect(Number((produto as { cost_price: number }).cost_price)).toBe(5.5);
 
   // produto novo criado com custo, preço e estoque da nota
@@ -300,9 +304,9 @@ test("6+7. resumo confere e a nota grava os quatro efeitos no banco", async ({
     note: string | null;
   }[];
   expect(movimentos).toHaveLength(2);
-  expect(movimentos.map((m) => Number(m.quantity)).sort((a, b) => a - b)).toEqual(
-    [6, 12],
-  );
+  expect(
+    movimentos.map((m) => Number(m.quantity)).sort((a, b) => a - b),
+  ).toEqual([6, 12]);
   expect(movimentos[0]?.note).toContain(FORNECEDOR);
 
   // (d) gasto automático em 'insumos', com o total, na data da compra
@@ -351,7 +355,9 @@ test("8. a mesma nota não entra duas vezes", async ({ page }) => {
     .select("stock_quantity")
     .eq("id", produtoId)
     .single();
-  expect(Number((produto as { stock_quantity: number }).stock_quantity)).toBe(16);
+  expect(Number((produto as { stock_quantity: number }).stock_quantity)).toBe(
+    16,
+  );
 });
 
 test("9. histórico lista a nota e o detalhe mostra os itens", async ({
@@ -412,7 +418,9 @@ test("10. regressão: venda à vista no PDV continua normal depois da compra", a
     .select("stock_quantity")
     .eq("id", produtoId)
     .single();
-  expect(Number((produto as { stock_quantity: number }).stock_quantity)).toBe(15);
+  expect(Number((produto as { stock_quantity: number }).stock_quantity)).toBe(
+    15,
+  );
 });
 
 test("10b. regressão: venda a prazo (FiadoApp) continua normal depois da compra", async ({
@@ -477,5 +485,99 @@ test("10b. regressão: venda a prazo (FiadoApp) continua normal depois da compra
     .select("stock_quantity")
     .eq("id", produtoId)
     .single();
-  expect(Number((produto as { stock_quantity: number }).stock_quantity)).toBe(14);
+  expect(Number((produto as { stock_quantity: number }).stock_quantity)).toBe(
+    14,
+  );
+});
+
+test("11. cancelar a nota desfaz estoque, custo e gasto (G2a.1)", async ({
+  page,
+}) => {
+  // Estado antes do cancelamento: 14 do produto existente (16 da nota menos
+  // as 2 vendas da regressão) e 12 do produto criado pela nota.
+  const { data: novoAntes } = await app
+    .from("products")
+    .select("id, stock_quantity")
+    .eq("name", "Feijão Teste 1kg")
+    .single();
+  const novoId = (novoAntes as { id: string }).id;
+  expect(Number((novoAntes as { stock_quantity: number }).stock_quantity)).toBe(
+    12,
+  );
+
+  await page.goto("/estoque/compras");
+  await page.getByRole("link", { name: new RegExp(FORNECEDOR) }).click();
+  await expect(page).toHaveURL(/\/estoque\/compras\/[0-9a-f-]+/);
+
+  // O diálogo explica os três efeitos antes de confirmar.
+  await page.getByRole("button", { name: "Cancelar esta nota" }).click();
+  const dialogo = page.getByRole("dialog");
+  await expect(dialogo).toContainText("sai do estoque");
+  await expect(dialogo).toContainText("volta ao da compra anterior");
+  await expect(dialogo).toContainText("sai do financeiro");
+  await dialogo.getByRole("button", { name: "Cancelar a nota" }).click();
+
+  await expect(page.getByText(/Nota cancelada/i).first()).toBeVisible();
+
+  // A nota continua na tela, agora marcada — e sem o botão de cancelar.
+  await expect(page.getByText("Esta nota foi cancelada em")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Cancelar esta nota" }),
+  ).toHaveCount(0);
+
+  // ── Conferência NO BANCO (docs/09 §1) ─────────────────────────────
+  const { data: nota } = await app
+    .from("purchases")
+    .select("voided_at, total")
+    .eq("access_key", chaveDaNota)
+    .single();
+  expect((nota as { voided_at: string | null }).voided_at).not.toBeNull();
+  // O histórico da nota permanece: valor e itens não são apagados.
+  expect(Number((nota as { total: number }).total)).toBe(120);
+
+  // (a) o estoque que a nota trouxe saiu dos dois produtos
+  const { data: produto } = await app
+    .from("products")
+    .select("stock_quantity, cost_price")
+    .eq("id", produtoId)
+    .single();
+  expect(Number((produto as { stock_quantity: number }).stock_quantity)).toBe(
+    8,
+  );
+  const { data: novoDepois } = await app
+    .from("products")
+    .select("stock_quantity")
+    .eq("id", novoId)
+    .single();
+  expect(
+    Number((novoDepois as { stock_quantity: number }).stock_quantity),
+  ).toBe(0);
+
+  // (b) as saídas viraram movimentos 'void' negativos
+  const { data: movs } = await app
+    .from("stock_movements")
+    .select("quantity, note")
+    .eq("type", "void");
+  const estornos = (movs ?? []) as { quantity: number; note: string | null }[];
+  expect(estornos.map((m) => Number(m.quantity)).sort((a, b) => a - b)).toEqual(
+    [-12, -6],
+  );
+  expect(estornos[0]?.note).toContain(FORNECEDOR);
+
+  // (c) o gasto automático saiu do financeiro
+  const { count: gastos } = await app
+    .from("expenses")
+    .select("id", { count: "exact", head: true })
+    .eq("category", "insumos");
+  expect(gastos ?? 0).toBe(0);
+});
+
+test("12. a nota cancelada continua no histórico, com o selo", async ({
+  page,
+}) => {
+  await page.goto("/estoque/compras");
+  const item = page.getByRole("link", { name: new RegExp(FORNECEDOR) });
+  await expect(item).toHaveCount(1);
+  await expect(item).toContainText("Cancelada");
+  await expect(item).toContainText("R$ 120,00");
 });
