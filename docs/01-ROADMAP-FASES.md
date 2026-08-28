@@ -379,7 +379,7 @@ referência ao FiadoApp = vermelho/coral + logo (`FiadoappBadge`).
 Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
 **G1 → G2a → G2b → G3 → (G2c opcional)**.
 
-- **G1 — Fundação de custo** (2026-08-27): migration **0013**
+- **G1 — Fundação de custo** (2026-08-27, PR #26, merge `e845d51`): migration **0013**
   (`products.cost_price`, `sale_items.unit_cost`, ambas aditivas e opcionais,
   com check `>= 0`) + `register_sale` gravando o **snapshot** do custo em cada
   item vendido com `product_id` (item avulso → null). A venda a prazo herda o
@@ -391,7 +391,8 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
   (snapshot à vista/fiado, imutabilidade histórica, isolamento por usuário).
   Nada de relatório aqui — o fechamento Lucro × Custo é a G3.
 
-- **G2a — Núcleo de compras (entrada manual)** (2026-08-27): migration **0014**
+- **G2a — Núcleo de compras (entrada manual)** (2026-08-27, PR #27, merge
+  `8ea1523`): migration **0014**
   — tabelas `purchases` (índice único parcial em `(user_id, access_key)` →
   mesma nota não entra duas vezes) e `purchase_items` (custo daquela compra
   preservado), tipo `'purchase'` em `stock_movements` e a RPC transacional
@@ -413,7 +414,7 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
 
 ### Validação da G2a (protocolo `docs/09-PROTOCOLO-DE-VALIDACAO.md`)
 
-Sessão de 2026-08-27, sem implementar funcionalidade nova:
+Sessão de 2026-08-27 (PRs #27 e #28, merge `00330f8`), sem funcionalidade nova:
 
 - **Funcional** (`tests/e2e/compras.spec.ts`, 11 testes): roda logado como
   **usuário descartável** (criado no `auth.setup.ts`, apagado no
@@ -438,3 +439,13 @@ Sessão de 2026-08-27, sem implementar funcionalidade nova:
   `BASE_URL=https://... VERCEL_AUTOMATION_BYPASS_SECRET=... npm run test:e2e`.
   Os baselines de screenshot têm sufixo de plataforma (`-win32`): outro SO
   gera o seu próprio na primeira execução.
+
+**Encerramento da sprint (2026-08-27).** Entregues e em produção: G1
+(fundação de custo), G2a (núcleo de compras) e a infraestrutura de validação
+(e2e com usuário descartável, visual desktop/mobile com contraste AA, e o
+mesmo suíte rodando contra o Preview — 33 testes verdes lá). Migrations
+0001–0014 aplicadas. Regra de merge e ritual de encerramento atualizados no
+`docs/09` (§3.6, §4 e §6). **Próxima sessão: G2a.1 (estorno de compra — exige
+migration, porque `purchases` só tem políticas de SELECT/INSERT) ou G2b
+(extração gratuita de PDF-texto/XML).** O ponto de partida detalhado está na
+memória do projeto (`sprint-handoff`).
