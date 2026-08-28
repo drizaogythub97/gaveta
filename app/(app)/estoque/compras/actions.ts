@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
-import { purchaseSchema, type PurchaseInput } from "@/lib/validations/purchases";
+import {
+  purchaseSchema,
+  voidPurchaseSchema,
+  type PurchaseInput,
+} from "@/lib/validations/purchases";
 
 export type RegisterPurchaseResult =
   | {
@@ -36,6 +40,23 @@ function rpcErrorToPortuguese(message: string | undefined): string {
     return "Sessão expirada. Entre novamente.";
   }
   return "Não foi possível lançar a nota. Tente novamente.";
+}
+
+function voidErrorToPortuguese(message: string | undefined): string {
+  const msg = (message ?? "").toLowerCase();
+  if (msg.includes("já foi cancelada")) {
+    return "Esta nota já foi cancelada.";
+  }
+  if (msg.includes("nota não encontrada")) {
+    return "Nota não encontrada.";
+  }
+  if (msg.includes("histórico")) {
+    return "Esta nota é histórico e não pode ser alterada.";
+  }
+  if (msg.includes("não autenticado")) {
+    return "Sessão expirada. Entre novamente.";
+  }
+  return "Não foi possível cancelar a nota. Tente novamente.";
 }
 
 /**
@@ -106,5 +127,74 @@ export async function registrarCompra(
     total: Number(resumo.total),
     produtosAtualizados: Number(resumo.produtos_atualizados),
     produtosNovos: Number(resumo.produtos_novos),
+  };
+}
+
+export type VoidPurchaseResult =
+  | {
+      ok: true;
+      /** Itens da nota que ainda tinham produto vinculado. */
+      itensEstornados: number;
+      /** Parte da mercadoria já havia saído: o estoque saiu só até zerar. */
+      estoqueParcial: boolean;
+      /** Produtos cujo "último custo" voltou ao da compra anterior. */
+      custosRevertidos: number;
+      /** O gasto automático em insumos foi removido do financeiro. */
+      gastoRemovido: boolean;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Cancela (estorna) uma nota lançada por engano — plano 08, fase G2a.1.
+ * Uma chamada à RPC transacional estornar_compra: tira o estoque que
+ * entrou, desfaz o último custo, remove o gasto em insumos e marca a nota
+ * como cancelada. O histórico da nota NÃO é apagado.
+ */
+export async function estornarCompra(
+  purchaseId: string,
+): Promise<VoidPurchaseResult> {
+  const parsed = voidPurchaseSchema.safeParse({ purchaseId });
+  if (!parsed.success) {
+    return { ok: false, error: "Nota inválida." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Sessão expirada. Entre novamente." };
+  }
+
+  const { data, error } = await supabase.rpc("estornar_compra", {
+    p_purchase_id: parsed.data.purchaseId,
+  });
+
+  if (error || !data) {
+    return { ok: false, error: voidErrorToPortuguese(error?.message) };
+  }
+
+  const resumo = data as {
+    itens_estornados: number;
+    estoque_parcial: boolean;
+    custos_revertidos: number;
+    gasto_removido: boolean;
+  };
+
+  // O estorno mexe em estoque, produtos e financeiro — todos precisam refletir.
+  revalidatePath("/estoque");
+  revalidatePath("/estoque/compras");
+  revalidatePath(`/estoque/compras/${parsed.data.purchaseId}`);
+  revalidatePath("/estoque/movimentacoes");
+  revalidatePath("/produtos");
+  revalidatePath("/financeiro");
+  revalidatePath("/dashboard");
+
+  return {
+    ok: true,
+    itensEstornados: Number(resumo.itens_estornados),
+    estoqueParcial: Boolean(resumo.estoque_parcial),
+    custosRevertidos: Number(resumo.custos_revertidos),
+    gastoRemovido: Boolean(resumo.gasto_removido),
   };
 }

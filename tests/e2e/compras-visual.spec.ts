@@ -51,7 +51,8 @@ async function estabilizaFormulario(page: Page) {
  */
 async function escondeOverlayDoNext(page: Page) {
   await page.addStyleTag({
-    content: "nextjs-portal, #__next-build-watcher { display: none !important; }",
+    content:
+      "nextjs-portal, #__next-build-watcher { display: none !important; }",
   });
 }
 
@@ -129,6 +130,10 @@ test("histórico de notas: layout, alvos e regressão visual", async ({
   await expect(page.getByText("Distribuidora Modelo")).toBeVisible();
   await expect(page.getByText("20/08/2026")).toBeVisible();
   await expect(page.getByText("R$ 99,00")).toBeVisible();
+  // A nota cancelada (G2a.1) continua na lista, com o selo que a distingue.
+  await expect(
+    page.getByRole("link", { name: /Fornecedor Cancelado/ }),
+  ).toContainText("Cancelada");
 
   await semRolagemHorizontal(page);
   await alvosGrandes(page);
@@ -158,8 +163,64 @@ test("detalhe da nota: layout e regressão visual", async ({ page }) => {
   await expect(page).toHaveScreenshot("nota-detalhe.png", { fullPage: true });
 });
 
+test("confirmação de cancelamento: layout, alvos e regressão visual", async ({
+  page,
+}) => {
+  if (ehMobile()) await usarModo(page, "simples");
+
+  const { visualPurchaseId } = loadUsers();
+  await page.goto(`/estoque/compras/${visualPurchaseId}`);
+
+  // O diálogo é destrutivo: precisa caber na tela, ter alvos grandes e
+  // explicar os três efeitos antes de o usuário confirmar.
+  await page.getByRole("button", { name: "Cancelar esta nota" }).click();
+  const dialogo = page.getByRole("dialog");
+  await expect(dialogo).toBeVisible();
+  await expect(dialogo).toContainText("sai do estoque");
+  await expect(dialogo).toContainText("Isso não pode ser desfeito.");
+
+  await semRolagemHorizontal(page);
+  await alvosGrandes(page);
+  await esperaContrasteAA(page);
+  await escondeOverlayDoNext(page);
+
+  await expect(page).toHaveScreenshot("nota-cancelar-dialogo.png");
+});
+
+test("detalhe da nota cancelada: layout e regressão visual", async ({
+  page,
+}) => {
+  if (ehMobile()) await usarModo(page, "simples");
+
+  const { visualVoidedPurchaseId } = loadUsers();
+  await page.goto(`/estoque/compras/${visualVoidedPurchaseId}`);
+  await expect(
+    page.getByRole("heading", { name: "Fornecedor Cancelado" }),
+  ).toBeVisible();
+  await expect(page.getByText("Esta nota foi cancelada em")).toBeVisible();
+  // Nota cancelada não oferece cancelar de novo.
+  await expect(
+    page.getByRole("button", { name: "Cancelar esta nota" }),
+  ).toHaveCount(0);
+
+  await semRolagemHorizontal(page);
+  await alvosGrandes(page);
+  await esperaContrasteAA(page);
+  await escondeOverlayDoNext(page);
+
+  // O aviso traz a DATA do cancelamento (muda a cada execução): mascarado
+  // para o baseline continuar válido amanhã.
+  await expect(page).toHaveScreenshot("nota-detalhe-cancelada.png", {
+    fullPage: true,
+    mask: [page.getByRole("status")],
+  });
+});
+
 test("celular no modo Minimalista mantém o padrão", async ({ page }) => {
-  test.skip(!ehMobile(), "O modo Minimalista só existe em viewport de celular.");
+  test.skip(
+    !ehMobile(),
+    "O modo Minimalista só existe em viewport de celular.",
+  );
 
   await usarModo(page, "minimalista");
   await page.goto("/estoque/compras/nova");

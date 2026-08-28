@@ -29,6 +29,8 @@ export type UsersFile = {
   visual: TestUser;
   /** Nota semeada para o usuário visual (histórico e detalhe estáveis). */
   visualPurchaseId: string;
+  /** Nota semeada JÁ CANCELADA, para o visual do estorno (G2a.1). */
+  visualVoidedPurchaseId: string;
 };
 
 export function saveUsers(users: UsersFile): void {
