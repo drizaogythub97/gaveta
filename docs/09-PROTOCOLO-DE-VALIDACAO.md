@@ -77,3 +77,8 @@ npm run test:e2e:preview    # o MESMO suíte contra o Preview da branch atual
   nascem e morrem dentro da execução.
 - Acessibilidade: `tests/e2e/a11y.ts` calcula contraste AA (WCAG 2.1) e tamanho
   de alvo direto no navegador, sem dependência externa.
+- **Estado (2026-08-27)**: o segredo de bypass já está no `.env.local`, então
+  `npm run test:e2e:preview` roda de verdade contra o Preview. A G2a foi
+  validada assim: 33 testes passaram no Preview (build de produção), com os
+  mesmos baselines visuais gerados em desenvolvimento — ou seja, a regressão
+  visual é a mesma nos dois ambientes.
