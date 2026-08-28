@@ -27,6 +27,9 @@ import {
   recebidoViaFiadoNoPeriodo,
 } from "@/lib/financeiro/fiado";
 
+import { carregarFechamento } from "@/lib/financeiro/lucro-custo";
+
+import { FechamentoView } from "./fechamento-view";
 import { FiadoAReceberBlock } from "./fiado-a-receber";
 import { ExpensesClient } from "./expenses-client";
 import { ToggleSaleStatusButton } from "./toggle-sale-status-button";
@@ -37,11 +40,17 @@ export const metadata = {
   title: "Financeiro",
 };
 
-type Tab = "vendas" | "despesas" | "resumo";
-const VALID_TABS: ReadonlySet<Tab> = new Set(["vendas", "despesas", "resumo"]);
+type Tab = "vendas" | "despesas" | "fechamento" | "resumo";
+const VALID_TABS: ReadonlySet<Tab> = new Set([
+  "vendas",
+  "despesas",
+  "fechamento",
+  "resumo",
+]);
 const TAB_LABELS: Record<Tab, string> = {
   vendas: "Vendas",
   despesas: "Despesas",
+  fechamento: "Fechamento",
   resumo: "Resumo",
 };
 
@@ -139,7 +148,9 @@ export default async function FinancialPage({
   return (
     <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
       <header>
-        <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">Financeiro</h1>
+        <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">
+          Financeiro
+        </h1>
         <p className="minimal:max-sm:text-sm minimal:max-sm:mt-1 text-muted-foreground mt-2 text-lg">
           Acompanhe as vendas, registre despesas e veja o resumo do período.
         </p>
@@ -169,6 +180,8 @@ export default async function FinancialPage({
         />
       ) : tab === "despesas" ? (
         <DespesasTab from={from} to={to} />
+      ) : tab === "fechamento" ? (
+        <FechamentoTab from={from} to={to} period={period} />
       ) : (
         <ResumoTab from={from} to={to} period={period} />
       )}
@@ -198,7 +211,7 @@ function TabNav({
 }) {
   return (
     <nav aria-label="Seções do financeiro" className="flex flex-wrap gap-2">
-      {(["vendas", "despesas", "resumo"] as Tab[]).map((t) => {
+      {(["vendas", "despesas", "fechamento", "resumo"] as Tab[]).map((t) => {
         const active = t === current;
         return (
           <Link
@@ -294,8 +307,7 @@ async function VendasTab({
     recebidoViaFiadoNoPeriodo(supabase, from, to),
     listarAReceberViaFiado(supabase),
   ]);
-  const totalRecebido =
-    Math.round((netRevenue + recebidoFiado) * 100) / 100;
+  const totalRecebido = Math.round((netRevenue + recebidoFiado) * 100) / 100;
 
   return (
     <>
@@ -396,7 +408,14 @@ function SalesPagination({
 
   const pageHref = (target: number) => {
     const next = new URLSearchParams();
-    for (const key of ["tab", "period", "from", "to", "methods", "sort"] as const) {
+    for (const key of [
+      "tab",
+      "period",
+      "from",
+      "to",
+      "methods",
+      "sort",
+    ] as const) {
       const v = pickString(params[key]);
       if (v) next.set(key, v);
     }
@@ -425,9 +444,9 @@ function SalesPagination({
         </span>
       )}
       <p className="text-muted-foreground text-base">
-        Página <span className="text-foreground font-medium">{currentPage}</span>{" "}
-        de {totalPages} · {totalSales}{" "}
-        {totalSales === 1 ? "venda" : "vendas"}
+        Página{" "}
+        <span className="text-foreground font-medium">{currentPage}</span> de{" "}
+        {totalPages} · {totalSales} {totalSales === 1 ? "venda" : "vendas"}
       </p>
       {currentPage < totalPages ? (
         <Link href={pageHref(currentPage + 1)} className={linkClass}>
@@ -467,6 +486,52 @@ async function DespesasTab({ from, to }: { from: string; to: string }) {
       expenses={expenses}
       defaultDate={defaultDate}
       total={total}
+    />
+  );
+}
+
+// ----------------------------------------------------------------- Fechamento
+// Fechamento Lucro × Custo (plano 08, seção 2): do que ENTROU no período,
+// quanto é recompra de mercadoria e quanto é lucro.
+async function FechamentoTab({
+  from,
+  to,
+  period,
+}: {
+  from: string;
+  to: string;
+  period: Period;
+}) {
+  const supabase = await createClient();
+  const fromDate = toDateInputValue(from);
+  const toDate = toDateInputValue(to);
+
+  const [{ fechamento, semCusto }, despesasRes] = await Promise.all([
+    carregarFechamento(supabase, from, to),
+    supabase.rpc("expenses_summary", { p_from: fromDate, p_to: toDate }),
+  ]);
+
+  // As compras de mercadoria (categoria 'insumos') ficam FORA da linha
+  // informativa de despesas: esse dinheiro é a própria recompra, já
+  // representada pelo custo. Somar os dois descontaria duas vezes.
+  const despesasSemCompras =
+    Math.round(
+      (
+        (despesasRes.data ?? []) as {
+          category: ExpenseCategory;
+          total: number;
+        }[]
+      )
+        .filter((linha) => linha.category !== "insumos")
+        .reduce((soma, linha) => soma + Number(linha.total), 0) * 100,
+    ) / 100;
+
+  return (
+    <FechamentoView
+      fechamento={fechamento}
+      semCusto={semCusto}
+      despesasSemCompras={despesasSemCompras}
+      periodo={PERIOD_LABELS[period]}
     />
   );
 }
@@ -516,12 +581,14 @@ async function ResumoTab({
     byCat.set(row.category, Number(row.total));
   }
   const expensesByCategory = EXPENSE_CATEGORIES.filter((c) => byCat.has(c)).map(
-    (c) => ({ category: c, total: Math.round((byCat.get(c) ?? 0) * 100) / 100 }),
+    (c) => ({
+      category: c,
+      total: Math.round((byCat.get(c) ?? 0) * 100) / 100,
+    }),
   );
   const expensesTotal =
-    Math.round(
-      Array.from(byCat.values()).reduce((s, v) => s + v, 0) * 100,
-    ) / 100;
+    Math.round(Array.from(byCat.values()).reduce((s, v) => s + v, 0) * 100) /
+    100;
   // Ecossistema (Fase 2): o recebido de vendas a prazo (origem Gaveta) no
   // período é income realizado — entra no resultado, junto da receita líquida.
   const recebidoFiado = await recebidoViaFiadoNoPeriodo(supabase, from, to);
@@ -551,7 +618,8 @@ async function ResumoTab({
   const monthSummary = (monthSummaryData ?? EMPTY_SUMMARY) as SalesSummaryRow;
   const monthSoFarNet =
     Math.round(
-      (Number(monthSummary.gross_total) - Number(monthSummary.fees_total)) * 100,
+      (Number(monthSummary.gross_total) - Number(monthSummary.fees_total)) *
+        100,
     ) / 100;
   const daysElapsed = now.getDate();
   const daysInMonth = new Date(

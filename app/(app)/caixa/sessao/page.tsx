@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Calculator } from "lucide-react";
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
@@ -45,7 +45,8 @@ export default async function CashSessionPage() {
     const salesRows = (sales ?? []) as { total: number }[];
     cashSalesCount = salesRows.length;
     cashSalesTotal =
-      Math.round(salesRows.reduce((s, r) => s + Number(r.total), 0) * 100) / 100;
+      Math.round(salesRows.reduce((s, r) => s + Number(r.total), 0) * 100) /
+      100;
   }
 
   const suprimentos = movements
@@ -102,6 +103,24 @@ export default async function CashSessionPage() {
         expected={expected}
         closedSessions={closedSessions}
       />
+
+      {/* Atalho pedido no plano 08 (§2.3): quem está fechando o caixa é
+          justamente quem quer saber quanto separar para repor a mercadoria. */}
+      <div className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-3 rounded-xl p-5 ring-1">
+        <p className="minimal:max-sm:text-base text-lg font-medium">
+          Quanto guardar para repor a mercadoria?
+        </p>
+        <p className="text-muted-foreground minimal:max-sm:text-sm text-base">
+          O fechamento do dia separa o que entrou em custo de recompra e lucro.
+        </p>
+        <Link
+          href="/financeiro?tab=fechamento&period=today"
+          className="border-border text-foreground hover:bg-muted minimal:max-sm:h-11 minimal:max-sm:text-base flex h-14 w-fit items-center gap-2 rounded-lg border px-6 text-lg font-medium"
+        >
+          <Calculator aria-hidden="true" className="size-5" />
+          Ver o fechamento do dia
+        </Link>
+      </div>
     </section>
   );
 }
