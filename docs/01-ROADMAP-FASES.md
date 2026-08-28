@@ -436,6 +436,45 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
   lista (total riscado). Testes: `tests/rls/estorno-compra.test.ts` (9 casos)
   + 2 e2e funcionais e 2 visuais (desktop e celular).
 
+- **G2b — Extração gratuita (PDF-texto + XML)** (2026-08-28, PR #30,
+  merge `MERGE_G2B`; **sem migration**): a nota entra por arquivo e a tela da
+  G2a vira a **tela de conferência**. Custo zero, tudo no próprio servidor —
+  o documento não é enviado para nenhum serviço de terceiros (decisão 7).
+  - `lib/compras/nfe-xml.ts` (via exata): `fast-xml-parser` sobre
+    `nfeProc`/`NFe`/`infNFe`; chave pelo `Id` ou pelo `protNFe`, emitente,
+    `dhEmi`, itens por `qCom`/`vUnCom` (unidade **comercial**, não a
+    tributável) e `cEAN` — `"SEM GTIN"` vira sem código. Entidades do
+    documento **não** são expandidas (XXE).
+  - `lib/compras/danfe-pdf.ts` (via tolerante): `unpdf` (pdf.js empacotado,
+    sem dependências). Reconstrói as **linhas visuais** pela posição dos
+    fragmentos (agrupa por Y, ordena por X) em vez de concatenar o texto na
+    ordem do arquivo, e reconhece a linha de item ancorada em **NCM + CFOP**,
+    com ou sem a coluna de CST. PDF que é só imagem cai fora com aviso claro.
+  - `lib/compras/numeros.ts`: **o formato do número é informado por quem
+    chama**, nunca adivinhado — `"5.499"` vale 5,499 no XML e 5.499 no DANFE.
+  - `lib/compras/correspondencia.ts`: motor **EAN → nome → novo**. A
+    semelhança de nomes usa **Dice** sobre as palavras significativas, porque
+    a descrição da nota costuma ser mais detalhada que o nome do cadastro
+    ("ARROZ TIPO 1 5KG" × "Arroz 5kg" casa; "ARROZ INTEGRAL 1KG" × "Arroz
+    5kg" não). Limiar 0,5.
+  - `import-actions.ts`: sessão, **rate limit próprio** (`importar-nota`),
+    limite de 8 MB e detecção de formato pelo **conteúdo** — não pela
+    extensão nem pelo `type` do navegador. Duas consultas resolvem a nota
+    inteira (códigos de barras + catálogo), sem uma ida ao banco por item.
+  - UI: bloco "Tem o arquivo da nota?"; cada item com selo **Já cadastrado /
+    Parecido — confira / Produto novo**, a descrição original ao lado para
+    comparar, botão "não é este" no sugerido, e o **preço de venda agora
+    editável na própria linha** (o arquivo traz o custo, nunca o preço).
+    Importar sobre itens já digitados pergunta antes. A origem (`pdf`/`xml`)
+    fica registrada na nota. **Nada é gravado sem a confirmação humana.**
+  - `next.config.ts`: `serverActions.bodySizeLimit` (o padrão de 1 MB não
+    comporta um DANFE de várias páginas).
+  - Testes: `tests/nota-extracao-xml.test.ts`, `tests/nota-extracao-pdf.test.ts`
+    (DANFE sintético montado com o `jspdf` que o app já usa) e
+    `tests/nota-correspondencia.test.ts` — 38 casos; e2e
+    `tests/e2e/importar-nota.spec.ts` (5) com conferência no banco, mais o
+    visual da tela de conferência em desktop e celular.
+
 ### Validação da G2a (protocolo `docs/09-PROTOCOLO-DE-VALIDACAO.md`)
 
 Sessão de 2026-08-27 (PRs #27 e #28, merge `00330f8`), sem funcionalidade nova:
