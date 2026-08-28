@@ -39,13 +39,25 @@ function branchAtual() {
   }).trim();
 }
 
-/** Mesma normalização que a Vercel usa no alias de branch. */
+/** Um rótulo de DNS não passa de 63 caracteres. */
+const LIMITE_DO_ROTULO = 63;
+
+/**
+ * O alias determinístico da branch. Vale como último recurso: quando o
+ * rótulo passa de 63 caracteres, a Vercel ENCURTA a parte da branch e cola
+ * um hash que não dá para calcular aqui — nesse caso o alias montado não
+ * existe, e o script avisa em vez de tentar.
+ */
 function aliasDaBranch(branch) {
   const slug = branch
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return `https://${PROJETO}-git-${slug}-${ESCOPO}.vercel.app`;
+  const rotulo = `${PROJETO}-git-${slug}-${ESCOPO}`;
+  return {
+    url: `https://${rotulo}.vercel.app`,
+    previsivel: rotulo.length <= LIMITE_DO_ROTULO,
+  };
 }
 
 function urlPelaCLI(branch) {
@@ -78,7 +90,9 @@ function urlPelaCLI(branch) {
     return null;
   }
   try {
-    const linhas = r.stdout.split("\n").filter((l) => l.trim().startsWith("{") || l.trim().startsWith("["));
+    const linhas = r.stdout
+      .split("\n")
+      .filter((l) => l.trim().startsWith("{") || l.trim().startsWith("["));
     const dados = JSON.parse(linhas.join("\n"));
     const lista = Array.isArray(dados) ? dados : (dados.deployments ?? []);
     const url = lista[0]?.url;
@@ -96,10 +110,15 @@ async function alvoResponde(url, bypass) {
         "x-vercel-set-bypass-cookie": "true",
       }
     : {};
-  const resposta = await fetch(`${url}/login`, {
-    headers,
-    redirect: "manual",
-  });
+  let resposta;
+  try {
+    resposta = await fetch(`${url}/login`, { headers, redirect: "manual" });
+  } catch (erro) {
+    // Sem isto, um endereço que não existe derrubava o script com um stack
+    // de fetch, sem dizer o que fazer.
+    const causa = erro?.cause?.code === "ENOTFOUND" ? "dns" : "rede";
+    return { ok: false, motivo: causa };
+  }
   const destino = resposta.headers.get("location") ?? "";
   if (destino.includes("vercel.com/sso-api")) {
     return { ok: false, motivo: "sso" };
@@ -112,13 +131,34 @@ async function alvoResponde(url, bypass) {
 
 const branch = branchAtual();
 const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
-const url =
-  process.env.BASE_URL?.trim() || urlPelaCLI(branch) || aliasDaBranch(branch);
+const alias = aliasDaBranch(branch);
+const url = process.env.BASE_URL?.trim() || urlPelaCLI(branch) || alias.url;
 
 console.log(`· Branch:  ${branch}`);
 console.log(`· Preview: ${url}`);
 
 const teste = await alvoResponde(url, bypass);
+if (!teste.ok && (teste.motivo === "dns" || teste.motivo === "rede")) {
+  console.error(
+    [
+      "",
+      `✗ O endereço acima não respondeu (${teste.motivo === "dns" ? "não existe" : "falha de rede"}).`,
+      ...(alias.previsivel
+        ? []
+        : [
+            "",
+            "  O nome desta branch é longo demais para o alias: a Vercel encurta",
+            "  a parte da branch e cola um hash, que não dá para calcular aqui.",
+          ]),
+      "",
+      "  Pegue a URL do Preview (painel da Vercel, ou o comentário do PR) e rode:",
+      "",
+      "    BASE_URL=https://... npm run test:e2e",
+      "",
+    ].join("\n"),
+  );
+  process.exit(1);
+}
 if (!teste.ok) {
   if (teste.motivo === "sso") {
     console.error(

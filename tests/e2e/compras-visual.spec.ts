@@ -237,7 +237,14 @@ test("confirmação de cancelamento: layout, alvos e regressão visual", async (
   await esperaContrasteAA(page);
   await escondeOverlayDoNext(page);
 
-  await expect(page).toHaveScreenshot("nota-cancelar-dialogo.png");
+  // Foto só do PAINEL do diálogo. O papel `dialog` está no overlay, que
+  // cobre a viewport inteira e deixa a página aparecer por transparência —
+  // aí a comparação passa a depender da rolagem do fundo, que varia ~1px
+  // entre o servidor de desenvolvimento e o build de produção do Preview.
+  // O que este teste verifica é o painel; o fundo já é coberto por outros.
+  await expect(page.locator("[data-dialog-panel]")).toHaveScreenshot(
+    "nota-cancelar-dialogo.png",
+  );
 });
 
 test("detalhe da nota cancelada: layout e regressão visual", async ({
