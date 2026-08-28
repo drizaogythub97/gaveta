@@ -54,8 +54,9 @@ type NotaItem = {
   /** Como o item se ligou ao catálogo (importação da G2b). */
   status: StatusItem;
   /**
-   * Descrição como veio na nota, quando o item foi importado e o produto do
-   * Gaveta tem outro nome — é o que a pessoa compara para conferir.
+   * Descrição como veio na nota (só em item importado). A tela mostra essa
+   * linha quando ela difere do nome atual — seja porque casou com um produto
+   * de outro nome, seja porque a pessoa editou o nome do produto novo.
    */
   descricaoNota: string | null;
 };
@@ -318,10 +319,10 @@ export function NotaForm() {
         salePriceDigits: "",
         trackStock: item.trackStock,
         status: item.status,
-        descricaoNota:
-          item.productName && item.productName !== item.descricao
-            ? item.descricao
-            : null,
+        // Guarda sempre o que a nota dizia: some da tela enquanto o nome
+        // estiver igual e reaparece assim que a pessoa editar, para ela
+        // poder comparar com o original.
+        descricaoNota: item.descricao,
       })),
     );
     setNotaImportada(nota);
@@ -382,6 +383,10 @@ export function NotaForm() {
       const qty = parseDecimalPtBR(item.quantity);
       if (!Number.isFinite(qty) || qty <= 0) {
         setErro(`Confira a quantidade de "${item.name}".`);
+        return;
+      }
+      if (item.name.trim().length === 0) {
+        setErro("Um dos itens está sem nome. Confira a lista.");
         return;
       }
       if (item.costDigits.length === 0) {
@@ -740,12 +745,33 @@ export function NotaForm() {
                 className="border-border flex flex-col gap-3 rounded-lg border p-4"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex flex-col gap-1">
-                    <span className="minimal:max-sm:text-base text-foreground text-lg font-semibold">
-                      {item.name}
-                    </span>
+                  <div className="flex flex-1 flex-col gap-1">
+                    {item.isNew ? (
+                      // Produto novo: o nome é o que vai para o cadastro, e
+                      // a nota costuma trazê-lo abreviado ou cortado — então
+                      // é campo, não texto fixo.
+                      <div className="flex flex-col gap-1">
+                        <Label htmlFor={`nome-${item.key}`} className="text-sm">
+                          Nome do produto
+                        </Label>
+                        <Input
+                          id={`nome-${item.key}`}
+                          type="text"
+                          autoComplete="off"
+                          value={item.name}
+                          onChange={(e) =>
+                            atualizarItem(item.key, { name: e.target.value })
+                          }
+                          className="h-12 text-base font-semibold"
+                        />
+                      </div>
+                    ) : (
+                      <span className="minimal:max-sm:text-base text-foreground text-lg font-semibold">
+                        {item.name}
+                      </span>
+                    )}
                     <StatusDoItem status={item.status} />
-                    {item.descricaoNota ? (
+                    {item.descricaoNota && item.descricaoNota !== item.name ? (
                       <span className="text-muted-foreground text-sm">
                         Na nota está:{" "}
                         <span className="text-foreground">
@@ -768,7 +794,7 @@ export function NotaForm() {
                     type="button"
                     variant="outline"
                     onClick={() => removerItem(item.key)}
-                    aria-label={`Remover ${item.name} da nota`}
+                    aria-label={`Remover ${item.name || "item sem nome"} da nota`}
                     className="size-12 shrink-0 p-0"
                   >
                     <Trash2 aria-hidden="true" className="size-5" />

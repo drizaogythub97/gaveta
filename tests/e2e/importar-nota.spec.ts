@@ -178,9 +178,13 @@ test("1. XML da NF-e preenche a tela com os três tipos de item", async ({
   await expect(cha).toContainText("Parecido — confira");
   await expect(cha).toContainText("CHA MATE NATURAL 250G");
 
-  // (c) não existe no Gaveta → produto novo.
-  const biscoito = linhas.filter({ hasText: "BISCOITO AGUA E SAL 200G" });
-  await expect(biscoito).toContainText("Produto novo");
+  // (c) não existe no Gaveta → produto novo. O nome dele é CAMPO (vai para o
+  // cadastro), então o item é localizado pelo selo e conferido pelo valor.
+  const biscoito = linhas.filter({ hasText: "Produto novo" });
+  await expect(biscoito).toHaveCount(1);
+  await expect(biscoito.getByLabel("Nome do produto")).toHaveValue(
+    "BISCOITO AGUA E SAL 200G",
+  );
 
   // NADA foi gravado só por importar — a conferência é obrigatória.
   const { count } = await app
@@ -204,7 +208,7 @@ test("2. depois de conferir, a nota importada é lançada como 'xml'", async ({
   // O produto novo ainda precisa do preço de venda — o arquivo não traz.
   const biscoito = page
     .locator(`${sel.itens} li`)
-    .filter({ hasText: "BISCOITO AGUA E SAL 200G" });
+    .filter({ hasText: "Produto novo" });
   await expect(
     page.getByRole("button", { name: "Conferir e lançar nota" }),
   ).toBeEnabled();
@@ -214,6 +218,16 @@ test("2. depois de conferir, a nota importada é lançada como 'xml'", async ({
   ).toBeVisible();
 
   await biscoito.getByLabel("Preço de venda").fill("450");
+
+  // O nome vindo da nota costuma vir abreviado ou cortado — e é ele que vai
+  // para o cadastro, então precisa ser editável (pedido do dono).
+  await expect(biscoito.getByLabel("Nome do produto")).toHaveValue(
+    "BISCOITO AGUA E SAL 200G",
+  );
+  await biscoito.getByLabel("Nome do produto").fill("Biscoito água e sal 200g");
+  // Depois de editar, a tela mostra o que a nota dizia, para comparar.
+  await expect(biscoito).toContainText("Na nota está:");
+  await expect(biscoito).toContainText("BISCOITO AGUA E SAL 200G");
 
   await page.getByRole("button", { name: "Conferir e lançar nota" }).click();
   const dialogo = page.getByRole("dialog");
@@ -256,15 +270,26 @@ test("2. depois de conferir, a nota importada é lançada como 'xml'", async ({
   expect(Number((chas ?? [])[0]?.stock_quantity as unknown as number)).toBe(3);
   expect(Number((chas ?? [])[0]?.cost_price as unknown as number)).toBe(5);
 
-  // O novo foi cadastrado com o preço que a pessoa informou.
+  // O novo foi cadastrado com o NOME CORRIGIDO e o preço informado.
   const { data: novo } = await app
     .from("products")
     .select("price, cost_price, stock_quantity")
-    .eq("name", "BISCOITO AGUA E SAL 200G")
+    .eq("name", "Biscoito água e sal 200g")
     .single();
   expect(Number((novo as { price: number }).price)).toBe(4.5);
   expect(Number((novo as { cost_price: number }).cost_price)).toBe(2);
   expect(Number((novo as { stock_quantity: number }).stock_quantity)).toBe(10);
+
+  // O histórico da nota guarda a descrição EDITADA do item — é o que a
+  // pessoa confirmou. O produto criado leva o mesmo nome.
+  const { data: itensDaNota } = await app
+    .from("purchase_items")
+    .select("description_snapshot")
+    .eq("purchase_id", (nota as { id: string }).id);
+  const descricoes = ((itensDaNota ?? []) as { description_snapshot: string }[])
+    .map((i) => i.description_snapshot)
+    .sort();
+  expect(descricoes).toContain("Biscoito água e sal 200g");
 
   // E o gasto automático saiu com o total da nota.
   const { data: gasto } = await app

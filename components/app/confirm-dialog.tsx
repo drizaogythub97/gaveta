@@ -77,6 +77,10 @@ export function ConfirmDialog({
       <div
         ref={panelRef}
         onClick={(e) => e.stopPropagation()}
+        // O papel `dialog` fica no overlay, que cobre a viewport inteira. A
+        // marca no PAINEL dá um alvo estável para a regressão visual — sem
+        // ela, a foto do diálogo inclui a página atrás pela transparência.
+        data-dialog-panel
         className="bg-card text-card-foreground ring-foreground/10 flex w-full max-w-md flex-col gap-4 rounded-xl p-6 ring-1"
       >
         <div>
