@@ -167,10 +167,15 @@ Despesas gerais (aluguel, salários…) não participam da divisão diária — 
 | **G2a — Núcleo de compras (manual)** ✅ ENTREGUE (0014_compras.sql) | Tabelas purchases/purchase_items, RPC transacional (compra+estoque+último custo+despesa automática), tela de entrada manual, histórico | G1 |
 | **G2a.1 — Estorno de compra** ✅ ENTREGUE (0015_estorno_compra.sql) | Cancelar uma compra lançada por engano: reverte estoque (movimento `void`), remove/estorna o gasto em `expenses`, marca a nota como cancelada (não apaga histórico). Exige política de UPDATE/soft-delete em `purchases`. **Motivo: hoje não há como corrigir erro de digitação — em uso diário isso acontece.** | G2a |
 | **G2b — Extração gratuita (PDF-texto + XML)** ✅ ENTREGUE (sem migration) | Upload → parser determinístico open source → motor de match (EAN→nome→novo) → mesma tela vira conferência | G2a |
-| **G3 — Fechamento Lucro × Custo** ⬅ PRÓXIMA | Card do dia + filtros + cobertura + regra fiado/taxas | G1 (melhor após G2) |
-| **G2c — OCR local (opcional)** | Tesseract.js no navegador para PDF-imagem/foto; só se G2b não cobrir | G2b |
+| **G3 — Fechamento Lucro × Custo** ✅ ENTREGUE (0016_lucro_custo.sql) | Card do dia + filtros + cobertura + regra fiado/taxas | G1 (melhor após G2) |
+| **G2c — OCR local (opcional)** ⬅ ÚNICA RESTANTE (só se a G2b não bastar) | Tesseract.js no navegador para PDF-imagem/foto; só se G2b não cobrir | G2b |
 
-Ordem decidida: **G1 ✅ → G2a ✅ → G2a.1 ✅ → G2b ✅ → G3 → (G2c opcional)**.
+Ordem decidida: **G1 ✅ → G2a ✅ → G2a.1 ✅ → G2b ✅ → G3 ✅ → (G2c opcional)**.
+
+> **Status (2026-08-28): a linha de custo/compras está COMPLETA em produção.**
+> Só resta a G2c (OCR local), que é opcional por desenho — o dono deve
+> avaliar se a extração da G2b cobre as notas que ele recebe de verdade
+> antes de investir nela.
 
 > ⚠️ **Regra de merge (CLAUDE.md):** cada fase é mesclada na `main` após aprovação do
 > preview — não acumular branches. As migrations já são aplicadas no banco compartilhado
@@ -189,4 +194,5 @@ Ordem decidida: **G1 ✅ → G2a ✅ → G2a.1 ✅ → G2b ✅ → G3 → (G2c o
    (parser de PDF-texto e XML open source, rodando na própria infra; OCR local opcional).
    Entrada manual é o fallback permanente.
 
-**Status: plano pronto para execução no Claude Code (G1 → G2 → G3 → G4).**
+**Status: executado.** G1, G2a, G2a.1, G2b e G3 estão em produção; a G2c
+continua opcional.
