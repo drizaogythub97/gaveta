@@ -475,7 +475,7 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
     `tests/e2e/importar-nota.spec.ts` (5) com conferência no banco, mais o
     visual da tela de conferência em desktop e celular.
 
-- **G3 — Fechamento Lucro × Custo** (2026-08-28, PR #31, merge `MERGE_G3`;
+- **G3 — Fechamento Lucro × Custo** (2026-08-28, PR #31, merge `670e9f5`;
   migration **0016**, só de LEITURA): a pergunta que motivou toda a linha de
   custo — do dinheiro que ENTROU, quanto guardar para repor a mercadoria e
   quanto é lucro. Regime caixa.
