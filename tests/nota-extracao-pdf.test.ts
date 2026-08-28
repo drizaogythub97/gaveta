@@ -20,6 +20,8 @@ const CHAVE = "35260812345678901234550010000123410001234567".padEnd(44, "8");
 type LinhaDanfe = {
   codigo: string;
   descricao: string;
+  /** Resto da descrição que não coube na coluna e transbordou para baixo. */
+  continuacao?: string;
   ncm: string;
   cst?: string;
   cfop: string;
@@ -62,9 +64,18 @@ function danfeComItens(
 
   doc.text("DANFE - DOCUMENTO AUXILIAR DA NOTA FISCAL ELETRONICA", 40, 40);
   if (opcoes.emitente !== false) {
+    // Como num DANFE real: rótulo, razão social (que pode quebrar em mais de
+    // uma linha) e, logo abaixo, o endereço — é ele que encerra o nome.
     doc.text("IDENTIFICACAO DO EMITENTE", 40, 56);
-    doc.text("Distribuidora Modelo LTDA", 40, 70);
-    doc.text("12.345.678/0001-99", 40, 84);
+    doc.text("Distribuidora Modelo", 40, 70);
+    doc.text("LTDA", 40, 84);
+    doc.text("RUA DAS FLORES, 100 - Cep:01234-567", 40, 98);
+    doc.text("12.345.678/0001-99", 40, 112);
+    // O quadro do título fica LADO A LADO com o do emitente, na mesma
+    // altura — é o que fazia o nome do fornecedor sair contaminado.
+    doc.text("DANFE", 200, 56);
+    doc.text("DOCUMENTO AUXILIAR DA", 200, 70);
+    doc.text("NOTA FISCAL ELETRONICA", 200, 84);
   }
   if (opcoes.chave !== false) {
     doc.text("CHAVE DE ACESSO", 320, 56);
@@ -108,11 +119,24 @@ function danfeComItens(
     celulas.forEach((celula, i) => {
       if (celula) doc.text(celula, xs[i]!, y);
     });
-    y += 16;
+    y += 10;
+    // A continuação sai alinhada à COLUNA DA DESCRIÇÃO, nunca à do código —
+    // é exatamente por essa posição que o parser a reconhece.
+    if (item.continuacao) {
+      doc.text(item.continuacao, xs[1]!, y);
+      y += 10;
+    }
+    // Risco que separa um item do próximo, na margem.
+    doc.text("- - - - - - - - - - - - - - - - - - - -", 40, y);
+    y += 12;
   }
 
-  doc.text("VALOR TOTAL DA NOTA", 40, y + 30);
-  doc.text(opcoes.total ?? "120,00", 460, y + 30);
+  // Rótulos numa faixa e valores na faixa DE BAIXO, cada um sob o seu — é
+  // assim que o DANFE imprime os totais.
+  doc.text("VALOR DO FRETE", 40, y + 30);
+  doc.text("VALOR TOTAL DA NOTA", 400, y + 30);
+  doc.text("0,00", 45, y + 42);
+  doc.text(opcoes.total ?? "120,00", 410, y + 42);
 
   return new Uint8Array(doc.output("arraybuffer"));
 }
@@ -141,6 +165,53 @@ describe("extrairDePdf (DANFE com camada de texto)", () => {
     expect(nota.itens[0]!.barcode).toBe("7891000000015");
     // A segunda traz um código interno do fornecedor — não é código de barras.
     expect(nota.itens[1]!.barcode).toBeNull();
+  });
+
+  it("junta a descrição que transbordou para a linha de baixo", async () => {
+    // Classe de falha vista numa nota real: a coluna da descrição é estreita
+    // e o nome do produto continua na linha seguinte, alinhado à coluna.
+    const nota = await extrairDePdf(
+      danfeComItens([
+        { ...ARROZ, descricao: "ARROZ TIPO 1", continuacao: "PARBOILIZADO" },
+        { ...FEIJAO, descricao: "FEIJAO PREMIUM MIX 1", continuacao: "5 KG" },
+      ]),
+    );
+
+    expect(nota.itens).toHaveLength(2);
+    // Palavra nova: junta com espaço.
+    expect(nota.itens[0]!.descricao).toBe("ARROZ TIPO 1 PARBOILIZADO");
+    // Número partido ao meio pela quebra de linha: junta sem espaço, senão
+    // "MIX 15 KG" viraria "MIX 1 5 KG".
+    expect(nota.itens[1]!.descricao).toBe("FEIJAO PREMIUM MIX 15 KG");
+
+    // E a continuação não vira item nem bagunça os valores.
+    expect(nota.itens[0]!.quantidade).toBe(6);
+    expect(nota.itens[1]!.custoUnitario).toBe(7.25);
+  });
+
+  it("não deixa o quadro vizinho entrar no nome do fornecedor", async () => {
+    // No DANFE, o quadro do emitente e o título "DANFE — Documento Auxiliar
+    // da Nota Fiscal Eletrônica" ficam lado a lado, na mesma altura.
+    const nota = await extrairDePdf(danfeComItens([ARROZ]));
+    expect(nota.fornecedor).toBe("Distribuidora Modelo LTDA");
+    expect(nota.fornecedor).not.toContain("DOCUMENTO AUXILIAR");
+    expect(nota.fornecedor).not.toContain("DANFE");
+  });
+
+  it("lê o total com o rótulo em cima e o valor na linha de baixo", async () => {
+    const nota = await extrairDePdf(
+      danfeComItens([ARROZ], { total: "1.234,56" }),
+    );
+    expect(nota.total).toBe(1234.56);
+  });
+
+  it("lê o total também quando o emissor põe valor e rótulo na mesma linha", async () => {
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    doc.setFontSize(8);
+    doc.text("030027 ARROZ 10063021 000 5102 UN 1,0000 9,9000 9,90", 40, 60);
+    doc.text("VALOR TOTAL DA NOTA 9,90", 40, 90);
+    const nota = await extrairDePdf(new Uint8Array(doc.output("arraybuffer")));
+    expect(nota.total).toBe(9.9);
   });
 
   it("lê a linha com e sem a coluna de CST", async () => {

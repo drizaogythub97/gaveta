@@ -70,7 +70,9 @@ type Fragmento = { x: number; texto: string };
  * posição; agrupar por Y (e ordenar por X) devolve a linha como ela aparece
  * impressa — bem mais confiável que concatenar o texto na ordem do arquivo.
  */
-async function lerLinhas(arquivo: Uint8Array): Promise<string[]> {
+type Linha = { texto: string; fragmentos: Fragmento[] };
+
+async function lerLinhas(arquivo: Uint8Array): Promise<Linha[]> {
   let pdf;
   try {
     pdf = await getDocumentProxy(arquivo);
@@ -78,7 +80,7 @@ async function lerLinhas(arquivo: Uint8Array): Promise<string[]> {
     throw new PdfDeNotaInvalido("PDF ilegível");
   }
 
-  const linhas: string[] = [];
+  const linhas: Linha[] = [];
   const paginas = Math.min(pdf.numPages, MAXIMO_PAGINAS);
 
   for (let numero = 1; numero <= paginas; numero++) {
@@ -109,68 +111,183 @@ async function lerLinhas(arquivo: Uint8Array): Promise<string[]> {
     // De cima para baixo (no PDF, Y cresce para cima).
     porLinha.sort((a, b) => b.y - a.y);
     for (const linha of porLinha) {
-      const texto = linha.partes
-        .sort((a, b) => a.x - b.x)
+      const fragmentos = linha.partes.sort((a, b) => a.x - b.x);
+      const texto = fragmentos
         .map((parte) => parte.texto)
         .join(" ")
         .replace(/\s+/g, " ")
         .trim();
-      if (texto) linhas.push(texto);
+      if (texto) linhas.push({ texto, fragmentos });
     }
   }
 
   return linhas;
 }
 
+const ROTULO_EMITENTE = /IDENTIFICA[ÇC][ÃA]O\s+DO\s+EMITENTE/i;
+
 /**
- * Nome do emitente: o DANFE rotula o bloco, então dá para ancorar nele.
- *
- * Cuidado do mundo real: no DANFE o quadro do emitente e o da chave de
- * acesso ficam LADO A LADO, na mesma altura — a linha reconstruída traz os
- * dois. Por isso o nome é cortado no primeiro blocão de dígitos (chave,
- * CNPJ, CEP ou telefone), que nunca faz parte da razão social.
+ * O que encerra a razão social no quadro do emitente: o endereço (que vem
+ * logo abaixo do nome em qualquer DANFE) ou o título de outro bloco. Os
+ * títulos são do layout oficial, não de um emissor específico.
  */
-function acharFornecedor(linhas: string[]): string | null {
-  const indice = linhas.findIndex((linha) =>
-    /IDENTIFICA[ÇC][ÃA]O\s+DO\s+EMITENTE/i.test(linha),
-  );
+const FIM_DA_RAZAO_SOCIAL =
+  /\b(RUA|AV|AVENIDA|ROD|RODOVIA|ESTRADA|TRAVESSA|PRA[ÇC]A|ALAMEDA|CEP|FONE|TEL)\b|Cep:|Fone:|DESTINAT[ÁA]RIO|C[ÁA]LCULO DO IMPOSTO|CALCULO DO IMPOSTO|DADOS DO PRODUTO|TRANSPORTADOR|DADOS ADICIONAIS|FATURA|DATA D[AE] EMISS[ÃA]O|CHAVE DE ACESSO/i;
+
+function acharFornecedor(linhas: Linha[]): string | null {
+  const indice = linhas.findIndex((linha) => ROTULO_EMITENTE.test(linha.texto));
   if (indice === -1) return null;
 
-  for (const candidata of linhas.slice(indice + 1, indice + 4)) {
-    const semNumeros = candidata.replace(/(?:\d[\s.\/-]?){8,}.*$/u, "").trim();
-    if (semNumeros.length < 3 || semNumeros.length > 120) continue;
-    // Precisa sobrar letra: só pontuação ou número não é razão social.
-    if (!/\p{L}/u.test(semNumeros)) continue;
-    if (/^(DANFE|DOCUMENTO AUXILIAR|CHAVE DE ACESSO)/i.test(semNumeros)) {
-      continue;
-    }
-    return semNumeros;
+  // A razão social fica na MESMA COLUNA do rótulo. Ancorar nela é o que
+  // impede o quadro vizinho (o título "DANFE — Documento Auxiliar da Nota
+  // Fiscal Eletrônica", que fica lado a lado e na mesma altura) de entrar
+  // no nome do fornecedor.
+  const coluna = linhas[indice]!.fragmentos.find((f) =>
+    ROTULO_EMITENTE.test(f.texto),
+  )?.x;
+  if (coluna === undefined) return null;
+
+  const partes: string[] = [];
+  for (let i = indice + 1; i < linhas.length && i <= indice + 8; i++) {
+    const naColuna = linhas[i]!.fragmentos.filter(
+      (f) => Math.abs(f.x - coluna) <= TOLERANCIA_COLUNA,
+    );
+    // Linha só do quadro vizinho: pula, o nome pode continuar abaixo.
+    if (naColuna.length === 0) continue;
+
+    const texto = naColuna
+      .map((f) => f.texto)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!texto) continue;
+    // Chegou no endereço ou em outro bloco: a razão social acabou.
+    if (FIM_DA_RAZAO_SOCIAL.test(texto)) break;
+
+    // Rede de segurança: se o CNPJ vier colado, corta no blocão de dígitos.
+    const semNumeros = texto.replace(/(?:\d[\s./-]?){8,}.*$/u, "").trim();
+    if (semNumeros.length === 0 || !/\p{L}/u.test(semNumeros)) continue;
+
+    partes.push(semNumeros);
+    if (partes.length === 4) break;
   }
-  return null;
+
+  const nome = partes.join(" ").trim();
+  if (nome.length < 3 || nome.length > 120) return null;
+  return nome;
 }
 
-function acharDataEmissao(linhas: string[]): string | null {
+function acharDataEmissao(linhas: Linha[]): string | null {
   const indice = linhas.findIndex((linha) =>
-    /DATA\s+D[AE]\s+EMISS[ÃA]O/i.test(linha),
+    /DATA\s+D[AE]\s+EMISS[ÃA]O/i.test(linha.texto),
   );
   if (indice === -1) return null;
 
   for (const candidata of linhas.slice(indice, indice + 3)) {
-    const achou = DATA_BRASILEIRA.exec(candidata);
+    const achou = DATA_BRASILEIRA.exec(candidata.texto);
     if (achou) return lerDataEmissao(achou[1]);
   }
   return null;
 }
 
-function acharTotal(linhas: string[]): number | null {
-  const linha = linhas.find((atual) =>
-    /VALOR\s+TOTAL\s+DA\s+NOTA/i.test(atual),
-  );
-  if (!linha) return null;
+const NUMERO_BR = /^[\d.]+,\d{2}$/;
 
-  const numeros = linha.match(/[\d.]+,\d{2}/g);
-  if (!numeros || numeros.length === 0) return null;
-  return lerDinheiro(numeros[numeros.length - 1]!, "brasileiro");
+/**
+ * Total da nota. O DANFE costuma imprimir os rótulos numa faixa e os valores
+ * na faixa DE BAIXO, cada um sob o seu rótulo — então achar o rótulo não
+ * basta: é preciso descer uma linha e pegar o número alinhado a ele.
+ */
+function acharTotal(linhas: Linha[]): number | null {
+  const indice = linhas.findIndex((linha) =>
+    /VALOR\s+TOTAL\s+DA\s+NOTA/i.test(linha.texto),
+  );
+  if (indice === -1) return null;
+
+  // Alguns emissores põem o valor na própria linha do rótulo.
+  const naMesmaLinha = linhas[indice]!.texto.match(/[\d.]+,\d{2}/g);
+  if (naMesmaLinha && naMesmaLinha.length > 0) {
+    return lerDinheiro(naMesmaLinha[naMesmaLinha.length - 1]!, "brasileiro");
+  }
+
+  const coluna = linhas[indice]!.fragmentos.find((f) =>
+    /VALOR\s+TOTAL\s+DA\s+NOTA/i.test(f.texto),
+  )?.x;
+  if (coluna === undefined) return null;
+
+  const abaixo = linhas[indice + 1];
+  if (!abaixo) return null;
+
+  // Números são alinhados à direita, então o valor começa um pouco depois do
+  // rótulo: pega o número mais próximo da coluna, sem voltar para a anterior.
+  const candidatos = abaixo.fragmentos
+    .filter((f) => NUMERO_BR.test(f.texto.trim()))
+    .filter((f) => f.x >= coluna - TOLERANCIA_COLUNA * 5)
+    .sort((a, b) => a.x - b.x);
+
+  const valor = candidatos[0]?.texto.trim();
+  return valor ? lerDinheiro(valor, "brasileiro") : null;
+}
+
+/** Linha só de traços/pontos: o risco que separa um item do próximo. */
+function ehSeparador(texto: string): boolean {
+  return /^[\s.\-_=•·|]+$/u.test(texto);
+}
+
+/** Quantas linhas de continuação de descrição são aceitas por item. */
+const MAXIMO_CONTINUACOES = 3;
+
+/** Folga para considerar que duas linhas começam na mesma coluna. */
+const TOLERANCIA_COLUNA = 2;
+
+/**
+ * Junta a continuação à descrição.
+ *
+ * O renderizador quebra a linha onde a coluna acaba — inclusive no meio de
+ * uma palavra. Quando a descrição termina em dígito E a continuação começa
+ * em dígito, a quebra quase certamente partiu um número ao meio
+ * ("...MIX 1" + "5 KG" = "...MIX 15 KG"), porque uma palavra nova teria sido
+ * quebrada no espaço. Nos demais casos, junta com espaço.
+ */
+function juntarContinuacao(descricao: string, continuacao: string): string {
+  const partiuNumero = /\d$/.test(descricao) && /^\d/.test(continuacao);
+  return partiuNumero
+    ? `${descricao}${continuacao}`
+    : `${descricao} ${continuacao}`;
+}
+
+/**
+ * Descrição longa não cabe na coluna e transborda para a linha de baixo —
+ * é assim em qualquer DANFE, porque a coluna da descrição é estreita.
+ *
+ * A continuação é reconhecida pela POSIÇÃO: ela começa alinhada à coluna da
+ * descrição, nunca à do código. Isso separa a continuação do risco que
+ * divide os itens e dos títulos de seção seguintes, que começam na margem.
+ */
+function continuacaoDaDescricao(
+  linhas: Linha[],
+  indiceDoItem: number,
+): string[] {
+  // A coluna da descrição é onde começa o 2º fragmento da linha do item (o
+  // 1º é o código). Sem esse fragmento, não há como ancorar: não arrisca.
+  const colunaDescricao = linhas[indiceDoItem]?.fragmentos[1]?.x;
+  if (colunaDescricao === undefined) return [];
+
+  const pedacos: string[] = [];
+  for (
+    let i = indiceDoItem + 1;
+    i < linhas.length && pedacos.length < MAXIMO_CONTINUACOES;
+    i++
+  ) {
+    const seguinte = linhas[i]!;
+    if (ehSeparador(seguinte.texto)) break;
+    if (LINHA_DE_ITEM.test(seguinte.texto)) break;
+
+    const inicio = Math.min(...seguinte.fragmentos.map((f) => f.x));
+    if (inicio < colunaDescricao - TOLERANCIA_COLUNA) break;
+
+    pedacos.push(seguinte.texto);
+  }
+  return pedacos;
 }
 
 /**
@@ -185,13 +302,13 @@ export async function extrairDePdf(arquivo: Uint8Array): Promise<NotaExtraida> {
   }
 
   const itens: ItemExtraido[] = [];
-  for (const linha of linhas) {
+  for (let i = 0; i < linhas.length; i++) {
     if (itens.length >= MAXIMO_ITENS_EXTRAIDOS) break;
 
-    const achou = LINHA_DE_ITEM.exec(linha);
+    const achou = LINHA_DE_ITEM.exec(linhas[i]!.texto);
     if (!achou) continue;
 
-    const descricao = achou[COLUNA.descricao]?.trim();
+    let descricao = achou[COLUNA.descricao]?.trim();
     const quantidade = lerQuantidade(achou[COLUNA.quantidade], "brasileiro");
     const custoUnitario = lerDinheiro(
       achou[COLUNA.valorUnitario],
@@ -200,6 +317,10 @@ export async function extrairDePdf(arquivo: Uint8Array): Promise<NotaExtraida> {
 
     // Linha incompleta não vira palpite.
     if (!descricao || quantidade === null || custoUnitario === null) continue;
+
+    for (const pedaco of continuacaoDaDescricao(linhas, i)) {
+      descricao = juntarContinuacao(descricao, pedaco);
+    }
 
     const codigo = achou[COLUNA.codigo] ?? "";
     const barcode = /^\d{8,14}$/.test(codigo) ? codigo : null;
@@ -217,7 +338,9 @@ export async function extrairDePdf(arquivo: Uint8Array): Promise<NotaExtraida> {
     throw new PdfDeNotaInvalido("Nenhum item reconhecido no PDF");
   }
 
-  const chaveNoTexto = CHAVE_IMPRESSA.exec(linhas.join(" "));
+  const chaveNoTexto = CHAVE_IMPRESSA.exec(
+    linhas.map((linha) => linha.texto).join(" "),
+  );
 
   return {
     origem: "pdf",
