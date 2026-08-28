@@ -38,7 +38,11 @@ Ao terminar, responder com:
 3. **O que foi corrigido** durante o processo (se algo quebrou/foi ajustado);
 4. **Se há necessidade de teste manual do dono — e por quê** (só quando inevitável);
 5. **Link do Preview Deployment**, sempre;
-6. **Aguardar autorização explícita do dono para o merge.** Nunca mesclar sozinho.
+6. **Merge** (regra atualizada em 2026-08-27): com a fase validada e **todos os
+   testes verdes — incluindo o suíte contra o Preview** —, abrir o PR e mesclar
+   sem esperar nova confirmação. O dono autorizou de forma permanente para não
+   ser o gargalo entre sessões. Se algo ficou por validar, ou se a mudança
+   extrapola o combinado, aí sim parar e perguntar.
 
 ## 4. Ritual técnico (já vigente no CLAUDE.md, reforçado)
 
@@ -46,7 +50,9 @@ Ao terminar, responder com:
 - Migrations **aditivas**, aplicadas antes do push; RLS em toda tabela nova.
 - Antes de fechar: `npm run lint`, `npx tsc --noEmit`, `npm run test`,
   `npm run test:rls` (se mexeu em banco) e `npm run build`.
-- Merge por fase, após aprovação do preview — não acumular para o fim.
+- Depois: `npm run test:e2e` (local) **e `npm run test:e2e:preview`** — o
+  mesmo suíte contra o Preview, em build de produção. Só então fechar (§3).
+- Merge por fase — não acumular para o fim.
 
 ## 5. Como rodar os testes (local e contra o Preview)
 
@@ -82,3 +88,28 @@ npm run test:e2e:preview    # o MESMO suíte contra o Preview da branch atual
   validada assim: 33 testes passaram no Preview (build de produção), com os
   mesmos baselines visuais gerados em desenvolvimento — ou seja, a regressão
   visual é a mesma nos dois ambientes.
+
+## 6. Encerramento da sprint — "encerre a sprint"
+
+Quando o dono pedir para **encerrar a sprint**, o objetivo não é resumir: é
+deixar o projeto pronto para **outra sessão retomar do zero**. Ele troca de
+sessão e de agente; a seguinte só sabe o que ficou escrito.
+
+1. **Working tree limpa**: PRs mesclados, branches apagadas, `main` local
+   sincronizada, nada pendente sem commit.
+2. **Roadmap** (`docs/01-ROADMAP-FASES.md`): o que foi entregue e validado, com
+   nº do PR e hash do merge, e o que resta.
+3. **Handoff**: estado atual, o que entrou na sprint, o **ponto de partida
+   exato** da próxima sessão (passo a passo) e os gotchas novos. No Gaveta o
+   handoff vive na **memória** do projeto (`sprint-handoff`), não no repo.
+4. **Memórias** do projeto atualizadas — decisões novas com o porquê, acessos e
+   técnicas que mudaram — e o índice `MEMORY.md` junto.
+5. **Docs commitados** na `main` (exceção de documentação) e push.
+6. **Resumo final**: o que a sprint entregou, estado da produção e o próximo
+   passo planejado.
+
+Regras que valem sempre: **nenhum segredo** em memória, handoff ou repositório
+— só o nome da variável e onde ela mora. E atenção a uma armadilha real: a
+memória é indexada pelo **caminho da pasta** do projeto, então renomear a pasta
+orfaniza tudo (aconteceu aqui quando `erp-simples` virou `gaveta`; as memórias
+antigas ficaram em `~/.claude/projects/C--Users-adria-Documents-erp-simples/`).
