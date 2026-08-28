@@ -22,6 +22,10 @@
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+
+// O segredo de bypass e o token da Vercel moram no .env.local (nunca no git).
+createRequire(import.meta.url)("dotenv").config({ path: ".env.local" });
 
 /** No Windows os executáveis do npm são .cmd; evita depender de shell. */
 const bin = (nome) => (process.platform === "win32" ? `${nome}.cmd` : nome);
@@ -45,23 +49,29 @@ function aliasDaBranch(branch) {
 }
 
 function urlPelaCLI(branch) {
-  const r = spawnSync(
-    bin("vercel"),
-    [
-      "ls",
-      PROJETO,
-      "--scope",
-      ESCOPO,
-      "--meta",
-      `githubCommitRef=${branch}`,
-      "--status",
-      "READY",
-      "--format",
-      "json",
-      "--yes",
-    ],
-    { encoding: "utf8" },
-  );
+  const args = [
+    "ls",
+    PROJETO,
+    "--scope",
+    ESCOPO,
+    "--meta",
+    `githubCommitRef=${branch}`,
+    "--status",
+    "READY",
+    "--format",
+    "json",
+    "--yes",
+    ...(process.env.VERCEL_TOKEN ? ["--token", process.env.VERCEL_TOKEN] : []),
+  ];
+  // No Windows a CLI é um .cmd: precisa de shell, e com shell os argumentos
+  // vão numa string só (passar array com shell gera aviso de depreciação).
+  const usaShell = process.platform === "win32";
+  const r = usaShell
+    ? spawnSync(`${bin("vercel")} ${args.join(" ")}`, {
+        encoding: "utf8",
+        shell: true,
+      })
+    : spawnSync("vercel", args, { encoding: "utf8" });
   if (r.status !== 0 || !r.stdout.trim()) {
     const motivo = (r.stderr || "").trim().split("\n").pop();
     console.warn(`· Vercel CLI indisponível (${motivo ?? "erro"}).`);
@@ -134,8 +144,14 @@ if (!teste.ok) {
 }
 
 const extras = process.argv.slice(2);
-const execucao = spawnSync(bin("npx"), ["playwright", "test", ...extras], {
-  stdio: "inherit",
-  env: { ...process.env, BASE_URL: url },
-});
+// Chama o CLI do Playwright pelo próprio node: no Windows, spawnar um .cmd
+// sem shell falha silenciosamente (Node bloqueia por segurança).
+const playwrightCli = createRequire(import.meta.url).resolve(
+  "@playwright/test/cli",
+);
+const execucao = spawnSync(
+  process.execPath,
+  [playwrightCli, "test", ...extras],
+  { stdio: "inherit", env: { ...process.env, BASE_URL: url } },
+);
 process.exit(execucao.status ?? 1);
