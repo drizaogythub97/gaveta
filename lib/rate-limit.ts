@@ -30,7 +30,8 @@ export type RateLimitAction =
   | "signup"
   | "recover"
   | "reset"
-  | "reauth";
+  | "reauth"
+  | "importar-nota";
 
 /**
  * Janela deslizante por ação. Valores conservadores: protegem contra
@@ -46,6 +47,9 @@ const RULES: Record<RateLimitAction, { limit: number; window: `${number} s` }> =
     // Reautenticação por senha em ações sensíveis da conta (trocar senha/
     // e-mail, excluir conta) — mesmo racional do login.
     reauth: { limit: 8, window: "60 s" },
+    // Importar nota (G2b): ler PDF/XML custa CPU e o arquivo vem de fora.
+    // Folgado para o uso real (algumas notas seguidas), apertado para abuso.
+    "importar-nota": { limit: 10, window: "60 s" },
   };
 
 const limiters: Partial<Record<RateLimitAction, Ratelimit>> = {};

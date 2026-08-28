@@ -2,6 +2,7 @@
 
 import {
   Camera,
+  HelpCircle,
   Package,
   PackagePlus,
   ScanBarcode,
@@ -29,13 +30,16 @@ import {
   parseDecimalPtBR,
   sanitizeDigits,
 } from "@/lib/products/format";
+import type { NotaConferencia, StatusItem } from "@/lib/compras/tipos";
 import type { Product } from "@/lib/types/db";
+import type { PurchaseSource } from "@/lib/types/purchases";
 
 // A busca de produto é a MESMA da frente de caixa (por nome ou por código
 // de barras) — sem duplicar lógica de busca.
 import { findProductByCode, searchProductsByName } from "../../caixa/actions";
 
 import { registrarCompra } from "./actions";
+import { ImportarNota } from "./importar-nota";
 
 type NotaItem = {
   key: string;
@@ -47,10 +51,51 @@ type NotaItem = {
   costDigits: string;
   salePriceDigits: string;
   trackStock: boolean;
+  /** Como o item se ligou ao catálogo (importação da G2b). */
+  status: StatusItem;
+  /**
+   * Descrição como veio na nota, quando o item foi importado e o produto do
+   * Gaveta tem outro nome — é o que a pessoa compara para conferir.
+   */
+  descricaoNota: string | null;
 };
 
 function makeKey() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+/** Quantidade numérica para o texto do campo (o app lê em pt-BR). */
+function quantidadeParaTexto(valor: number): string {
+  return String(valor).replace(".", ",");
+}
+
+/**
+ * Como o item se ligou ao catálogo. O "parecido" é o que mais importa: é o
+ * único que pede atenção antes de lançar.
+ */
+function StatusDoItem({ status }: { status: StatusItem }) {
+  if (status === "novo") {
+    return (
+      <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-sm font-medium text-blue-800 dark:bg-blue-950/40 dark:text-blue-300">
+        <PackagePlus aria-hidden="true" className="size-4" />
+        Produto novo
+      </span>
+    );
+  }
+  if (status === "sugerido") {
+    return (
+      <span className="border-warning/40 bg-warning/10 text-warning inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-sm font-medium">
+        <HelpCircle aria-hidden="true" className="size-4" />
+        Parecido — confira
+      </span>
+    );
+  }
+  return (
+    <span className="bg-primary/10 text-primary inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-sm font-medium">
+      <Package aria-hidden="true" className="size-4" />
+      Já cadastrado
+    </span>
+  );
 }
 
 function hoje(): string {
@@ -88,6 +133,14 @@ export function NotaForm() {
   const [showScanner, setShowScanner] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isSaving, startSaving] = useTransition();
+
+  // Origem da nota: muda para 'pdf'/'xml' quando os itens vieram de arquivo
+  // (fase G2b), e é isso que fica registrado no histórico da compra.
+  const [origem, setOrigem] = useState<PurchaseSource>("manual");
+  const [notaImportada, setNotaImportada] = useState<NotaConferencia | null>(
+    null,
+  );
+  const [substituirOpen, setSubstituirOpen] = useState(false);
 
   const scannerSupported = useClientFlag(isBarcodeCameraSupported);
   const queryRef = useRef<HTMLInputElement>(null);
@@ -134,6 +187,8 @@ export function NotaForm() {
         costDigits: numberToDigits(product.cost_price),
         salePriceDigits: "",
         trackStock: product.track_stock,
+        status: "reconhecido",
+        descricaoNota: null,
       },
     ]);
     setQuery("");
@@ -229,12 +284,81 @@ export function NotaForm() {
         costDigits: novoCustoDigits,
         salePriceDigits: novoPrecoDigits,
         trackStock: true,
+        status: "novo",
+        descricaoNota: null,
       },
     ]);
     setQuery("");
     limparNovo();
     setErro(null);
     refocus();
+  }
+
+  /**
+   * Traz para a tela o que foi extraído do arquivo (fase G2b). Tudo fica
+   * editável: a importação preenche, a conferência é sempre humana.
+   */
+  function aplicarImportacao(nota: NotaConferencia) {
+    if (nota.fornecedor) setSupplier(nota.fornecedor);
+    if (nota.emitidaEm && nota.emitidaEm <= hoje()) setIssuedOn(nota.emitidaEm);
+    if (nota.chaveAcesso) setAccessKey(nota.chaveAcesso);
+    setOrigem(nota.origem);
+
+    setItems(
+      nota.itens.map((item) => ({
+        key: makeKey(),
+        productId: item.productId,
+        isNew: item.status === "novo",
+        // Item ligado mostra o nome do produto do Gaveta (é ele que vai ser
+        // atualizado); a descrição da nota fica ao lado, para comparar.
+        name: item.productName ?? item.descricao,
+        barcode: item.barcode ?? "",
+        quantity: quantidadeParaTexto(item.quantidade),
+        costDigits: numberToDigits(item.custoUnitario),
+        salePriceDigits: "",
+        trackStock: item.trackStock,
+        status: item.status,
+        descricaoNota:
+          item.productName && item.productName !== item.descricao
+            ? item.descricao
+            : null,
+      })),
+    );
+    setNotaImportada(nota);
+    setQuery("");
+    setSuggestions([]);
+    limparNovo();
+    setErro(null);
+  }
+
+  function receberImportacao(nota: NotaConferencia) {
+    // Substituir o que a pessoa já digitou tem que ser escolha dela.
+    if (items.length > 0) {
+      setNotaImportada(nota);
+      setSubstituirOpen(true);
+      return;
+    }
+    aplicarImportacao(nota);
+  }
+
+  /** "Não é este produto": o item passa a ser cadastrado como novo. */
+  function tratarComoNovo(key: string) {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.key === key
+          ? {
+              ...item,
+              productId: null,
+              isNew: true,
+              status: "novo",
+              name: item.descricaoNota ?? item.name,
+              descricaoNota: null,
+              trackStock: true,
+            }
+          : item,
+      ),
+    );
+    setErro(null);
   }
 
   function atualizarItem(key: string, patch: Partial<NotaItem>) {
@@ -279,7 +403,7 @@ export function NotaForm() {
         supplierName: supplier,
         accessKey,
         issuedOn,
-        source: "manual",
+        source: origem,
         items: items.map((item) => ({
           productId: item.productId,
           isNew: item.isNew,
@@ -304,6 +428,24 @@ export function NotaForm() {
   return (
     <div className="flex flex-col gap-6">
       {erro ? <ErrorAlert message={erro} /> : null}
+
+      {/* ---------- Importar de PDF/XML (G2b) ---------- */}
+      <ImportarNota onImportar={receberImportacao} desabilitado={isSaving} />
+
+      {notaImportada && items.length > 0 ? (
+        <p
+          role="status"
+          className="border-primary/30 bg-primary/5 minimal:max-sm:p-3.5 minimal:max-sm:text-sm rounded-xl border p-4 text-base"
+        >
+          Li {items.length} {items.length === 1 ? "item" : "itens"} do arquivo.
+          <strong className="text-foreground font-medium">
+            {" "}
+            Confira item a item
+          </strong>{" "}
+          — principalmente os marcados como “parecido” — e ajuste o que precisar
+          antes de lançar.
+        </p>
+      ) : null}
 
       {/* ---------- Dados da nota ---------- */}
       <section
@@ -468,8 +610,7 @@ export function NotaForm() {
           <div className="border-border flex flex-col gap-3 rounded-lg border border-dashed p-4">
             <p className="flex items-center gap-2 text-base">
               <PackagePlus aria-hidden="true" className="size-5 shrink-0" />
-              Produto ainda não cadastrado. Cadastre agora com os dados da
-              nota:
+              Produto ainda não cadastrado. Cadastre agora com os dados da nota:
             </p>
             <div className="flex flex-col gap-1">
               <Label htmlFor="novo-nome" className="text-sm">
@@ -603,20 +744,25 @@ export function NotaForm() {
                     <span className="minimal:max-sm:text-base text-foreground text-lg font-semibold">
                       {item.name}
                     </span>
-                    <span
-                      className={
-                        item.isNew
-                          ? "inline-flex w-fit items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-sm font-medium text-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
-                          : "bg-primary/10 text-primary inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-sm font-medium"
-                      }
-                    >
-                      {item.isNew ? (
-                        <PackagePlus aria-hidden="true" className="size-4" />
-                      ) : (
-                        <Package aria-hidden="true" className="size-4" />
-                      )}
-                      {item.isNew ? "Produto novo" : "Já cadastrado"}
-                    </span>
+                    <StatusDoItem status={item.status} />
+                    {item.descricaoNota ? (
+                      <span className="text-muted-foreground text-sm">
+                        Na nota está:{" "}
+                        <span className="text-foreground">
+                          {item.descricaoNota}
+                        </span>
+                      </span>
+                    ) : null}
+                    {item.status === "sugerido" ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => tratarComoNovo(item.key)}
+                        className="mt-1 h-11 w-fit px-3 text-sm"
+                      >
+                        Não é este — cadastrar como novo
+                      </Button>
+                    ) : null}
                   </div>
                   <Button
                     type="button"
@@ -631,10 +777,7 @@ export function NotaForm() {
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="flex flex-col gap-1">
-                    <Label
-                      htmlFor={`qtd-${item.key}`}
-                      className="text-sm"
-                    >
+                    <Label htmlFor={`qtd-${item.key}`} className="text-sm">
                       Quantidade
                     </Label>
                     <Input
@@ -649,10 +792,7 @@ export function NotaForm() {
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <Label
-                      htmlFor={`custo-${item.key}`}
-                      className="text-sm"
-                    >
+                    <Label htmlFor={`custo-${item.key}`} className="text-sm">
                       Custo por unidade
                     </Label>
                     <Input
@@ -682,20 +822,44 @@ export function NotaForm() {
                 </div>
 
                 {item.isNew ? (
-                  <p className="text-muted-foreground text-sm">
-                    Vai ser cadastrado com preço de venda de{" "}
-                    <strong className="text-foreground font-medium">
-                      {formatBRL(digitsToNumber(item.salePriceDigits))}
-                    </strong>
-                    {item.barcode ? (
-                      <>
-                        {" "}
-                        e código{" "}
-                        <span className="font-mono">{item.barcode}</span>
-                      </>
-                    ) : null}
-                    , controlando estoque.
-                  </p>
+                  <div className="flex flex-col gap-2">
+                    {/* Editável na própria linha: o arquivo importado traz o
+                        custo, mas nunca o preço de venda — e quem digitou à
+                        mão pode querer corrigir sem refazer o item. */}
+                    <div className="flex flex-col gap-1 sm:max-w-[16rem]">
+                      <Label htmlFor={`venda-${item.key}`} className="text-sm">
+                        Preço de venda
+                      </Label>
+                      <Input
+                        id={`venda-${item.key}`}
+                        type="text"
+                        inputMode="numeric"
+                        value={
+                          item.salePriceDigits === ""
+                            ? ""
+                            : digitsToBRL(item.salePriceDigits)
+                        }
+                        onChange={(e) =>
+                          atualizarItem(item.key, {
+                            salePriceDigits: sanitizeDigits(e.target.value),
+                          })
+                        }
+                        placeholder="R$ 0,00"
+                        className="h-12 text-base"
+                      />
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      Vai ser cadastrado
+                      {item.barcode ? (
+                        <>
+                          {" "}
+                          com o código{" "}
+                          <span className="font-mono">{item.barcode}</span>
+                        </>
+                      ) : null}
+                      , controlando estoque.
+                    </p>
+                  </div>
                 ) : null}
               </li>
             ))}
@@ -759,6 +923,24 @@ export function NotaForm() {
             </span>
           </span>
         }
+      />
+
+      <ConfirmDialog
+        open={substituirOpen}
+        onClose={() => setSubstituirOpen(false)}
+        title="Substituir os itens desta tela?"
+        description={
+          <>
+            Você já tem {items.length} {items.length === 1 ? "item" : "itens"}{" "}
+            na tela. Os itens do arquivo vão tomar o lugar deles.
+          </>
+        }
+        confirmLabel="Usar os itens do arquivo"
+        cancelLabel="Manter o que digitei"
+        onConfirm={() => {
+          if (notaImportada) aplicarImportacao(notaImportada);
+          setSubstituirOpen(false);
+        }}
       />
 
       {showScanner ? (
