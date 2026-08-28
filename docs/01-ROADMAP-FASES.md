@@ -412,7 +412,7 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
   atômica não deixa rastro, isolamento por usuário). A extração de PDF/XML é a
   G2b.
 
-- **G2a.1 — Estorno de compra** (2026-08-28, PR #29, merge `MERGE_G2A1`;
+- **G2a.1 — Estorno de compra** (2026-08-28, PR #29, merge `1cfb1ca`;
   migration **0015**): cancelar a nota lançada por engano sem apagar o
   histórico. `purchases` ganha `voided_at` (null = ativa) e `expense_id` — o
   vínculo com o gasto automático em `insumos`, que antes não existia (com
