@@ -42,7 +42,7 @@ paga foi REMOVIDA do roadmap.**
 |---|---|---|---|---|
 | **A) PDF com camada de texto** | DANFE/espelho gerado digitalmente carrega o texto embutido. Biblioteca Node (`pdf-parse`/`pdfjs-dist`) lê o texto no servidor e um parser determinístico reconhece o bloco de itens (descrição, EAN, qtd, vl. unit., total) e a chave de 44 dígitos. | **Alta** (é texto real, não adivinhação) | **R$ 0** — biblioteca open source | **Via principal — G2b** |
 | **B) XML da NF-e** | Parse direto quando o fornecedor mandar o XML (vale pedir aos maiores). | 100% | **R$ 0** | Incluída na G2b (barato de somar) |
-| **C) OCR local (Tesseract.js)** | PDF-imagem ou foto → OCR **no próprio navegador** do usuário, sem servidor e sem API. | Média/baixa em foto de papel amassado; melhor em digitalização limpa | **R$ 0** | **Opcional (G2c)** — só se A e B não bastarem |
+| **C) OCR local (Tesseract)** | PDF-imagem ou foto → OCR no **servidor do próprio Gaveta**, sem API externa. | **MEDIDA (2026-08-28)**: nomes utilizáveis, **números inúteis**, confiança ~50% numa digitalização de ~90 DPI | **R$ 0** | ✅ Entregue na G2c — só a lista de NOMES |
 | **D) IA de visão (API paga)** | — | — | centavos/nota | ❌ **REMOVIDA** (decisão 7) |
 | **E) QR/chave via SEFAZ** | Portais estaduais instáveis, captcha, muitos exigem certificado. | Baixa | R$ 0 | ❌ Não prometer |
 
@@ -168,14 +168,13 @@ Despesas gerais (aluguel, salários…) não participam da divisão diária — 
 | **G2a.1 — Estorno de compra** ✅ ENTREGUE (0015_estorno_compra.sql) | Cancelar uma compra lançada por engano: reverte estoque (movimento `void`), remove/estorna o gasto em `expenses`, marca a nota como cancelada (não apaga histórico). Exige política de UPDATE/soft-delete em `purchases`. **Motivo: hoje não há como corrigir erro de digitação — em uso diário isso acontece.** | G2a |
 | **G2b — Extração gratuita (PDF-texto + XML)** ✅ ENTREGUE (sem migration) | Upload → parser determinístico open source → motor de match (EAN→nome→novo) → mesma tela vira conferência | G2a |
 | **G3 — Fechamento Lucro × Custo** ✅ ENTREGUE (0016_lucro_custo.sql) | Card do dia + filtros + cobertura + regra fiado/taxas | G1 (melhor após G2) |
-| **G2c — OCR local (opcional)** ⬅ ÚNICA RESTANTE (só se a G2b não bastar) | Tesseract.js no navegador para PDF-imagem/foto; só se G2b não cobrir | G2b |
+| **G2c — OCR local** ✅ ENTREGUE (sem migration) | Tesseract no servidor para PDF-imagem/foto. Entrega só a LISTA DE NOMES: medido, o OCR lê descrição e não lê número | G2b |
 
-Ordem decidida: **G1 ✅ → G2a ✅ → G2a.1 ✅ → G2b ✅ → G3 ✅ → (G2c opcional)**.
+Ordem decidida: **G1 ✅ → G2a ✅ → G2a.1 ✅ → G2b ✅ → G3 ✅ → G2c ✅**.
 
-> **Status (2026-08-28): a linha de custo/compras está COMPLETA em produção.**
-> Só resta a G2c (OCR local), que é opcional por desenho — o dono deve
-> avaliar se a extração da G2b cobre as notas que ele recebe de verdade
-> antes de investir nela.
+> **Status (2026-08-29): a linha de custo/compras está COMPLETA em produção**,
+> incluindo a G2c. A leitura por foto entrega só os nomes, e a tela avisa
+> isso — a medição está na tabela da seção 1.1.
 
 > ⚠️ **Regra de merge (CLAUDE.md):** cada fase é mesclada na `main` após aprovação do
 > preview — não acumular branches. As migrations já são aplicadas no banco compartilhado
@@ -194,5 +193,4 @@ Ordem decidida: **G1 ✅ → G2a ✅ → G2a.1 ✅ → G2b ✅ → G3 ✅ → (G
    (parser de PDF-texto e XML open source, rodando na própria infra; OCR local opcional).
    Entrada manual é o fallback permanente.
 
-**Status: executado.** G1, G2a, G2a.1, G2b e G3 estão em produção; a G2c
-continua opcional.
+**Status: executado.** G1, G2a, G2a.1, G2b, G3 e G2c estão em produção.
