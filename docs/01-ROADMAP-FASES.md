@@ -569,6 +569,29 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
     `docs/09` §5.1, porque o id do usuário descartável só existe depois do
     `setup`.
 
+- **Correção — nota digitalizada derrubava a página** (2026-08-29, PR #35,
+  merge `0165634`): um PDF de digitalização devolvia "This page couldn't
+  load" em produção. Três defeitos empilhados:
+  1. **O pdf.js consome o buffer que recebe** — transfere-o para o próprio
+     worker e o `Uint8Array` de origem fica com zero byte. O Gaveta lê o
+     mesmo PDF duas vezes (texto e, na falta dele, imagem), então a segunda
+     leitura pegava um buffer detached: `DataCloneError`. Cada leitura passou
+     a levar a sua cópia (`copiaParaPdfJs`).
+  2. **Erro não previsto em Server Action derruba a PÁGINA**, não só a ação —
+     a pessoa perdia o que já tinha digitado. As duas portas de importação
+     ganharam rede de segurança; a extração de imagem não lança mais.
+  3. **O OCR morria em folha A4** com `RangeError: Too many properties to
+     enumerate`: o tesseract.js monta a árvore de blocos/palavras/símbolos e
+     ela não atravessa o canal do worker. Passou a pedir só o texto, e o teto
+     de pixels caiu de 6 Mpx para 3 Mpx (medido: 2000×2993 falha,
+     1400×2095 lê). No mesmo movimento, `escalaSegura` passou a **encolher**
+     imagem grande demais em vez de devolvê-la intacta — foto de celular de
+     página inteira ia direto para o OCR e o derrubava.
+
+  Resultado: numa digitalização real, a via gratuita foi de 0 para 4 nomes
+  reconhecidos. Faltava teste com **PDF sem camada de texto** (só existia
+  imagem solta e PDF com texto); agora existe.
+
 ### Validação da G2a (protocolo `docs/09-PROTOCOLO-DE-VALIDACAO.md`)
 
 Sessão de 2026-08-27 (PRs #27 e #28, merge `00330f8`), sem funcionalidade nova:

@@ -121,6 +121,17 @@ um POST de 1s em Node puro leva 21s no runner e, com `AbortSignal`, trava.
 GET funciona. Portanto integração com API externa se testa por e2e, nunca
 por unidade — o que se testa em unidade é a validação da resposta.
 
+## 5.2 Duas lições que já custaram produção
+
+- **Todo formato novo precisa de um caso de teste próprio**, mesmo quando
+  "é só uma variação". PDF-com-texto e imagem solta estavam cobertos; PDF
+  **sem** camada de texto não estava — e era exatamente ele que derrubava a
+  página. Variação de formato é caminho de código diferente.
+- **Erro não previsto dentro de uma Server Action derruba a página inteira**,
+  não só a ação: o usuário vê "This page couldn't load" e perde o que já
+  tinha digitado. Toda ação que processa arquivo do usuário precisa de um
+  `try/catch` de fronteira que vire frase na tela e log no servidor.
+
 ## 6. Encerramento da sprint — "encerre a sprint"
 
 Quando o dono pedir para **encerrar a sprint**, o objetivo não é resumir: é
