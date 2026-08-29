@@ -535,6 +535,40 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
     (30 casos) + e2e que gera a "foto" por screenshot no próprio navegador —
     nota de ninguém entra neste repositório, que é público.
 
+- **G2d — Leitura de nota por IA de visão** (2026-08-29, PR #PR_G2D, merge
+  `MERGE_G2D`; migration **0017**): a via mais forte para nota de PAPEL — e a
+  única que manda o arquivo para FORA da infraestrutura do Gaveta.
+  - **Fase de teste, liberada só para a conta do dono**, por **variável de
+    ambiente** (`IA_VISAO_LIBERADA_PARA`), nunca por coluna no banco: as
+    tabelas são expostas pela API, então uma flag de privilégio gravável pelo
+    próprio usuário poderia ser auto-concedida. A checagem é feita **na
+    server action**; esconder o botão é só conveniência.
+  - Nunca dispara sozinha: é um botão separado, com diálogo dizendo que o
+    arquivo sai do Gaveta e o que a nota contém. A ordem das vias continua
+    XML → PDF-texto → OCR local → IA.
+  - **Modelo escolhido por medição** na nota real do dono, com resultado
+    IDÊNTICO nos três: `gemini-3.5-flash-lite` (4,9s), `gemini-2.5-flash`
+    (17,4s), `gemini-3.7-flash` (67,7s). Ganho sobre o OCR local: 13 itens
+    com nomes **e** valores, contra só nomes.
+  - **A saída passa por Zod de novo**, mesmo com esquema estruturado na API:
+    o esquema garante o FORMATO, não o VALOR. Valor fora de faixa é
+    descartado em vez de entrar no estoque.
+  - **Conferência de coerência**: a soma das linhas é comparada com o total
+    impresso na nota, e a tela avisa quando não fecha. É o sinal mais barato
+    de leitura incoerente — um modelo que inventou número dificilmente
+    produz linhas que fecham no total.
+  - Migration 0017: origem `'ia'` em `purchases.source` (constraint **e** a
+    validação dentro da `registrar_compra`), para dar rastreabilidade — se um
+    número errado chegar aos livros, dá para saber que veio de leitura
+    automática.
+  - Limite de taxa próprio (4/min, contra 10/min da importação normal):
+    cada chamada consome cota da conta do dono.
+  - Testes: `tests/nota-ia-visao.test.ts` (14 casos de validação da resposta
+    e da liberação) + `tests/e2e/ia-visao.spec.ts`. O teste do **fechado por
+    padrão** roda sempre; o da leitura de verdade roda na sequência do
+    `docs/09` §5.1, porque o id do usuário descartável só existe depois do
+    `setup`.
+
 ### Validação da G2a (protocolo `docs/09-PROTOCOLO-DE-VALIDACAO.md`)
 
 Sessão de 2026-08-27 (PRs #27 e #28, merge `00330f8`), sem funcionalidade nova:

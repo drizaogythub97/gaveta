@@ -114,7 +114,7 @@ function lineTotal(item: NotaItem): number {
   return Math.round(qty * cost * 100) / 100;
 }
 
-export function NotaForm() {
+export function NotaForm({ iaLiberada }: { iaLiberada: boolean }) {
   const router = useRouter();
 
   const [supplier, setSupplier] = useState("");
@@ -139,10 +139,20 @@ export function NotaForm() {
   // Origem da nota: muda para 'pdf'/'xml' quando os itens vieram de arquivo
   // (fase G2b), e é isso que fica registrado no histórico da compra.
   const [origem, setOrigem] = useState<PurchaseSource>("manual");
+  // A nota que está NA TELA. Só recebe valor quando os itens são de fato
+  // aplicados — senão a mensagem de topo descreveria uma leitura que a
+  // pessoa ainda não aceitou.
   const [notaImportada, setNotaImportada] = useState<NotaConferencia | null>(
     null,
   );
+  /** Leitura esperando a pessoa decidir se substitui o que já está na tela. */
+  const [notaPendente, setNotaPendente] = useState<NotaConferencia | null>(
+    null,
+  );
   const [substituirOpen, setSubstituirOpen] = useState(false);
+  // A soma das linhas não fechou com o total do documento (só a leitura por
+  // IA sabe dizer isso). É o sinal mais barato de leitura incoerente.
+  const [somaNaoFecha, setSomaNaoFecha] = useState(false);
 
   const scannerSupported = useClientFlag(isBarcodeCameraSupported);
   const queryRef = useRef<HTMLInputElement>(null);
@@ -333,10 +343,17 @@ export function NotaForm() {
     setErro(null);
   }
 
-  function receberImportacao(nota: NotaConferencia) {
-    // Substituir o que a pessoa já digitou tem que ser escolha dela.
-    if (items.length > 0) {
-      setNotaImportada(nota);
+  function receberImportacao(
+    nota: NotaConferencia,
+    avisoDeSoma?: boolean,
+    jaConfirmado?: boolean,
+  ) {
+    setSomaNaoFecha(Boolean(avisoDeSoma));
+    // Substituir o que a pessoa já digitou tem que ser escolha dela — MENOS
+    // quando ela acabou de pedir a releitura do mesmo arquivo pela IA: ali a
+    // troca é justamente o que ela pediu, e perguntar de novo seria ruído.
+    if (items.length > 0 && !jaConfirmado) {
+      setNotaPendente(nota);
       setSubstituirOpen(true);
       return;
     }
@@ -436,7 +453,29 @@ export function NotaForm() {
       {erro ? <ErrorAlert message={erro} /> : null}
 
       {/* ---------- Importar de PDF/XML (G2b) ---------- */}
-      <ImportarNota onImportar={receberImportacao} desabilitado={isSaving} />
+      <ImportarNota
+        onImportar={receberImportacao}
+        desabilitado={isSaving}
+        iaLiberada={iaLiberada}
+      />
+
+      {somaNaoFecha ? (
+        <div
+          role="status"
+          className="border-warning/40 bg-warning/10 minimal:max-sm:p-4 flex flex-col gap-2 rounded-xl border p-5"
+        >
+          <p className="text-warning flex items-center gap-2 text-base font-semibold">
+            <AlertTriangle aria-hidden="true" className="size-5 shrink-0" />
+            As contas da nota não fecharam
+          </p>
+          <p className="text-foreground minimal:max-sm:text-sm text-base">
+            A soma dos itens lidos <strong>não bate</strong> com o total
+            impresso na nota. Ou faltou algum item, ou algum valor saiu errado
+            na leitura — <strong>confira linha por linha</strong> antes de
+            lançar.
+          </p>
+        </div>
+      ) : null}
 
       {notaImportada && items.length > 0 ? (
         notaImportada.origem === "foto" ? (
@@ -465,12 +504,24 @@ export function NotaForm() {
               nesses formatos o Gaveta lê nomes, quantidades e valores.
             </p>
           </div>
+        ) : notaImportada.origem === "ia" ? (
+          <p
+            role="status"
+            className="border-primary/30 bg-primary/5 minimal:max-sm:p-3.5 minimal:max-sm:text-sm rounded-xl border p-4 text-base"
+          >
+            A IA leu {items.length} {items.length === 1 ? "item" : "itens"}.{" "}
+            <strong className="text-foreground font-medium">
+              Confira item a item
+            </strong>{" "}
+            — ela acerta muito, mas quando erra, erra com cara de certo.
+          </p>
         ) : (
           <p
             role="status"
             className="border-primary/30 bg-primary/5 minimal:max-sm:p-3.5 minimal:max-sm:text-sm rounded-xl border p-4 text-base"
           >
-            Li {items.length} {items.length === 1 ? "item" : "itens"} do arquivo.
+            Li {items.length} {items.length === 1 ? "item" : "itens"} do
+            arquivo.
             <strong className="text-foreground font-medium">
               {" "}
               Confira item a item
@@ -982,7 +1033,10 @@ export function NotaForm() {
 
       <ConfirmDialog
         open={substituirOpen}
-        onClose={() => setSubstituirOpen(false)}
+        onClose={() => {
+          setNotaPendente(null);
+          setSubstituirOpen(false);
+        }}
         title="Substituir os itens desta tela?"
         description={
           <>
@@ -993,7 +1047,8 @@ export function NotaForm() {
         confirmLabel="Usar os itens do arquivo"
         cancelLabel="Manter o que digitei"
         onConfirm={() => {
-          if (notaImportada) aplicarImportacao(notaImportada);
+          if (notaPendente) aplicarImportacao(notaPendente);
+          setNotaPendente(null);
           setSubstituirOpen(false);
         }}
       />

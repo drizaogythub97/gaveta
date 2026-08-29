@@ -109,7 +109,7 @@ export const purchaseSchema = z.object({
     .transform((v) => (v && v.length > 0 ? v : null)),
   accessKey,
   issuedOn,
-  source: z.enum(["manual", "pdf", "foto", "xml"]),
+  source: z.enum(["manual", "pdf", "foto", "xml", "ia"]),
   items: z
     .array(purchaseItemSchema)
     .min(1, "Adicione ao menos um item à nota.")
