@@ -36,14 +36,31 @@ const nextConfig: NextConfig = {
   // volta a valer.
   serverExternalPackages: ["tesseract.js"],
   // O worker do tesseract.js é carregado por CAMINHO em tempo de execução
-  // (`new Worker(...)`), então o rastreador de arquivos da Vercel não o
-  // enxerga e não segue o `require('..')` que ele faz para o próprio pacote
-  // — em produção isso dava "Cannot find module '..'". Aqui os dois pacotes
-  // são incluídos por inteiro na função que lê nota por foto.
+  // (`new Worker(...)`), então o rastreador de arquivos da Vercel não enxerga
+  // nada a partir dele: nem o `require('..')` para o próprio pacote, nem as
+  // dependências que o worker carrega (bmp-js e companhia). Em produção isso
+  // aparecia como "Cannot find module", uma de cada vez.
+  //
+  // Por isso vai o FECHO INTEIRO de dependências do tesseract.js, calculado
+  // do package.json de cada pacote — listar uma a uma conforme quebra é
+  // caçar erro em produção.
   outputFileTracingIncludes: {
     "/estoque/compras/nova": [
+      "./node_modules/bmp-js/**",
+      "./node_modules/data-uri-to-buffer/**",
+      "./node_modules/fetch-blob/**",
+      "./node_modules/formdata-polyfill/**",
+      "./node_modules/idb-keyval/**",
+      "./node_modules/is-url/**",
+      "./node_modules/node-domexception/**",
+      "./node_modules/node-fetch/**",
+      "./node_modules/opencollective-postinstall/**",
+      "./node_modules/regenerator-runtime/**",
       "./node_modules/tesseract.js/**",
       "./node_modules/tesseract.js-core/**",
+      "./node_modules/wasm-feature-detect/**",
+      "./node_modules/web-streams-polyfill/**",
+      "./node_modules/zlibjs/**",
     ],
   },
   experimental: {
