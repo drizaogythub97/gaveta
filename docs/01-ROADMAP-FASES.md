@@ -504,6 +504,37 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
     medindo a VARIAÇÃO que cada venda causa na tela) e
     `tests/e2e/fechamento-visual.spec.ts` (3: desktop, celular e Minimalista).
 
+- **G2c — Leitura de nota de papel por OCR** (2026-08-29, PR #33, merge
+  `MERGE_G2C`; **sem migration**): o caminho de quando não existe PDF-texto
+  nem XML. Entrega deliberadamente modesta, e a tela diz isso.
+  - **A medição que definiu o escopo**: numa digitalização real de ~90 DPI, o
+    Tesseract lê as DESCRIÇÕES de forma utilizável e os NÚMEROS não
+    (`3) 7300) — 7acof`), com confiança ~50%; ampliar e binarizar não mudou
+    nada (49 → 51). Então a via devolve só a **lista de nomes**, com
+    quantidade 1 e **custo em branco**. Chutar número seria pior.
+  - Descoberta do mesmo teste: o documento nem era um DANFE, era **espelho de
+    pedido** (sem CFOP). Por isso o OCR usa âncora própria — no
+    reconhecimento as colunas não são confiáveis, mas **o nome vem em caixa
+    alta e o lixo em minúsculas**; e só procura DENTRO do bloco de produtos,
+    devolvendo vazio em vez de lixo quando não acha o bloco.
+  - `danfe.ts` (novo): a interpretação saiu de `danfe-pdf.ts`. Qualquer
+    leitor monta as mesmas "linhas visuais" e cai na mesma lógica.
+  - `imagem.ts`: cinza, contraste, ampliação bilinear e Otsu em JS puro.
+    Amplia **antes** de binarizar — na ordem inversa a interpolação devolve
+    cinza na borda das letras.
+  - `ocr-imagem.ts`: PDF digitalizado tem a foto embutida, então
+    `extractImages` evita depender de rasterizador nativo. `tesseract.js` por
+    import dinâmico. Recusa imagem incompleta ANTES de subir o OCR (PNG
+    exige assinatura completa + IHDR; JPEG, SOI e EOI).
+  - **Gotchas de produção, achados pelos logs do Preview** (o local não
+    reproduz): `serverExternalPackages` para o worker se achar, e
+    `outputFileTracingIncludes` com o **fecho inteiro** de dependências do
+    tesseract.js (15 pacotes) — o rastreador não enxerga nada a partir de um
+    worker carregado por caminho em tempo de execução.
+  - Testes: `tests/nota-imagem.test.ts` e `tests/nota-ocr-nomes.test.ts`
+    (30 casos) + e2e que gera a "foto" por screenshot no próprio navegador —
+    nota de ninguém entra neste repositório, que é público.
+
 ### Validação da G2a (protocolo `docs/09-PROTOCOLO-DE-VALIDACAO.md`)
 
 Sessão de 2026-08-27 (PRs #27 e #28, merge `00330f8`), sem funcionalidade nova:

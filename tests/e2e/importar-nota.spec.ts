@@ -415,3 +415,65 @@ test("5. importar não apaga o que já foi digitado sem perguntar", async ({
     .click();
   await expect(page.locator(`${sel.itens} li`)).toHaveCount(3);
 });
+
+/**
+ * Via de OCR (fase G2c). A "foto" é gerada aqui: o navegador desenha um
+ * bloco de nota e tira um screenshot. Assim o teste exercita o caminho real
+ * (imagem → OCR no servidor → tela de conferência) sem colocar nota de
+ * ninguém num repositório público.
+ */
+async function fotoDeUmaNota(page: import("@playwright/test").Page) {
+  await page.setContent(`
+    <body style="margin:0;background:#fff;font-family:Arial,Helvetica,sans-serif">
+      <div style="padding:28px;color:#000">
+        <div style="font-size:26px;font-weight:bold">DADOS DOS PRODUTOS</div>
+        <div style="font-size:24px;margin-top:18px">ARROZ BRANCO TIPO UM</div>
+        <div style="font-size:24px;margin-top:14px">FEIJAO CARIOCA COMUM</div>
+        <div style="font-size:24px;margin-top:14px">ACUCAR REFINADO UNIAO</div>
+      </div>
+    </body>`);
+  return page.screenshot({ clip: { x: 0, y: 0, width: 700, height: 260 } });
+}
+
+test("6. foto da nota traz só os nomes, e a tela avisa a limitação", async ({
+  page,
+}) => {
+  // O OCR é bem mais lento que ler um XML, e na primeira vez ainda baixa o
+  // modelo de idioma.
+  test.setTimeout(180_000);
+
+  const foto = await fotoDeUmaNota(page);
+
+  await page.goto("/estoque/compras/nova");
+  await page.locator("#nota-arquivo").setInputFiles({
+    name: "nota.png",
+    mimeType: "image/png",
+    buffer: foto,
+  });
+
+  // O aviso é obrigatório: esta via é a mais fraca das três.
+  await expect(page.getByText("Li a foto, mas só os nomes")).toBeVisible({
+    timeout: 150_000,
+  });
+  await expect(page.getByText("números não saem confiáveis")).toBeVisible();
+  await expect(
+    page.getByText("Sempre que tiver o", { exact: false }),
+  ).toBeVisible();
+
+  const linhas = page.locator(`${sel.itens} li`);
+  await expect(linhas).toHaveCount(3);
+
+  // Os nomes vieram; quantidade e custo NÃO — ficam para a pessoa preencher.
+  await expect(linhas.first().getByLabel("Nome do produto")).toHaveValue(
+    /ARROZ/,
+  );
+  await expect(linhas.first().getByLabel("Custo por unidade")).toHaveValue("");
+  await expect(linhas.first().getByLabel("Quantidade")).toHaveValue("1");
+
+  // E nada foi gravado: continua sendo a pessoa que confirma.
+  const { count } = await app
+    .from("purchases")
+    .select("id", { count: "exact", head: true })
+    .eq("source", "foto");
+  expect(count ?? 0).toBe(0);
+});

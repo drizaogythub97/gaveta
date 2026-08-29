@@ -7,7 +7,12 @@
  * com confiança fica nulo e o usuário completa na conferência.
  */
 
-export type OrigemExtracao = "xml" | "pdf";
+/**
+ * De onde a nota foi lida. Bate com `PurchaseSource`, que é o que fica
+ * gravado no histórico da compra — dá para saber depois se aquela nota veio
+ * do XML (exata) ou de uma foto (só os nomes).
+ */
+export type OrigemExtracao = "xml" | "pdf" | "foto";
 
 export type ItemExtraido = {
   /** Descrição do produto como está na nota. */
@@ -15,7 +20,13 @@ export type ItemExtraido = {
   /** GTIN/EAN quando a nota traz (o XML tem campo próprio). */
   barcode: string | null;
   quantidade: number;
-  custoUnitario: number;
+  /**
+   * Nulo quando a leitura não conseguiu o valor com confiança — é o caso do
+   * OCR de imagem (G2c), que lê nomes bem e números mal. A tela mostra o
+   * campo vazio para a pessoa preencher, em vez de exibir R$ 0,00 e deixar
+   * passar um custo errado.
+   */
+  custoUnitario: number | null;
   /** Total da linha conforme a nota — só para conferência. */
   totalLinha: number | null;
 };
