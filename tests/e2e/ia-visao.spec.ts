@@ -33,8 +33,14 @@ test.beforeAll(() => {
   app = userClient(user.accessToken);
 });
 
-/** Uma "foto" de nota, desenhada e fotografada pelo próprio navegador. */
-async function fotoDeUmaNota(page: import("@playwright/test").Page) {
+/**
+ * Uma "foto" de nota, desenhada e fotografada pelo próprio navegador.
+ *
+ * ATENÇÃO: isto SUBSTITUI o conteúdo da página. Chame ANTES de navegar para
+ * o Gaveta — passar `await fotoDeUmaNota(page)` como argumento de um
+ * `setInputFiles` apaga a tela que se ia usar.
+ */
+async function fotografarNota(page: import("@playwright/test").Page) {
   await page.setContent(`
     <body style="margin:0;background:#fff;font-family:Arial,Helvetica,sans-serif">
       <div style="padding:24px;color:#000">
@@ -69,11 +75,14 @@ test("1. conta fora da lista não vê a leitura por IA", async ({ page }) => {
   // modelo de idioma.
   test.setTimeout(180_000);
 
+  // A foto primeiro: desenhá-la substitui o conteúdo da página.
+  const foto = await fotografarNota(page);
+
   await page.goto("/estoque/compras/nova");
   await page.locator("#nota-arquivo").setInputFiles({
     name: "nota.png",
     mimeType: "image/png",
-    buffer: await fotoDeUmaNota(page),
+    buffer: foto,
   });
 
   // Espera a leitura local TERMINAR, tendo dado certo ou não: o que este
@@ -100,11 +109,14 @@ test("2. a IA lê a foto com nomes E valores", async ({ page }) => {
   // A chamada ao modelo é lenta e passa por rede externa.
   test.setTimeout(180_000);
 
+  // A foto primeiro: desenhá-la substitui o conteúdo da página.
+  const foto = await fotografarNota(page);
+
   await page.goto("/estoque/compras/nova");
   await page.locator("#nota-arquivo").setInputFiles({
     name: "nota.png",
     mimeType: "image/png",
-    buffer: await fotoDeUmaNota(page),
+    buffer: foto,
   });
   await expect(page.getByText("Li a foto, mas só os nomes")).toBeVisible({
     timeout: 150_000,
