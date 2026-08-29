@@ -59,3 +59,9 @@ docs/ESTUDO-NOTA-FISCAL.md
 # Estudos de design (protótipos locais, não vão para produção)
 concept/
 fiadoapp-study/
+
+# O `vercel link` acrescenta `.env*` aqui. As regras acima já cobrem os
+# arquivos com segredo; a exceção mantém o modelo versionado, que é
+# justamente o que ensina quais variáveis existem.
+.env*
+!.env.example
