@@ -283,6 +283,61 @@ Fase 0 (você) → Fases 1–4 (Claude Code). Ao fim da Fase 4 já há um sistem
 - Usar variáveis de ambiente padrão e `@supabase/ssr` (portável).
 - Documentar no README o passo de migração. Detalhes na nota do [README](../README.md) e no guia de deploy.
 
+## PRÓXIMOS PASSOS ESCOLHIDOS (2026-08-29) — começar por aqui
+
+O plano 08 (nota de compra + Lucro × Custo) está inteiro entregue e em
+produção. Estes dois itens foram escolhidos pelo dono como o que vem a
+seguir. Nenhum depende de decisão pendente; ordem sugerida abaixo.
+
+### H1 — Editar uma nota de compra já lançada
+
+**Por quê.** Hoje o único jeito de corrigir uma nota é **estornar e
+relançar** (G2a.1). Funciona e é seguro, mas é ríspido para o caso comum:
+um valor digitado errado, um nome de fornecedor trocado, uma data. O dono
+já avisou que **quase sempre ajusta valores**, porque o preço final nem
+sempre é o impresso na nota.
+
+**O que a edição precisa respeitar** — é aqui que mora a dificuldade, e
+não na tela:
+
+- Uma nota lançada **já mexeu em três lugares**: estoque (movimento de
+  entrada), custo do produto (`products.cost_price`, método último custo) e
+  Financeiro (o gasto vinculado, `purchases.expense_id`). Editar tem de
+  refazer os três de forma **atômica**, como a `registrar_compra` faz.
+- **Não reescrever a história do custo.** A G1 grava `sale_items.unit_cost`
+  como SNAPSHOT no momento da venda. Corrigir o custo de uma compra **não
+  pode** alterar vendas já fechadas, senão o fechamento Lucro × Custo de
+  dias passados muda sozinho.
+- **Nota cancelada não se edita** (`voided_at` preenchido).
+- O caminho mais simples e auditável, a avaliar antes de inventar outro:
+  uma RPC `editar_compra` que, por dentro, **estorna e relança** numa só
+  transação, preservando o `id` da nota. Reaproveita o que já foi provado
+  na `estornar_compra` — inclusive o clamp de estoque em zero e a regra de
+  só reverter o custo quando ele ainda é o daquela nota.
+- Migration aditiva + RLS + testes em `tests/rls/`, como todas as outras.
+
+### H2 — Relatório de compras: por fornecedor e evolução do custo
+
+**Por quê.** Os dados já estão todos gravados desde a G1/G2a — é leitura
+pura, sem migration de escrita. Responde duas perguntas que o dono não tem
+como responder hoje: *quanto eu compro de cada fornecedor* e *o custo deste
+produto está subindo?*
+
+**Escopo sugerido:**
+
+- **Por fornecedor**, num período: total comprado, nº de notas, ticket
+  médio, e a lista das notas (com origem — manual, PDF, XML, foto ou IA).
+  `purchases.supplier_name` é texto livre, então **agrupar por nome
+  normalizado** (mesma normalização de acento/caixa usada em
+  `lib/compras/correspondencia.ts`), sem criar cadastro de fornecedor.
+- **Evolução do custo por produto**: a série de `purchase_items.unit_cost`
+  ao longo do tempo, com a data da nota. Uma tabela simples já entrega o
+  essencial; gráfico é bônus.
+- Seguir o padrão da G3: **agregar no banco** por função `security invoker`
+  com `search_path = ''`, nunca somando no cliente — é o que mantém o
+  número exato com qualquer volume e a RLS valendo.
+- Notas **canceladas ficam de fora** dos totais.
+
 ## Evoluções pós-MVP (fora do escopo das 9 fases)
 
 - ~~**Preferências do usuário — taxas por forma de pagamento.**~~ ✅ **JÁ
