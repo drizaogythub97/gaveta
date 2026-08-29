@@ -32,6 +32,21 @@ export class PdfDeNotaInvalido extends Error {}
 export class PdfSemTexto extends PdfDeNotaInvalido {}
 
 /**
+ * O pdf.js **consome** o buffer que recebe: ele o transfere para o próprio
+ * "worker", e o `Uint8Array` de origem fica com zero byte. Quem tentar ler o
+ * mesmo arquivo de novo — e o Gaveta tenta, porque um PDF sem texto ainda é
+ * candidato a OCR — recebe um buffer detached e leva
+ * `DataCloneError: Cannot transfer object of unsupported type`.
+ *
+ * Isso derrubou a página de nova compra em produção (2026-08-29) com uma
+ * nota digitalizada. Cada leitura leva a SUA cópia; o arquivo do chamador
+ * continua intacto.
+ */
+export function copiaParaPdfJs(arquivo: Uint8Array): Uint8Array {
+  return arquivo.slice();
+}
+
+/**
  * O pdf.js entrega fragmentos soltos com posição; agrupá-los por altura
  * devolve a linha como ela aparece impressa — bem mais confiável que
  * concatenar o texto na ordem em que está no arquivo.
@@ -39,7 +54,7 @@ export class PdfSemTexto extends PdfDeNotaInvalido {}
 async function lerLinhas(arquivo: Uint8Array) {
   let pdf;
   try {
-    pdf = await getDocumentProxy(arquivo);
+    pdf = await getDocumentProxy(copiaParaPdfJs(arquivo));
   } catch {
     throw new PdfDeNotaInvalido("PDF ilegível");
   }
