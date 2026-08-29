@@ -9,6 +9,7 @@ import {
   paraBmp,
   prepararParaOcr,
 } from "@/lib/compras/imagem";
+import { imagemPareceIntegra } from "@/lib/compras/ocr-imagem";
 
 /**
  * Preparo da imagem antes do OCR (plano 08, fase G2c). São as contas que
@@ -118,5 +119,51 @@ describe("paraBmp", () => {
       altura: 3,
     });
     expect(bmp.length).toBe(54 + 12 * 3);
+  });
+});
+
+describe("imagemPareceIntegra", () => {
+  /** PNG mínimo válido: assinatura de 8 bytes + bloco IHDR, com corpo. */
+  function pngValido(): Uint8Array {
+    const b = new Uint8Array(2048);
+    b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+    b.set([0x49, 0x48, 0x44, 0x52], 12); // "IHDR"
+    return b;
+  }
+
+  it("aceita PNG com assinatura completa e bloco IHDR", () => {
+    expect(imagemPareceIntegra(pngValido())).toBe(true);
+  });
+
+  it("recusa arquivo que só copiou o começo da assinatura", () => {
+    // Era este caso que fazia o servidor subir o OCR à toa para depois
+    // descobrir que a imagem não abre.
+    const truncado = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a]);
+    expect(imagemPareceIntegra(truncado)).toBe(false);
+  });
+
+  it("recusa PNG com assinatura certa mas sem IHDR", () => {
+    const semIhdr = pngValido();
+    semIhdr.set([0, 0, 0, 0], 12);
+    expect(imagemPareceIntegra(semIhdr)).toBe(false);
+  });
+
+  it("aceita JPEG que começa em SOI e termina em EOI", () => {
+    const jpeg = new Uint8Array(2048);
+    jpeg.set([0xff, 0xd8, 0xff], 0);
+    jpeg.set([0xff, 0xd9], jpeg.length - 2);
+    expect(imagemPareceIntegra(jpeg)).toBe(true);
+  });
+
+  it("recusa JPEG cortado no meio (sem o fim)", () => {
+    const cortado = new Uint8Array(2048);
+    cortado.set([0xff, 0xd8, 0xff], 0);
+    expect(imagemPareceIntegra(cortado)).toBe(false);
+  });
+
+  it("recusa arquivo pequeno demais para ser foto de nota", () => {
+    const minusculo = new Uint8Array(64);
+    minusculo.set([0xff, 0xd8, 0xff], 0);
+    expect(imagemPareceIntegra(minusculo)).toBe(false);
   });
 });

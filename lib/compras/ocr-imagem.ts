@@ -42,6 +42,13 @@ export class OcrSemProdutos extends Error {}
 /** O arquivo diz ser imagem, mas o decodificador não consegue abri-lo. */
 export class ImagemIlegivel extends Error {}
 
+/**
+ * Menor tamanho plausível para uma foto de nota. Serve para recusar na hora
+ * um arquivo truncado, sem pagar o custo de subir o OCR só para descobrir
+ * que ele não abre.
+ */
+const TAMANHO_MINIMO_DE_IMAGEM = 1024;
+
 /** Assinaturas dos formatos de imagem que aceitamos direto. */
 export function pareceImagem(bytes: Uint8Array): boolean {
   // JPEG: FF D8 FF
@@ -68,6 +75,53 @@ export function pareceImagem(bytes: Uint8Array): boolean {
   ) {
     return true;
   }
+  return false;
+}
+
+/**
+ * Confere a estrutura mínima do arquivo de imagem ANTES de acionar o OCR.
+ *
+ * Sem isto, um arquivo truncado (ou que só copiou a assinatura) faz o
+ * servidor iniciar o worker e baixar o modelo de idioma para só então
+ * descobrir que a imagem não abre — segundos jogados fora, e o usuário
+ * esperando por nada.
+ */
+export function imagemPareceIntegra(bytes: Uint8Array): boolean {
+  if (bytes.length < TAMANHO_MINIMO_DE_IMAGEM) return false;
+
+  // PNG: a assinatura tem 8 bytes e o primeiro bloco é sempre o IHDR.
+  if (bytes[0] === 0x89 && bytes[1] === 0x50) {
+    const assinaturaCompleta =
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47 &&
+      bytes[4] === 0x0d &&
+      bytes[5] === 0x0a &&
+      bytes[6] === 0x1a &&
+      bytes[7] === 0x0a;
+    const temIhdr =
+      bytes[12] === 0x49 &&
+      bytes[13] === 0x48 &&
+      bytes[14] === 0x44 &&
+      bytes[15] === 0x52;
+    return assinaturaCompleta && temIhdr;
+  }
+
+  // JPEG: começa em SOI e termina em EOI (pode haver lixo depois, então a
+  // busca é nos últimos bytes).
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) {
+    for (let i = bytes.length - 2; i >= bytes.length - 64 && i >= 0; i--) {
+      if (bytes[i] === 0xff && bytes[i + 1] === 0xd9) return true;
+    }
+    return false;
+  }
+
+  // WEBP: o tamanho declarado no cabeçalho RIFF tem de bater com o arquivo.
+  if (bytes[0] === 0x52 && bytes[1] === 0x49) {
+    const declarado =
+      bytes[4]! | (bytes[5]! << 8) | (bytes[6]! << 16) | (bytes[7]! << 24);
+    return declarado > 0 && declarado <= bytes.length;
+  }
+
   return false;
 }
 
@@ -162,6 +216,12 @@ export async function extrairPorOcr(
   bytes: Uint8Array,
   origemPdf: boolean,
 ): Promise<NotaExtraida> {
+  // Arquivo que não é imagem íntegra é recusado de imediato: não vale subir
+  // o OCR para descobrir isso lá na frente.
+  if (!origemPdf && !imagemPareceIntegra(bytes)) {
+    throw new ImagemIlegivel("Arquivo de imagem incompleto");
+  }
+
   const entradas = origemPdf ? await imagensDoPdf(bytes) : [bytes];
 
   if (entradas.length === 0) {
