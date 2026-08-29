@@ -43,6 +43,32 @@ export type ImportarNotaResult =
   | { ok: true; nota: NotaConferencia; avisoDeSoma?: boolean }
   | { ok: false; error: string };
 
+/**
+ * Rede de segurança das duas portas.
+ *
+ * Uma leitura de arquivo mexe com formatos que a gente não controla, e um
+ * erro não previsto dentro de uma Server Action **derruba a página inteira**
+ * ("This page couldn't load") — foi o que aconteceu em produção em
+ * 2026-08-29 com uma digitalização. O usuário não pode perder a tela e o que
+ * já digitou por causa de um arquivo estranho: a falha vira uma frase, e o
+ * motivo técnico fica no log do servidor.
+ */
+async function semDerrubarAPagina(
+  onde: string,
+  trabalho: () => Promise<ImportarNotaResult>,
+): Promise<ImportarNotaResult> {
+  try {
+    return await trabalho();
+  } catch (erro) {
+    console.error(`[${onde}] falha inesperada:`, erro);
+    return {
+      ok: false,
+      error:
+        "Não consegui ler este arquivo. Se puder, use o PDF original do fornecedor ou o XML da nota — ou digite os itens abaixo.",
+    };
+  }
+}
+
 /** Sessão + arquivo dentro dos limites. Vale para as duas portas. */
 async function receberArquivo(
   formData: FormData,
@@ -162,24 +188,26 @@ async function casarComCatalogo(
 export async function importarNotaDeArquivo(
   formData: FormData,
 ): Promise<ImportarNotaResult> {
-  const entrada = await receberArquivo(formData);
-  if (!entrada.ok) return entrada;
+  return semDerrubarAPagina("importar-nota", async () => {
+    const entrada = await receberArquivo(formData);
+    if (!entrada.ok) return entrada;
 
-  const limite = await checkRateLimit("importar-nota");
-  if (!limite.ok) {
-    return { ok: false, error: limite.message };
-  }
+    const limite = await checkRateLimit("importar-nota");
+    if (!limite.ok) {
+      return { ok: false, error: limite.message };
+    }
 
-  const bytes = new Uint8Array(await entrada.arquivo.arrayBuffer());
-  const extracao = await extrairNota(bytes);
-  if (!extracao.ok) {
-    return { ok: false, error: extracao.erro };
-  }
+    const bytes = new Uint8Array(await entrada.arquivo.arrayBuffer());
+    const extracao = await extrairNota(bytes);
+    if (!extracao.ok) {
+      return { ok: false, error: extracao.erro };
+    }
 
-  return {
-    ok: true,
-    nota: await casarComCatalogo(entrada.supabase, extracao.nota),
-  };
+    return {
+      ok: true,
+      nota: await casarComCatalogo(entrada.supabase, extracao.nota),
+    };
+  });
 }
 
 /**
@@ -193,56 +221,63 @@ export async function importarNotaDeArquivo(
 export async function importarNotaComIa(
   formData: FormData,
 ): Promise<ImportarNotaResult> {
-  const entrada = await receberArquivo(formData);
-  if (!entrada.ok) return entrada;
+  return semDerrubarAPagina("ler-nota-com-ia", async () => {
+    const entrada = await receberArquivo(formData);
+    if (!entrada.ok) return entrada;
 
-  if (!iaLiberadaPara(entrada.userId)) {
-    // Mensagem igual à de recurso inexistente: quem não tem acesso não
-    // precisa saber que existe.
-    return { ok: false, error: "Recurso indisponível nesta conta." };
-  }
+    if (!iaLiberadaPara(entrada.userId)) {
+      // Mensagem igual à de recurso inexistente: quem não tem acesso não
+      // precisa saber que existe.
+      return { ok: false, error: "Recurso indisponível nesta conta." };
+    }
 
-  const limite = await checkRateLimit("ler-nota-com-ia");
-  if (!limite.ok) {
-    return { ok: false, error: limite.message };
-  }
+    const limite = await checkRateLimit("ler-nota-com-ia");
+    if (!limite.ok) {
+      return { ok: false, error: limite.message };
+    }
 
-  const tipo = entrada.arquivo.type;
-  const aceitos = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
-  if (!aceitos.includes(tipo)) {
-    return {
-      ok: false,
-      error: "Para a leitura por IA, envie o PDF ou uma foto (JPG, PNG).",
-    };
-  }
-
-  const bytes = new Uint8Array(await entrada.arquivo.arrayBuffer());
-
-  try {
-    const leitura = await lerNotaComIa(bytes, tipo);
-    return {
-      ok: true,
-      nota: await casarComCatalogo(entrada.supabase, leitura.nota),
-      // `false` = a soma das linhas NÃO fecha com o total do documento, o que
-      // é o sinal mais barato de leitura incoerente. `null` = não deu para
-      // conferir, e aí não há aviso a dar.
-      avisoDeSoma: leitura.somaConfere === false,
-    };
-  } catch (erro) {
-    if (erro instanceof IaSemProdutos) {
+    const tipo = entrada.arquivo.type;
+    const aceitos = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+    if (!aceitos.includes(tipo)) {
       return {
         ok: false,
-        error:
-          "A IA não encontrou produtos neste arquivo. Confira se é a nota certa ou digite os itens abaixo.",
+        error: "Para a leitura por IA, envie o PDF ou uma foto (JPG, PNG).",
       };
     }
-    if (erro instanceof IaIndisponivel) {
+
+    const bytes = new Uint8Array(await entrada.arquivo.arrayBuffer());
+
+    try {
+      const leitura = await lerNotaComIa(bytes, tipo);
       return {
-        ok: false,
-        error:
-          "A leitura por IA falhou agora. Tente de novo em instantes, use o PDF/XML da nota, ou digite os itens.",
+        ok: true,
+        nota: await casarComCatalogo(entrada.supabase, leitura.nota),
+        // `false` = a soma das linhas NÃO fecha com o total do documento, o que
+        // é o sinal mais barato de leitura incoerente. `null` = não deu para
+        // conferir, e aí não há aviso a dar.
+        avisoDeSoma: leitura.somaConfere === false,
       };
+    } catch (erro) {
+      if (erro instanceof IaSemProdutos) {
+        return {
+          ok: false,
+          error:
+            "A IA não encontrou produtos neste arquivo. Confira se é a nota certa ou digite os itens abaixo.",
+        };
+      }
+      if (erro instanceof IaIndisponivel) {
+        return {
+          ok: false,
+          error:
+            "A leitura por IA falhou agora. Tente de novo em instantes, use o PDF/XML da nota, ou digite os itens.",
+        };
+      }
+      throw erro;
     }
-    throw erro;
-  }
+  });
 }

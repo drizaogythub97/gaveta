@@ -18,10 +18,17 @@
 export const MAXIMO_PIXELS_ENTRADA = 40_000_000;
 
 /**
- * Teto de pixels DEPOIS de ampliar. Acima disso o próprio worker do
- * Tesseract engasga ao receber a imagem (medido: 2613×3910 já falha).
+ * Teto de pixels DEPOIS de redimensionar.
+ *
+ * Acima disso o worker do Tesseract morre com
+ * `RangeError: Too many properties to enumerate` — ele monta a árvore de
+ * blocos/linhas/palavras/símbolos da página e o objeto fica grande demais
+ * para atravessar o canal do worker. Medido numa digitalização real de
+ * folha A4: **2000×2993 (6,0 Mpx) falha; 1400×2095 (2,9 Mpx) lê**. Como o
+ * estopim é a quantidade de símbolos, e não o pixel em si, o limite é
+ * folgado de propósito.
  */
-export const MAXIMO_PIXELS_SAIDA = 6_000_000;
+export const MAXIMO_PIXELS_SAIDA = 3_000_000;
 
 /** Largura que buscamos para o OCR ler bem uma folha A4. */
 const LARGURA_ALVO = 2000;
@@ -105,14 +112,18 @@ export function limiarDeOtsu(cinza: Uint8Array): number {
   return limiar;
 }
 
-/** Ampliação bilinear — suaviza a borda das letras em vez de serrilhar. */
-function ampliar(
+/**
+ * Reamostragem bilinear. Amplia letra pequena sem serrilhar e, quando a
+ * imagem passa do teto, REDUZ — uma foto de celular de página inteira chega
+ * com muito mais pixel do que o OCR aguenta.
+ */
+function redimensionar(
   cinza: Uint8Array,
   largura: number,
   altura: number,
   escala: number,
 ): ImagemCinza {
-  if (escala <= 1) return { dados: cinza, largura, altura };
+  if (escala === 1) return { dados: cinza, largura, altura };
 
   const nova = Math.round(largura * escala);
   const novaAltura = Math.round(altura * escala);
@@ -145,13 +156,23 @@ function ampliar(
   return { dados: saida, largura: nova, altura: novaAltura };
 }
 
-/** Quanto dá para ampliar sem estourar o teto de pixels da saída. */
+/**
+ * Fator de redimensionamento para o OCR ler bem sem estourar o worker.
+ *
+ * Três casos, nesta ordem:
+ *   • imagem grande demais → ENCOLHE até caber no teto (era o buraco: uma
+ *     foto de celular de página inteira ia inteira para o OCR e o derrubava);
+ *   • imagem pequena → amplia até perto da largura alvo, respeitando o teto;
+ *   • imagem já em bom tamanho → não mexe.
+ */
 export function escalaSegura(largura: number, altura: number): number {
   if (largura <= 0 || altura <= 0) return 1;
+
+  const teto = Math.sqrt(MAXIMO_PIXELS_SAIDA / (largura * altura));
+  if (teto < 1) return teto;
+
   const desejada = LARGURA_ALVO / largura;
-  if (desejada <= 1) return 1;
-  const maxima = Math.sqrt(MAXIMO_PIXELS_SAIDA / (largura * altura));
-  return Math.max(1, Math.min(desejada, maxima));
+  return Math.max(1, Math.min(desejada, teto));
 }
 
 /**
@@ -180,7 +201,7 @@ export function prepararParaOcr(
   // Amplia ANTES de binarizar: ampliar uma imagem já em preto e branco
   // interpola os dois extremos e devolve cinza nas bordas das letras. Na
   // ordem certa, a saída é binária de verdade e a borda fica mais limpa.
-  const ampliada = ampliar(
+  const ampliada = redimensionar(
     cinza,
     largura,
     altura,

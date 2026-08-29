@@ -42,11 +42,21 @@ describe("limiarDeOtsu", () => {
 
 describe("escalaSegura", () => {
   it("amplia imagem pequena até perto do alvo de leitura", () => {
-    expect(escalaSegura(1000, 1400)).toBeGreaterThan(1.5);
+    expect(escalaSegura(1000, 1400)).toBeGreaterThan(1.3);
   });
 
-  it("não amplia imagem que já é grande", () => {
-    expect(escalaSegura(3000, 4000)).toBe(1);
+  it("encolhe foto grande demais em vez de derrubar o OCR", () => {
+    // Foto de celular de uma página inteira: passa MUITO do teto e, sem
+    // reduzir, mata o worker do Tesseract.
+    const escala = escalaSegura(3000, 4000);
+    expect(escala).toBeLessThan(1);
+    expect(3000 * escala * (4000 * escala)).toBeLessThanOrEqual(
+      MAXIMO_PIXELS_SAIDA,
+    );
+  });
+
+  it("não mexe em imagem que já está em bom tamanho", () => {
+    expect(escalaSegura(2200, 1300)).toBe(1);
   });
 
   it("nunca estoura o teto de pixels da saída", () => {

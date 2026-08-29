@@ -477,3 +477,94 @@ test("6. foto da nota traz só os nomes, e a tela avisa a limitação", async ({
     .eq("source", "foto");
   expect(count ?? 0).toBe(0);
 });
+
+/**
+ * PDF que é só uma FOTO — o que sai de um aplicativo de digitalização.
+ *
+ * Este caso derrubou a produção em 2026-08-29: a extração da imagem de
+ * dentro do PDF estourava `DataCloneError` no runtime da Vercel (e só lá),
+ * o erro subia pela Server Action e a pessoa via "This page couldn't load",
+ * perdendo o que já tinha digitado. Não havia teste cobrindo PDF sem camada
+ * de texto — só imagem solta e PDF com texto.
+ *
+ * O que este teste garante é o mínimo inegociável: aconteça o que
+ * acontecer com o arquivo, a TELA SOBREVIVE e a pessoa recebe uma frase.
+ */
+async function folhaInteiraDeUmaNota(
+  page: import("@playwright/test").Page,
+): Promise<Buffer> {
+  await page.setContent(`
+    <body style="margin:0;background:#fff;font-family:Arial,Helvetica,sans-serif">
+      <div style="padding:40px;color:#000">
+        <div style="font-size:30px;font-weight:bold">DADOS DOS PRODUTOS</div>
+        <div style="font-size:26px;margin-top:34px">ARROZ BRANCO TIPO UM</div>
+        <div style="font-size:26px;margin-top:30px">FEIJAO CARIOCA COMUM</div>
+        <div style="font-size:26px;margin-top:30px">ACUCAR REFINADO UNIAO</div>
+        <div style="font-size:26px;margin-top:30px">CAFE TORRADO MOIDO</div>
+        <div style="font-size:26px;margin-top:30px">OLEO DE SOJA GARRAFA</div>
+      </div>
+    </body>`);
+  // A folha precisa ser GRANDE: imagem com menos de 400px de lado é tratada
+  // como logotipo ou carimbo e descartada antes do OCR.
+  return page.screenshot({ clip: { x: 0, y: 0, width: 760, height: 620 } });
+}
+
+function pdfQueEhSoUmaFoto(foto: Buffer): Buffer {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  doc.addImage(
+    `data:image/png;base64,${foto.toString("base64")}`,
+    "PNG",
+    30,
+    30,
+    535,
+    436,
+  );
+  return Buffer.from(doc.output("arraybuffer"));
+}
+
+test("7. PDF digitalizado (só imagem) nunca derruba a tela", async ({
+  page,
+}) => {
+  // Se o OCR conseguir rodar, ele é lento; se não conseguir, responde rápido.
+  test.setTimeout(180_000);
+
+  const foto = await folhaInteiraDeUmaNota(page);
+
+  await page.goto("/estoque/compras/nova");
+
+  // Digita um item à mão ANTES: é isso que a pessoa perdia quando a página
+  // caía.
+  await page.locator("#nota-query").fill(CODIGO_CAFE);
+  await page.locator("#nota-query").press("Enter");
+  await expect(page.locator(`${sel.itens} li`)).toHaveCount(1);
+
+  await page.locator("#nota-arquivo").setInputFiles({
+    name: "digitalizada.pdf",
+    mimeType: "application/pdf",
+    buffer: pdfQueEhSoUmaFoto(foto),
+  });
+
+  // A leitura chegou ao fim: como já havia um item digitado, o Gaveta
+  // pergunta antes de substituir. Antes da correção a página caía aqui, e a
+  // pessoa perdia o que tinha digitado.
+  const dialogo = page.getByRole("dialog");
+  await expect(dialogo).toContainText("Substituir os itens desta tela?", {
+    timeout: 150_000,
+  });
+  await dialogo
+    .getByRole("button", { name: "Usar os itens do arquivo" })
+    .click();
+
+  // Digitalização é foto: valem os nomes, com o aviso da limitação.
+  await expect(page.getByText("Li a foto, mas só os nomes")).toBeVisible();
+  const linhas = page.locator(`${sel.itens} li`);
+  expect(await linhas.count()).toBeGreaterThan(0);
+  await expect(linhas.first().getByLabel("Nome do produto")).not.toHaveValue(
+    "",
+  );
+
+  // A página não caiu, e a falha não escorregou para a rede de segurança
+  // genérica (se escorregar, é sinal de que a extração quebrou por dentro).
+  await expect(page.getByText("This page couldn't load")).toHaveCount(0);
+  await expect(page.getByText("Não consegui ler este arquivo")).toHaveCount(0);
+});

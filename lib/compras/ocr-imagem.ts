@@ -2,6 +2,8 @@ import "server-only";
 
 import { extractImages, getDocumentProxy } from "unpdf";
 
+import { copiaParaPdfJs } from "./danfe-pdf";
+
 import {
   ImagemInvalida,
   MAXIMO_PIXELS_ENTRADA,
@@ -151,7 +153,23 @@ async function reconhecer(entrada: Uint8Array): Promise<string[]> {
   }
 
   try {
-    const { data } = await worker.recognize(Buffer.from(entrada));
+    // Pedir SÓ o texto. Por padrão o tesseract.js monta também a árvore de
+    // blocos, parágrafos, linhas, palavras e símbolos e a devolve pelo
+    // canal do worker — numa folha A4 inteira isso estoura com
+    // `RangeError: Too many properties to enumerate`, que era o que
+    // impedia de ler nota digitalizada de página cheia. O Gaveta só usa
+    // `data.text`.
+    const { data } = await worker.recognize(
+      Buffer.from(entrada),
+      {},
+      {
+        text: true,
+        blocks: false,
+        layoutBlocks: false,
+        hocr: false,
+        tsv: false,
+      },
+    );
     return (data.text ?? "")
       .split("\n")
       .map((linha) => linha.trim())
@@ -173,36 +191,48 @@ async function reconhecer(entrada: Uint8Array): Promise<string[]> {
  * nativo só para redesenhar o que já está lá dentro.
  */
 async function imagensDoPdf(arquivo: Uint8Array): Promise<Uint8Array[]> {
-  const pdf = await getDocumentProxy(arquivo);
-  const paginas = Math.min(pdf.numPages, MAXIMO_PAGINAS_OCR);
   const saida: Uint8Array[] = [];
 
-  for (let numero = 1; numero <= paginas; numero++) {
-    let imagens;
-    try {
-      imagens = await extractImages(pdf, numero);
-    } catch {
-      continue;
-    }
-    for (const imagem of imagens) {
-      const { width, height, data, channels } = imagem;
-      if (!width || !height || !data) continue;
-      if (width * height > MAXIMO_PIXELS_ENTRADA) continue;
-      // Imagem miúda é logotipo/carimbo, não a folha.
-      if (width < 400 || height < 400) continue;
+  // Nada aqui pode derrubar a requisição. Tirar imagem de PDF passa por
+  // dentro do pdf.js, que troca mensagens consigo mesmo por
+  // `structuredClone` — e isso quebrou com `DataCloneError` dentro do Next
+  // (2026-08-29), levando a página inteira junto. Sem imagem o OCR não tem
+  // o que ler, e isso a tela sabe explicar; o motivo técnico vai para o log.
+  let pdf;
+  try {
+    pdf = await getDocumentProxy(copiaParaPdfJs(arquivo));
+  } catch (erro) {
+    console.error("[ocr] não deu para abrir o PDF como imagem:", erro);
+    return saida;
+  }
 
-      try {
-        const pronta = prepararParaOcr(
-          data,
-          width,
-          height,
-          channels ?? Math.max(1, Math.round(data.length / (width * height))),
-        );
-        saida.push(paraBmp(pronta));
-      } catch (erro) {
-        if (erro instanceof ImagemInvalida) continue;
-        throw erro;
+  const paginas = Math.min(pdf.numPages, MAXIMO_PAGINAS_OCR);
+  for (let numero = 1; numero <= paginas; numero++) {
+    try {
+      // O erro pode nascer na chamada OU no meio da iteração.
+      for await (const imagem of await extractImages(pdf, numero)) {
+        const { width, height, data, channels } = imagem;
+        if (!width || !height || !data) continue;
+        if (width * height > MAXIMO_PIXELS_ENTRADA) continue;
+        // Imagem miúda é logotipo/carimbo, não a folha.
+        if (width < 400 || height < 400) continue;
+
+        try {
+          const pronta = prepararParaOcr(
+            data,
+            width,
+            height,
+            channels ?? Math.max(1, Math.round(data.length / (width * height))),
+          );
+          saida.push(paraBmp(pronta));
+        } catch (erro) {
+          if (erro instanceof ImagemInvalida) continue;
+          throw erro;
+        }
       }
+    } catch (erro) {
+      console.error(`[ocr] página ${numero} do PDF não rendeu imagem:`, erro);
+      continue;
     }
   }
   return saida;
