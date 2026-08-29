@@ -1,13 +1,26 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+import { iaLiberadaPara } from "@/lib/compras/ia-visao";
+import { createClient } from "@/lib/supabase/server";
+
 import { NotaForm } from "../nota-form";
 
 export const metadata = {
   title: "Entrada por nota",
 };
 
-export default function NovaCompraPage() {
+export default async function NovaCompraPage() {
+  // A leitura por IA (G2d) está em teste e liberada só para as contas
+  // listadas em variável de ambiente. Aqui a resposta serve só para MOSTRAR
+  // ou esconder o botão — a permissão de verdade é conferida de novo na
+  // server action, que é a fronteira.
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const iaLiberada = user ? iaLiberadaPara(user.id) : false;
+
   return (
     <section className="minimal:max-sm:gap-4 mx-auto flex w-full max-w-3xl flex-col gap-6">
       <header className="flex flex-col gap-3">
@@ -28,7 +41,7 @@ export default function NovaCompraPage() {
         </p>
       </header>
 
-      <NotaForm />
+      <NotaForm iaLiberada={iaLiberada} />
     </section>
   );
 }

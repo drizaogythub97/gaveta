@@ -1,6 +1,6 @@
 /** Como a nota entrou no sistema. 'manual' é a digitação (G2a); os demais
  *  ficam prontos para a extração de PDF/XML da fase G2b. */
-export type PurchaseSource = "manual" | "pdf" | "foto" | "xml";
+export type PurchaseSource = "manual" | "pdf" | "foto" | "xml" | "ia";
 
 export type Purchase = {
   id: string;
@@ -29,4 +29,5 @@ export const PURCHASE_SOURCE_LABELS: Record<PurchaseSource, string> = {
   pdf: "PDF da nota",
   foto: "Foto da nota",
   xml: "XML da nota",
+  ia: "Lida por IA",
 };

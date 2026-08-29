@@ -89,6 +89,38 @@ npm run test:e2e:preview    # o MESMO suíte contra o Preview da branch atual
   mesmos baselines visuais gerados em desenvolvimento — ou seja, a regressão
   visual é a mesma nos dois ambientes.
 
+## 5.1 Validar a leitura por IA (fase G2d)
+
+A via de IA é liberada por **variável de ambiente**, com o id da conta. Isso
+cria um problema prático para o e2e: o usuário descartável só ganha id
+DEPOIS que o `setup` roda, e o servidor já subiu com o ambiente fixo.
+
+Por isso o suíte tem dois testes em `tests/e2e/ia-visao.spec.ts`:
+
+- **o fechado por padrão roda sempre** — conta fora da lista não vê nada da
+  via de IA;
+- **o da leitura de verdade só roda com `IA_E2E_LIBERADA=1`**, na sequência
+  abaixo.
+
+Sequência para exercitar a leitura de verdade (feita em 2026-08-29):
+
+1. criar uma conta descartável por script (service_role) e anotar o **id**;
+2. subir o servidor com essa conta liberada:
+   `PORT=3100 IA_VISAO_LIBERADA_PARA=<id> npm run dev`;
+3. rodar o teste apontando para ele, sem recriar usuários:
+   `BASE_URL=http://localhost:3100 IA_E2E_LIBERADA=1 npx playwright test tests/e2e/ia-visao.spec.ts --no-deps`;
+4. apagar a conta descartável no fim.
+
+**Não dá para validar a leitura por IA contra o Preview** com conta de teste:
+lá a lista tem o id do dono, e não se põe id de teste em configuração de
+produção. O que o Preview valida é o resto — inclusive o fechado por padrão.
+A leitura em si, em produção, é conferida pelo dono na conta dele.
+
+⚠️ **Chamada de rede com POST dentro do Vitest é inutilizável neste projeto**:
+um POST de 1s em Node puro leva 21s no runner e, com `AbortSignal`, trava.
+GET funciona. Portanto integração com API externa se testa por e2e, nunca
+por unidade — o que se testa em unidade é a validação da resposta.
+
 ## 6. Encerramento da sprint — "encerre a sprint"
 
 Quando o dono pedir para **encerrar a sprint**, o objetivo não é resumir: é

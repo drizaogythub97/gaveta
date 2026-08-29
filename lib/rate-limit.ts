@@ -31,7 +31,8 @@ export type RateLimitAction =
   | "recover"
   | "reset"
   | "reauth"
-  | "importar-nota";
+  | "importar-nota"
+  | "ler-nota-com-ia";
 
 /**
  * Janela deslizante por ação. Valores conservadores: protegem contra
@@ -50,6 +51,9 @@ const RULES: Record<RateLimitAction, { limit: number; window: `${number} s` }> =
     // Importar nota (G2b): ler PDF/XML custa CPU e o arquivo vem de fora.
     // Folgado para o uso real (algumas notas seguidas), apertado para abuso.
     "importar-nota": { limit: 10, window: "60 s" },
+    // Ler nota com IA (G2d): cada chamada consome cota da conta do dono e
+    // manda o arquivo para fora. Bem mais apertado, de propósito.
+    "ler-nota-com-ia": { limit: 4, window: "60 s" },
   };
 
 const limiters: Partial<Record<RateLimitAction, Ratelimit>> = {};

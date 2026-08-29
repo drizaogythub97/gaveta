@@ -12,7 +12,7 @@
  * gravado no histórico da compra — dá para saber depois se aquela nota veio
  * do XML (exata) ou de uma foto (só os nomes).
  */
-export type OrigemExtracao = "xml" | "pdf" | "foto";
+export type OrigemExtracao = "xml" | "pdf" | "foto" | "ia";
 
 export type ItemExtraido = {
   /** Descrição do produto como está na nota. */
