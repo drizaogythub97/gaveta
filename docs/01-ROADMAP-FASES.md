@@ -535,8 +535,8 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
     (30 casos) + e2e que gera a "foto" por screenshot no próprio navegador —
     nota de ninguém entra neste repositório, que é público.
 
-- **G2d — Leitura de nota por IA de visão** (2026-08-29, PR #PR_G2D, merge
-  `MERGE_G2D`; migration **0017**): a via mais forte para nota de PAPEL — e a
+- **G2d — Leitura de nota por IA de visão** (2026-08-29, PR #34, merge
+  `83c5b30`; migration **0017**): a via mais forte para nota de PAPEL — e a
   única que manda o arquivo para FORA da infraestrutura do Gaveta.
   - **Fase de teste, liberada só para a conta do dono**, por **variável de
     ambiente** (`IA_VISAO_LIBERADA_PARA`), nunca por coluna no banco: as
