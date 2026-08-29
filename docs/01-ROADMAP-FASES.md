@@ -285,15 +285,12 @@ Fase 0 (você) → Fases 1–4 (Claude Code). Ao fim da Fase 4 já há um sistem
 
 ## Evoluções pós-MVP (fora do escopo das 9 fases)
 
-- **Preferências do usuário — taxas por forma de pagamento.** Criar uma seção
-  "Preferências" onde o lojista cadastra as taxas que paga em cada método
-  (ex.: Pix 0%, débito 1,5%, crédito 3,5%, vale 5%). Persistir em uma tabela
-  `payment_fees` por `user_id` × `payment_method`. Os relatórios financeiros
-  da Fase 5 ganham um filtro/coluna **"Faturamento líquido"** que aplica as
-  taxas vigentes às vendas do período. A migração `0002_payment_method.sql`
-  já grava `sales.payment_method`, então quando isso entrar bastará uma
-  migração nova para `payment_fees` + ajuste do dashboard. Não implementar
-  agora.
+- ~~**Preferências do usuário — taxas por forma de pagamento.**~~ ✅ **JÁ
+  ENTREGUE** na migration `0004_preferences_and_fees.sql`: as taxas ficam em
+  Configurações, a venda grava `sales.fee_amount`, e o fechamento Lucro ×
+  Custo (G3) desconta essas taxas do LUCRO. Este item ficou aqui como "não
+  implementar agora" depois de já ter sido feito — corrigido em 2026-08-29
+  para não induzir a refazer.
 
 ## Configuração de painel pós-deploy
 
