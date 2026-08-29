@@ -505,7 +505,7 @@ Ordem decidida pelo dono (revisada em jul/2026, decisão 7 = custo zero):
     `tests/e2e/fechamento-visual.spec.ts` (3: desktop, celular e Minimalista).
 
 - **G2c — Leitura de nota de papel por OCR** (2026-08-29, PR #33, merge
-  `MERGE_G2C`; **sem migration**): o caminho de quando não existe PDF-texto
+  `5501a61`; **sem migration**): o caminho de quando não existe PDF-texto
   nem XML. Entrega deliberadamente modesta, e a tela diz isso.
   - **A medição que definiu o escopo**: numa digitalização real de ~90 DPI, o
     Tesseract lê as DESCRIÇÕES de forma utilizável e os NÚMEROS não
