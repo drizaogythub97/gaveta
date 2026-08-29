@@ -35,6 +35,17 @@ const nextConfig: NextConfig = {
   // .../worker-script/node/index.js"). Fora do pacote, a resolução do Node
   // volta a valer.
   serverExternalPackages: ["tesseract.js"],
+  // O worker do tesseract.js é carregado por CAMINHO em tempo de execução
+  // (`new Worker(...)`), então o rastreador de arquivos da Vercel não o
+  // enxerga e não segue o `require('..')` que ele faz para o próprio pacote
+  // — em produção isso dava "Cannot find module '..'". Aqui os dois pacotes
+  // são incluídos por inteiro na função que lê nota por foto.
+  outputFileTracingIncludes: {
+    "/estoque/compras/nova": [
+      "./node_modules/tesseract.js/**",
+      "./node_modules/tesseract.js-core/**",
+    ],
+  },
   experimental: {
     serverActions: {
       // A importação de nota (G2b) envia o PDF/XML por Server Action. O
