@@ -710,3 +710,158 @@ describe("Hardening 0010 — propriedade do produto e agregações", () => {
     expect(bobRows ?? []).toHaveLength(0);
   });
 });
+
+/**
+ * Tabelas e funções acrescentadas na sprint de 2026-08-30: as categorias de
+ * produto (0019) e o fechamento dia a dia (0018).
+ *
+ * Ficam AQUI, e não num arquivo próprio, porque acesso cruzado é o assunto
+ * deste arquivo — e porque cada usuário descartável a mais é um login no
+ * Supabase Auth, que tem limite por IP. Alice e Bob já existem e Alice já
+ * tem produto e venda registrados acima.
+ */
+describe("RLS — product_tags e product_tag_links (0019)", () => {
+  let tagDeAlice = "";
+  let produtoDeBob = "";
+
+  it("prepara: Alice cria uma categoria; Bob não a enxerga", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const { data, error } = await aliceApp
+      .from("product_tags")
+      .insert({ user_id: alice.id, name: "Categoria da Alice" })
+      .select("id")
+      .single();
+    expect(error).toBeNull();
+    tagDeAlice = (data as { id: string }).id;
+
+    const bobApp = userClient(bob.accessToken);
+    const { data: doBob, error: erroBob } = await bobApp
+      .from("product_tags")
+      .select("id");
+    expect(erroBob).toBeNull();
+    expect(doBob ?? []).toHaveLength(0);
+  });
+
+  it("Bob não cria categoria forjando o user_id de Alice", async () => {
+    const bobApp = userClient(bob.accessToken);
+    const { error } = await bobApp
+      .from("product_tags")
+      .insert({ user_id: alice.id, name: "Forjada" });
+    expect(error).not.toBeNull();
+  });
+
+  it("Bob não edita nem apaga a categoria de Alice", async () => {
+    const bobApp = userClient(bob.accessToken);
+
+    const { data: editadas, error: erroUpdate } = await bobApp
+      .from("product_tags")
+      .update({ name: "Sequestrada" })
+      .eq("id", tagDeAlice)
+      .select("id");
+    expect(erroUpdate).toBeNull();
+    expect(editadas ?? []).toHaveLength(0);
+
+    const { data: apagadas, error: erroDelete } = await bobApp
+      .from("product_tags")
+      .delete()
+      .eq("id", tagDeAlice)
+      .select("id");
+    expect(erroDelete).toBeNull();
+    expect(apagadas ?? []).toHaveLength(0);
+  });
+
+  it("a RPC ignora id de categoria alheia em vez de vinculá-la", async () => {
+    const bobApp = userClient(bob.accessToken);
+    const { data: produto } = await bobApp
+      .from("products")
+      .insert({
+        user_id: bob.id,
+        name: "Produto do Bob",
+        price: 5,
+        track_stock: false,
+        stock_quantity: null,
+      })
+      .select("id")
+      .single();
+    produtoDeBob = (produto as { id: string }).id;
+
+    // A categoria é de Alice: a função filtra pelos ids do PRÓPRIO dono, e
+    // uma lista com id alheio não derruba o cadastro — só não vincula nada.
+    const { error } = await bobApp.rpc("aplicar_tags_no_produto", {
+      p_product: produtoDeBob,
+      p_tags: [tagDeAlice],
+      p_new_tags: [],
+    });
+    expect(error).toBeNull();
+
+    const { data: links } = await bobApp
+      .from("product_tag_links")
+      .select("tag_id")
+      .eq("product_id", produtoDeBob);
+    expect(links ?? []).toHaveLength(0);
+  });
+
+  it("a RPC recusa produto que não é do usuário", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const { error } = await aliceApp.rpc("aplicar_tags_no_produto", {
+      p_product: produtoDeBob,
+      p_tags: [],
+      p_new_tags: ["Invasora"],
+    });
+    // A RLS esconde o produto de Bob, então a função não o encontra.
+    expect(error).not.toBeNull();
+  });
+});
+
+describe("RLS — fechamento dia a dia (0018)", () => {
+  const DE = "2026-01-01T00:00:00.000Z";
+  const ATE = "2030-12-31T23:59:59.999Z";
+  const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+  /**
+   * Aqui os DOIS têm movimento (Alice e Bob registram venda mais acima neste
+   * arquivo), então "Bob não vê nada" seria a asserção errada — ele vê o
+   * dele. O que prova o isolamento é que **nenhuma venda de Alice aparece
+   * para Bob**: os conjuntos de `sale_id` não se tocam.
+   */
+  it("cada um só enxerga as próprias vendas no mesmo dia", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const bobApp = userClient(bob.accessToken);
+
+    const janela = { p_from: DE, p_to: ATE, p_tz: TZ };
+    const { data: diasDaAlice, error } = await aliceApp.rpc(
+      "fechamento_por_dia",
+      janela,
+    );
+    expect(error).toBeNull();
+    expect((diasDaAlice ?? []).length).toBeGreaterThan(0);
+    const dia = (diasDaAlice as { dia: string }[])[0].dia;
+
+    const itensDe = async (app: ReturnType<typeof userClient>) => {
+      const { data } = await app.rpc("fechamento_vendas_do_dia", {
+        p_dia: dia,
+        ...janela,
+      });
+      return (data ?? []) as { sale_id: string; valor: number }[];
+    };
+
+    const daAlice = await itensDe(aliceApp);
+    const doBob = await itensDe(bobApp);
+    expect(daAlice.length).toBeGreaterThan(0);
+
+    const vendasDaAlice = new Set(daAlice.map((i) => i.sale_id));
+    for (const item of doBob) {
+      expect(vendasDaAlice.has(item.sale_id)).toBe(false);
+    }
+
+    // E o total do dia de Bob fecha com o detalhe DELE — sinal de que o
+    // dinheiro de Alice não entrou na conta em lugar nenhum.
+    const { data: diasDoBob } = await bobApp.rpc("fechamento_por_dia", janela);
+    const recebidoDoBob = (diasDoBob as { dia: string; recebido: number }[])
+      .filter((d) => d.dia === dia)
+      .reduce((s, d) => s + Number(d.recebido), 0);
+    const somaDoDetalhe =
+      Math.round(doBob.reduce((s, i) => s + Number(i.valor), 0) * 100) / 100;
+    expect(recebidoDoBob).toBe(somaDoDetalhe);
+  });
+});

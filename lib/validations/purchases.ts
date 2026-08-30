@@ -40,6 +40,27 @@ const salePrice = z
   .max(MAX_MONEY, "Preço de venda muito alto.")
   .nullable();
 
+// Categorias do produto novo (0019). Chegam em duas listas: as que já
+// existem, por id, e as digitadas na hora, por nome — é o banco que decide
+// o que criar, na mesma transação da nota.
+const MAX_TAGS_POR_ITEM = 12;
+
+const tagIds = z
+  .array(z.uuid("Categoria inválida."))
+  .max(MAX_TAGS_POR_ITEM, "Escolha no máximo 12 categorias.")
+  .default([]);
+
+const newTags = z
+  .array(
+    z
+      .string()
+      .trim()
+      .min(1, "Categoria sem nome.")
+      .max(30, "Categoria muito longa (máx. 30 caracteres)."),
+  )
+  .max(MAX_TAGS_POR_ITEM, "Escolha no máximo 12 categorias.")
+  .default([]);
+
 export const purchaseItemSchema = z
   .object({
     productId: z.uuid("Produto inválido.").nullable(),
@@ -50,6 +71,8 @@ export const purchaseItemSchema = z
     unitCost,
     salePrice,
     trackStock: z.boolean(),
+    tagIds,
+    newTags,
   })
   .superRefine((item, ctx) => {
     if (item.isNew && item.productId !== null) {

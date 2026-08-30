@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 import { iaLiberadaPara } from "@/lib/compras/ia-visao";
+import { listarTags } from "@/lib/products/tags";
 import { createClient } from "@/lib/supabase/server";
 
 import { NotaForm } from "../nota-form";
@@ -20,6 +21,9 @@ export default async function NovaCompraPage() {
     data: { user },
   } = await supabase.auth.getUser();
   const iaLiberada = user ? iaLiberadaPara(user.id) : false;
+
+  // O produto novo cadastrado pela nota pode nascer já categorizado.
+  const tags = await listarTags(supabase);
 
   return (
     <section className="minimal:max-sm:gap-4 mx-auto flex w-full max-w-3xl flex-col gap-6">
@@ -41,7 +45,7 @@ export default async function NovaCompraPage() {
         </p>
       </header>
 
-      <NotaForm iaLiberada={iaLiberada} />
+      <NotaForm iaLiberada={iaLiberada} tags={tags} />
     </section>
   );
 }

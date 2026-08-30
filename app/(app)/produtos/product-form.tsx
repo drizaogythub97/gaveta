@@ -7,9 +7,11 @@ import { useActionState, useState } from "react";
 import { ErrorAlert } from "@/components/auth/form-feedback";
 import { SubmitButton } from "@/components/auth/submit-button";
 import { CurrencyInput } from "@/components/app/currency-input";
+import { TagPicker } from "@/components/app/tag-picker";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { ProductTag } from "@/lib/types/db";
 import { cn } from "@/lib/utils";
 
 import { type ProductFormState } from "./actions";
@@ -26,7 +28,10 @@ type Props = {
     costPrice?: number | null;
     trackStock?: "true" | "false";
     stockQuantity?: string;
+    tagIds?: string[];
   };
+  /** Categorias que o dono já criou — a lista de marcar. */
+  tags: ProductTag[];
   submitLabel: string;
   submitPendingLabel: string;
 };
@@ -36,6 +41,7 @@ const initialState: ProductFormState = {};
 export function ProductForm({
   action,
   initialValues,
+  tags,
   submitLabel,
   submitPendingLabel,
 }: Props) {
@@ -170,6 +176,18 @@ export function ProductForm({
           </p>
         ) : null}
       </fieldset>
+
+      <div className="flex flex-col gap-2">
+        <TagPicker
+          disponiveis={tags}
+          idsIniciais={initialValues?.tagIds ?? []}
+        />
+        {state.fieldErrors?.tags ? (
+          <p className="text-destructive text-sm" role="alert">
+            {state.fieldErrors.tags}
+          </p>
+        ) : null}
+      </div>
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="price" className="text-base">

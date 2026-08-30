@@ -17,7 +17,8 @@ export type ProductFormState = {
       | "price"
       | "costPrice"
       | "trackStock"
-      | "stockQuantity",
+      | "stockQuantity"
+      | "tags",
       string
     >
   >;
@@ -28,6 +29,7 @@ export type ProductFormState = {
     costPrice?: string;
     trackStock?: "true" | "false";
     stockQuantity?: string;
+    tagIds?: string[];
   };
 };
 
@@ -39,6 +41,8 @@ function readForm(formData: FormData) {
     costPrice: String(formData.get("costPrice") ?? ""),
     trackStock: String(formData.get("trackStock") ?? ""),
     stockQuantity: String(formData.get("stockQuantity") ?? ""),
+    tagIds: formData.getAll("tagIds").map((v) => String(v)),
+    newTags: formData.getAll("newTags").map((v) => String(v)),
   };
 }
 
@@ -53,6 +57,7 @@ function rawValues(raw: ReturnType<typeof readForm>) {
         ? (raw.trackStock as "true" | "false")
         : undefined,
     stockQuantity: raw.stockQuantity,
+    tagIds: raw.tagIds,
   };
 }
 
@@ -66,7 +71,8 @@ function collectFieldErrors(issues: ZodIssue[]): ProductFormState["fieldErrors"]
       key === "price" ||
       key === "costPrice" ||
       key === "trackStock" ||
-      key === "stockQuantity"
+      key === "stockQuantity" ||
+      key === "tags"
     ) {
       fieldErrors[key] = issue.message;
     }
@@ -86,6 +92,30 @@ function dbErrorToPortuguese(message: string | undefined): string {
     return "O preço de custo não pode ser negativo.";
   }
   return "Não foi possível salvar. Tente novamente.";
+}
+
+/**
+ * Deixa o produto com exatamente as categorias escolhidas.
+ *
+ * Vai por RPC (`aplicar_tags_no_produto`, migration 0019) e não por inserts
+ * soltos: criar a categoria nova e vinculá-la precisa acontecer junto, senão
+ * um erro no meio deixa tag órfã ou produto com metade das categorias.
+ */
+async function syncTags(
+  productId: string,
+  tagIds: string[],
+  newTags: string[],
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("aplicar_tags_no_produto", {
+    p_product: productId,
+    p_tags: tagIds,
+    p_new_tags: newTags,
+  });
+  if (error) {
+    return { error: "Não foi possível salvar as categorias. Tente novamente." };
+  }
+  return {};
 }
 
 async function syncBarcodes(
@@ -171,6 +201,20 @@ export async function createProduct(
     return { error: syncResult.error, values: rawValues(raw) };
   }
 
+  const tagResult = await syncTags(
+    inserted.id,
+    parsed.data.tagIds,
+    parsed.data.newTags,
+  );
+  if (tagResult.error) {
+    await supabase
+      .from("products")
+      .delete()
+      .eq("id", inserted.id)
+      .eq("user_id", user.id);
+    return { error: tagResult.error, values: rawValues(raw) };
+  }
+
   revalidatePath("/produtos");
   redirect("/produtos");
 }
@@ -221,6 +265,15 @@ export async function updateProduct(
   const syncResult = await syncBarcodes(id, user.id, parsed.data.barcodes);
   if (syncResult.error) {
     return { error: syncResult.error, values: rawValues(raw) };
+  }
+
+  const tagResult = await syncTags(
+    id,
+    parsed.data.tagIds,
+    parsed.data.newTags,
+  );
+  if (tagResult.error) {
+    return { error: tagResult.error, values: rawValues(raw) };
   }
 
   revalidatePath("/produtos");

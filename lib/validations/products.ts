@@ -97,6 +97,49 @@ const barcodesField = z
     return deduped;
   });
 
+/**
+ * Tags do produto. Chegam do formulário em duas listas: as que já existem
+ * (por id) e as digitadas na hora (por nome) — é o que permite criar
+ * categoria sem uma tela de cadastro antes.
+ */
+const MAX_TAGS_POR_PRODUTO = 12;
+
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const tagIdsField = z
+  .array(z.string())
+  .optional()
+  .transform((arr) => Array.from(new Set((arr ?? []).filter((v) => v !== ""))))
+  .refine((arr) => arr.every((v) => UUID.test(v)), "Categoria inválida.");
+
+const newTagsField = z
+  .array(z.string())
+  .optional()
+  .transform((arr, ctx) => {
+    const limpas = (arr ?? []).map((t) => t.trim()).filter((t) => t !== "");
+    for (const nome of limpas) {
+      if (nome.length > 30) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Categoria muito longa (máx. 30 caracteres).",
+        });
+        return z.NEVER;
+      }
+    }
+    // Dedupe ignorando caixa, igual ao índice único do banco.
+    const vistas = new Set<string>();
+    const unicas: string[] = [];
+    for (const nome of limpas) {
+      const chave = nome.toLocaleLowerCase("pt-BR");
+      if (!vistas.has(chave)) {
+        vistas.add(chave);
+        unicas.push(nome);
+      }
+    }
+    return unicas;
+  });
+
 export const productSchema = z
   .object({
     name,
@@ -107,8 +150,17 @@ export const productSchema = z
       error: "Escolha se controla estoque.",
     }),
     stockQuantity: stockField,
+    tagIds: tagIdsField,
+    newTags: newTagsField,
   })
   .superRefine((data, ctx) => {
+    if (data.tagIds.length + data.newTags.length > MAX_TAGS_POR_PRODUTO) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["tags"],
+        message: `Escolha no máximo ${MAX_TAGS_POR_PRODUTO} categorias.`,
+      });
+    }
     if (data.trackStock === "true" && data.stockQuantity === null) {
       ctx.addIssue({
         code: "custom",
