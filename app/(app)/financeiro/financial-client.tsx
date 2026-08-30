@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PERIOD_LABELS, type Period } from "@/lib/dashboard/dates";
+import { useFiltroNav } from "@/lib/hooks/use-filtro-nav";
 import { SALE_SORTS, SORT_LABELS, type SaleSort } from "@/lib/financeiro/sort";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types/sales";
 import type { PaymentMethod } from "@/app/(app)/caixa/actions";
@@ -33,19 +33,6 @@ const ALL_METHODS: PaymentMethod[] = [
   "vale",
 ];
 
-function buildHref(
-  base: URLSearchParams,
-  overrides: Record<string, string | null>,
-) {
-  const next = new URLSearchParams(base);
-  for (const [key, value] of Object.entries(overrides)) {
-    if (value === null) next.delete(key);
-    else next.set(key, value);
-  }
-  const qs = next.toString();
-  return qs ? `?${qs}` : "?";
-}
-
 export function FinancialClient({
   period,
   from,
@@ -55,9 +42,7 @@ export function FinancialClient({
   showMethods = true,
   showSort = true,
 }: Props) {
-  const router = useRouter();
-  const params = useSearchParams();
-  const baseParams = new URLSearchParams(params?.toString() ?? "");
+  const { pendente, href, aplicar } = useFiltroNav();
 
   const [fromValue, setFromValue] = useState(from);
   const [toValue, setToValue] = useState(to);
@@ -67,15 +52,35 @@ export function FinancialClient({
     if (next.has(method)) next.delete(method);
     else next.add(method);
     const list = Array.from(next);
-    const href = buildHref(baseParams, {
+    aplicar({
       methods: list.length === 0 ? null : list.join(","),
       page: null, // filtros novos voltam à primeira página
     });
-    router.push(href);
   }
 
   function clearMethods() {
-    router.push(buildHref(baseParams, { methods: null, page: null }));
+    aplicar({ methods: null, page: null });
+  }
+
+  // O intervalo personalizado era um <form method="get">: o navegador
+  // montava uma query NOVA com os campos do formulário, jogando fora a aba
+  // aberta e a ordenação, e recarregava o documento inteiro. Agora é o mesmo
+  // caminho dos outros filtros.
+  function aplicarIntervalo(event: React.FormEvent) {
+    event.preventDefault();
+    aplicar(mudancaDePeriodo("custom"));
+  }
+
+  // Ao entrar no "Personalizado" valem as datas que estão NOS CAMPOS — não
+  // as do período anterior, senão a tela mostraria um intervalo e filtraria
+  // por outro.
+  function mudancaDePeriodo(p: Period) {
+    return {
+      period: p,
+      from: p === "custom" ? fromValue : null,
+      to: p === "custom" ? toValue : null,
+      page: null,
+    };
   }
 
   return (
@@ -89,16 +94,17 @@ export function FinancialClient({
         >
           {ORDERED_PERIODS.map((p) => {
             const active = p === period;
-            const href = buildHref(baseParams, {
-              period: p,
-              from: p === "custom" ? from : null,
-              to: p === "custom" ? to : null,
-              page: null,
-            });
+            const destino = href(mudancaDePeriodo(p));
             return (
               <Link
                 key={p}
-                href={href}
+                href={destino}
+                onClick={(e) => {
+                  // Mesma transição dos demais filtros: sem o carregador de
+                  // tela cheia entre um período e outro.
+                  e.preventDefault();
+                  aplicar(mudancaDePeriodo(p));
+                }}
                 role="radio"
                 aria-checked={active}
                 className={cn(
@@ -117,17 +123,9 @@ export function FinancialClient({
 
       {period === "custom" ? (
         <form
-          method="get"
+          onSubmit={aplicarIntervalo}
           className="border-border flex flex-col gap-3 rounded-lg border border-dashed p-4 sm:flex-row sm:items-end"
         >
-          <input type="hidden" name="period" value="custom" />
-          {selectedMethods.length > 0 ? (
-            <input
-              type="hidden"
-              name="methods"
-              value={selectedMethods.join(",")}
-            />
-          ) : null}
           <div className="flex flex-1 flex-col gap-2">
             <Label htmlFor="from" className="text-base">
               De
@@ -158,9 +156,10 @@ export function FinancialClient({
           </div>
           <button
             type="submit"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 h-12 rounded-lg px-5 text-base font-medium"
+            disabled={pendente}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 h-12 rounded-lg px-5 text-base font-medium disabled:opacity-70"
           >
-            Aplicar
+            {pendente ? "Aplicando…" : "Aplicar"}
           </button>
         </form>
       ) : null}
@@ -173,11 +172,7 @@ export function FinancialClient({
           <select
             id="sort"
             value={sort}
-            onChange={(e) =>
-              router.push(
-                buildHref(baseParams, { sort: e.target.value, page: null }),
-              )
-            }
+            onChange={(e) => aplicar({ sort: e.target.value, page: null })}
             className="border-input bg-background focus-visible:border-ring focus-visible:ring-ring/50 h-12 w-full rounded-lg border px-3 text-base outline-none focus-visible:ring-3 sm:max-w-xs"
           >
             {SALE_SORTS.map((s) => (

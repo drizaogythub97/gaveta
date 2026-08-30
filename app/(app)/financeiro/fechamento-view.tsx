@@ -2,7 +2,13 @@ import { AlertTriangle, CheckCircle2, Package, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 import { formatBRL } from "@/lib/products/format";
-import type { Fechamento, ProdutoSemCusto } from "@/lib/financeiro/lucro-custo";
+import type {
+  Fechamento,
+  FechamentoDia,
+  ProdutoSemCusto,
+} from "@/lib/financeiro/lucro-custo";
+
+import { FechamentoDias } from "./fechamento-dias";
 
 /**
  * A tela "Fechamento do dia" (plano 08, §2.3).
@@ -16,12 +22,19 @@ export function FechamentoView({
   semCusto,
   despesasSemCompras,
   periodo,
+  dias,
+  from,
+  to,
 }: {
   fechamento: Fechamento;
   semCusto: ProdutoSemCusto[];
   /** Despesas do período SEM as compras de mercadoria (ver nota abaixo). */
   despesasSemCompras: number;
   periodo: string;
+  /** O período quebrado por dia — a soma bate com os números acima. */
+  dias: FechamentoDia[];
+  from: string;
+  to: string;
 }) {
   const { recebido, recebidoVista, recebidoFiado, taxas, custo, lucro } =
     fechamento;
@@ -167,6 +180,8 @@ export function FechamentoView({
           </ul>
         </section>
       )}
+
+      <FechamentoDias dias={dias} from={from} to={to} />
 
       {/* ---------- Linha informativa: as outras despesas ---------- */}
       <section className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-2 rounded-xl p-5 ring-1">

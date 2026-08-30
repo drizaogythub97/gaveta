@@ -7,6 +7,19 @@ export const LOW_STOCK_THRESHOLD = 5;
 
 export type Period = "today" | "7d" | "30d" | "month" | "custom";
 
+/**
+ * Fuso usado para calcular as bordas dos períodos acima — o do servidor
+ * (UTC na Vercel), porque é dele que saem `startOfDay`/`endOfDay`.
+ *
+ * Quem agrupa por dia no banco precisa receber ESTE fuso, senão os dias não
+ * somam o total do período. A imprecisão de o dia virar às 21h de Brasília
+ * é conhecida e vale para o Financeiro inteiro; o dia em que for corrigida,
+ * muda aqui e o banco acompanha.
+ */
+export function periodTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
 export const PERIOD_LABELS: Record<Period, string> = {
   today: "Hoje",
   "7d": "Últimos 7 dias",

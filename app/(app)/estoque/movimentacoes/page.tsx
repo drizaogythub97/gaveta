@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+import { FiltroChips } from "@/components/app/filtro-chips";
 import { createClient } from "@/lib/supabase/server";
 import { formatQuantity } from "@/lib/products/format";
 import {
@@ -80,30 +81,13 @@ export default async function StockMovementsPage({
         </p>
       </header>
 
-      <nav aria-label="Filtrar por tipo" className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => {
-          const active = f.value === activeType;
-          const href =
-            f.value === "todos"
-              ? "/estoque/movimentacoes"
-              : `/estoque/movimentacoes?type=${f.value}`;
-          return (
-            <Link
-              key={f.value}
-              href={href}
-              aria-current={active ? "true" : undefined}
-              className={cn(
-                "flex h-11 items-center rounded-lg px-4 text-base font-medium transition-colors",
-                active
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {f.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <FiltroChips
+        param="type"
+        rotulo="Filtrar por tipo"
+        atual={activeType}
+        valorPadrao="todos"
+        opcoes={FILTERS.map((f) => ({ value: f.value, label: f.label }))}
+      />
 
       {error ? (
         <p className="text-destructive text-base" role="alert">

@@ -283,6 +283,59 @@ Fase 0 (você) → Fases 1–4 (Claude Code). Ao fim da Fase 4 já há um sistem
 - Usar variáveis de ambiente padrão e `@supabase/ssr` (portável).
 - Documentar no README o passo de migração. Detalhes na nota do [README](../README.md) e no guia de deploy.
 
+## Sprint de ajustes finos (2026-08-30)
+
+Pedidos do dono depois de usar o sistema no dia a dia. Três entregas
+independentes, cada uma com o seu PR e a sua validação no Preview.
+
+### A — Tema por conta e total do caixa (PR #36)
+
+- **O tema não se mantinha entre aparelhos.** Ele mora em `profiles.theme`
+  (banco, por conta) e no cookie `erp_theme` (por aparelho), mas quem
+  decidia o que ir à tela era **só o cookie** — aparelho novo entrava claro
+  enquanto a chave em Preferências, que lê o banco, aparecia em "Escuro".
+  Agora o banco é a fonte da verdade e o cookie é cache do script
+  anti-flash: `resolveTheme()` consulta o perfil quando o cookie falta, o
+  script grava o cookie, e `ThemeSync` aplica o tema **depois do login** —
+  que é navegação de cliente e não re-renderiza o `<html>`. Entrar grava o
+  cookie da conta (antes, o cookie de OUTRA conta no mesmo aparelho valia
+  para sempre) e sair apaga. O modo Simples/Minimalista continua por
+  aparelho, de propósito.
+- **Total da frente de caixa colidia com o botão** a partir de 3 dígitos: o
+  bloco se media pela janela, não pelo próprio card, que em duas colunas é
+  estreito. Passou a container query com fonte fluida e quebra garantida, e
+  a tela ganhou largura acima de 1280px.
+
+### B — Filtro sem recarregar e Fechamento dia a dia
+
+- **O padrão de filtragem do sistema** (ver `CLAUDE.md`): o recorte vive na
+  URL e a navegação acontece dentro de um `startTransition`, via
+  `useFiltroNav`. O `<form method="get">` do intervalo personalizado era a
+  causa do bug relatado — o navegador monta uma query NOVA só com os campos
+  do formulário, então `tab` sumia e a pessoa voltava para a aba Vendas, com
+  recarga do documento inteiro. Componentes reaproveitáveis: `FiltroChips` e
+  `Paginacao`. O conteúdo de cada aba do Financeiro ficou sob um `Suspense`
+  próprio, para o carregador de tela cheia não substituir a página a cada
+  filtro.
+- **Fechamento dia a dia** (migration 0018, só leitura): `fechamento_por_dia`
+  quebra o período em dias com as MESMAS regras da `lucro_custo_summary` —
+  a soma dos dias fecha com o total do topo, e isso é testado. Cada dia abre
+  (sob demanda, por Server Action) nas vendas daquele dia, item a item, com
+  custo e lucro. Quitação de venda a prazo aparece marcada, com a fração
+  paga no dia.
+- **Fuso**: as duas funções recebem `p_tz` — o MESMO fuso que a aplicação usa
+  para calcular as bordas do período (`periodTimeZone()`). É o que garante a
+  soma fechar. Segue valendo a imprecisão antiga do Financeiro: na Vercel o
+  servidor é UTC, então o dia do lojista vira às 21h de Brasília. Corrigir
+  isso muda os números de todo o Financeiro e é decisão do dono; quando for,
+  muda em `lib/dashboard/dates.ts` e o banco acompanha.
+
+### C — Produtos: paginação e tags
+
+Em andamento.
+
+---
+
 ## PRÓXIMOS PASSOS ESCOLHIDOS (2026-08-29) — começar por aqui
 
 O plano 08 (nota de compra + Lucro × Custo) está inteiro entregue e em
