@@ -11,12 +11,11 @@ import type { TestUser } from "./helpers";
  *   1. a soma dos dias é EXATAMENTE o total do período já mostrado no topo
  *      da aba — se divergir, a tela passa a contar duas histórias;
  *   2. o detalhe de um dia bate com a linha daquele dia;
- *   3. o isolamento por usuário continua valendo (a RLS é a fronteira).
  *
- * **Dois usuários para o arquivo inteiro, criados uma vez.** Cada
- * `createTestUser` é um cadastro + login no Supabase Auth, que tem limite de
- * taxa por IP; a suíte inteira já anda perto dele, então um usuário por
- * asserção derrubaria os outros arquivos.
+ * O acesso CRUZADO (Bob não enxerga os dias de Alice) mora em
+ * `isolation-extended.test.ts`, que é o arquivo desse assunto e já tem os
+ * dois usuários criados. Cada `createTestUser` é um login no Supabase Auth,
+ * que tem limite de taxa por IP — a suíte inteira compartilha esse teto.
  */
 
 const DE = new Date(Date.now() - 3_600_000).toISOString();
@@ -48,9 +47,7 @@ type ItemRow = {
 const centavos = (n: number) => Math.round(n * 100) / 100;
 
 let dono: TestUser;
-let intruso: TestUser;
 let app: ReturnType<typeof userClient>;
-let appIntruso: ReturnType<typeof userClient>;
 
 async function dias(cliente = app): Promise<DiaRow[]> {
   const { data, error } = await cliente.rpc("fechamento_por_dia", {
@@ -103,9 +100,7 @@ async function criarProduto(
  */
 beforeAll(async () => {
   dono = await createTestUser("dia-dono");
-  intruso = await createTestUser("dia-intruso");
   app = userClient(dono.accessToken);
-  appIntruso = userClient(intruso.accessToken);
 
   const arroz = await criarProduto("Arroz", 10, 4);
   const feijao = await criarProduto("Feijão", 20, 7);
@@ -130,7 +125,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await deleteTestUser(dono);
-  await deleteTestUser(intruso);
 });
 
 describe("RPC fechamento_por_dia", () => {
@@ -177,10 +171,6 @@ describe("RPC fechamento_por_dia", () => {
     // O bolo (R$ 30) entra no que foi vendido, mas não no que está coberto.
     expect(soma("base")).toBe(70);
     expect(soma("base_coberta")).toBe(40);
-  });
-
-  it("não enxerga o movimento de outro usuário", async () => {
-    expect(await dias(appIntruso)).toHaveLength(0);
   });
 });
 
@@ -270,10 +260,5 @@ describe("RPC fechamento_vendas_do_dia", () => {
     const semCusto = itens.filter((i) => i.custo === null);
     expect(semCusto).toHaveLength(1);
     expect(Number(semCusto[0].valor)).toBe(30);
-  });
-
-  it("não devolve o dia de outro usuário", async () => {
-    const [linha] = await dias();
-    expect(await itensDoDia(linha.dia, appIntruso)).toHaveLength(0);
   });
 });

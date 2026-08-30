@@ -6,13 +6,18 @@
 ---
 
 
-> **Cuidado com o limite de taxa do Supabase Auth.** A suíte de RLS cria ~35
-> usuários descartáveis por execução, cada um com um `signInWithPassword`.
-> Rodá-la várias vezes seguidas estoura o limite por IP e os arquivos passam
-> a falhar com *"Request rate limit reached"* — que **não é** falha de teste.
-> Rodar uma vez e, se precisar repetir, esperar ~10 minutos. Teste novo em
-> `tests/rls/` deve compartilhar os usuários do arquivo (um `beforeAll`),
-> nunca criar um par por asserção.
+> **A suíte de RLS anda no teto do limite de taxa do Supabase Auth.** São
+> ~33 usuários descartáveis por execução, cada um com um
+> `signInWithPassword`; acima disso os arquivos começam a falhar com
+> *"Request rate limit reached"*, que **não é** falha de teste. Medido em
+> 2026-08-30: 33 passa, 35 não.
+>
+> Por isso, ao acrescentar teste em `tests/rls/`:
+> - criar os usuários **uma vez por arquivo** (`beforeAll`), nunca um par por
+>   asserção;
+> - **acesso cruzado entre usuários vai para `isolation-extended.test.ts`**,
+>   que já tem Alice e Bob criados — não custa usuário novo;
+> - rodar a suíte uma vez; se precisar repetir, esperar ~10 minutos.
 
 ## 1. Teste funcional automatizado com usuário descartável
 
