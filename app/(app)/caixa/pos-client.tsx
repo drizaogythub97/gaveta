@@ -919,7 +919,11 @@ export function PosClient({
 
           <section
             aria-labelledby="total-heading"
-            className="bg-primary text-primary-foreground flex flex-col gap-4 rounded-xl p-5"
+            // @container: o bloco do total se mede pela PRÓPRIA largura, não
+            // pela da janela. É o que faltava — em duas colunas a janela é
+            // "grande" e o card é estreito, e era aí que o valor passava por
+            // baixo do botão.
+            className="bg-primary text-primary-foreground @container flex flex-col gap-4 rounded-xl p-5"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex flex-col gap-1">
@@ -962,13 +966,21 @@ export function PosClient({
                 </div>
               </div>
             ) : null}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
+            {/* flex-wrap é a garantia final: se o valor e o botão não couberem
+                lado a lado, o botão desce para a própria linha em vez de
+                sobrepor o número. */}
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+              {/* flex-auto (base no conteúdo), não flex-1: com base 0 o bloco
+                  encolheria a zero em vez de empurrar o botão para a linha
+                  de baixo, e a quebra nunca aconteceria. */}
+              <div className="@lg:basis-auto min-w-0 flex-auto basis-full">
                 <p id="total-heading" className="text-base opacity-90">
                   Total da venda
                 </p>
                 <p
-                  className="text-4xl font-bold tabular-nums sm:text-5xl"
+                  // Fonte fluida pela largura do card (cqi), com piso e teto:
+                  // acompanha o espaço disponível em vez de saltar em degraus.
+                  className="text-[clamp(1.875rem,11cqi,3rem)] leading-tight font-bold tabular-nums"
                   aria-live="polite"
                 >
                   {formatBRL(total)}
@@ -984,7 +996,7 @@ export function PosClient({
                   (isFiado && !fiadoCliente)
                 }
                 aria-busy={isRegistering}
-                className="bg-background text-primary hover:bg-background/90 h-16 shrink-0 px-8 text-xl font-semibold whitespace-nowrap"
+                className="bg-background text-primary hover:bg-background/90 @lg:w-auto h-16 w-full shrink-0 px-8 text-xl font-semibold whitespace-nowrap"
               >
                 {isRegistering
                   ? "Registrando…"

@@ -4,7 +4,12 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { PwaRegister } from "@/components/app/pwa-register";
 import { cn } from "@/lib/utils";
-import { getThemeFromCookie } from "@/lib/theme/cookie";
+import {
+  THEME_COOKIE,
+  THEME_COOKIE_MAX_AGE,
+  resolveTheme,
+  type Theme,
+} from "@/lib/theme/cookie";
 import { getUiModeFromCookie } from "@/lib/ui-mode/cookie";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
@@ -57,25 +62,38 @@ export const viewport: Viewport = {
 
 // Script injetado no <head> para aplicar o tema antes da hidratação,
 // evitando o piscar branco→escuro (FOUC) em quem usa o modo escuro.
-const THEME_INIT_SCRIPT = `
+//
+// O cookie manda quando existe (é o que o navegador tem em mãos, inclusive
+// num documento vindo do cache). Quando falta — aparelho novo, cookie
+// limpo —, vale o tema que o servidor resolveu a partir do perfil, e o
+// script grava o cookie para as próximas visitas não consultarem o banco.
+function themeInitScript(resolved: Theme, cookieName: string, maxAge: number) {
+  return `
 (function () {
   try {
-    var m = document.cookie.match(/(?:^|; )erp_theme=([^;]+)/);
+    var d = document.documentElement;
+    var m = document.cookie.match(/(?:^|; )${cookieName}=([^;]+)/);
     var v = m ? decodeURIComponent(m[1]) : null;
+    if (v !== 'dark' && v !== 'light') {
+      v = '${resolved}';
+      document.cookie = '${cookieName}=' + v + ';path=/;max-age=${maxAge};samesite=lax';
+    }
     if (v === 'dark') {
-      document.documentElement.classList.add('dark');
-      document.documentElement.style.colorScheme = 'dark';
+      d.classList.add('dark');
+      d.style.colorScheme = 'dark';
     } else {
-      document.documentElement.style.colorScheme = 'light';
+      d.classList.remove('dark');
+      d.style.colorScheme = 'light';
     }
   } catch (e) {}
 })();
 `;
+}
 
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const theme = await getThemeFromCookie();
+  const { theme } = await resolveTheme();
   const isDark = theme === "dark";
   const uiMode = await getUiModeFromCookie();
   const nonce = (await headers()).get("x-nonce") ?? undefined;
@@ -97,7 +115,9 @@ export default async function RootLayout({
       <head>
         <script
           nonce={nonce}
-          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+          dangerouslySetInnerHTML={{
+            __html: themeInitScript(theme, THEME_COOKIE, THEME_COOKIE_MAX_AGE),
+          }}
         />
       </head>
       <body className="bg-background text-foreground min-h-screen">

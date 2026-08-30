@@ -6,10 +6,13 @@ import { revalidatePath } from "next/cache";
 import { marcaUnicaAtiva, removerLogoSeguro } from "@/lib/ecossistema-server";
 import { createClient } from "@/lib/supabase/server";
 import { parseDecimalPtBR } from "@/lib/products/format";
-import { THEME_COOKIE, type Theme } from "@/lib/theme/cookie";
+import {
+  THEME_COOKIE,
+  THEME_COOKIE_MAX_AGE,
+  type Theme,
+} from "@/lib/theme/cookie";
 import { receiptPrefsSchema } from "@/lib/validations/receipt";
 
-const ONE_YEAR = 60 * 60 * 24 * 365;
 const MAX_LOGO_BYTES = 1_500_000; // ~1,5 MB depois de cropado/reencoded
 
 type AcceptedKind = "webp" | "png" | "jpeg";
@@ -75,7 +78,7 @@ export async function saveTheme(theme: Theme): Promise<void> {
   const store = await cookies();
   store.set(THEME_COOKIE, theme, {
     path: "/",
-    maxAge: ONE_YEAR,
+    maxAge: THEME_COOKIE_MAX_AGE,
     sameSite: "lax",
   });
 

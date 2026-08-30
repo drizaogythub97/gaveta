@@ -8,8 +8,10 @@ import { BottomNav } from "@/components/app/bottom-nav";
 import { LogoutButton } from "@/components/app/logout-button";
 import { ModoChooser } from "@/components/app/modo-chooser";
 import { PersonalizationTip } from "@/components/app/personalization-tip";
+import { ThemeSync } from "@/components/app/theme-sync";
 import { Toaster } from "@/components/ui/sonner";
 import { createClient } from "@/lib/supabase/server";
+import { parseTheme } from "@/lib/theme/theme";
 import { getUiModeFromCookie } from "@/lib/ui-mode/cookie";
 
 export default async function AppLayout({
@@ -28,9 +30,13 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("brand_name, brand_logo_path")
+    .select("brand_name, brand_logo_path, theme")
     .eq("id", user.id)
     .maybeSingle();
+
+  // O tema vem junto do perfil que o cabeçalho já buscava — nenhuma consulta
+  // a mais só para isso.
+  const theme = parseTheme(profile?.theme as string | undefined) ?? "light";
 
   const customName = (profile?.brand_name as string | null) ?? null;
   const logoPath = profile?.brand_logo_path as string | null;
@@ -114,6 +120,7 @@ export default async function AppLayout({
         displayName={displayName ?? ""}
         mostrarSwitcher={mostrarSwitcher}
       />
+      <ThemeSync theme={theme} />
       {uiMode === null ? <ModoChooser /> : null}
       <Toaster />
       <PersonalizationTip isPersonalized={isPersonalized} />

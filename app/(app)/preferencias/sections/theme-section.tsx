@@ -4,7 +4,7 @@ import { Moon, Sun } from "lucide-react";
 import { useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import type { Theme } from "@/lib/theme/cookie";
+import type { Theme } from "@/lib/theme/theme";
 
 import { saveTheme } from "../actions";
 
