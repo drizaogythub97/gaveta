@@ -139,3 +139,168 @@ export async function carregarFechamento(
 
   return { fechamento, semCusto };
 }
+
+// --------------------------------------------------------------- dia a dia
+
+/** Uma linha da RPC `fechamento_por_dia`. */
+type FechamentoDiaRow = {
+  dia: string;
+  recebido: number;
+  taxas: number;
+  custo: number;
+  base: number;
+  base_coberta: number;
+  vendas: number;
+  recebido_fiado: number;
+};
+
+/** Um dia do período, já com o split pronto para a tela. */
+export type FechamentoDia = {
+  /** "YYYY-MM-DD" — data pura, nunca passar por `new Date` (voltaria um dia). */
+  dia: string;
+  recebido: number;
+  taxas: number;
+  custo: number;
+  lucro: number;
+  /** Quantas vendas de caixa aconteceram no dia. */
+  vendas: number;
+  /** Quanto do recebido veio de quitação de venda a prazo. */
+  recebidoFiado: number;
+  /** Fração do valor vendido com custo conhecido; `null` sem venda no dia. */
+  cobertura: number | null;
+};
+
+export function calcularDia(row: FechamentoDiaRow): FechamentoDia {
+  const recebido = centavos(Number(row.recebido));
+  const taxas = centavos(Number(row.taxas));
+  const custo = centavos(Number(row.custo));
+  const base = Number(row.base);
+  const coberta = Number(row.base_coberta);
+
+  return {
+    dia: row.dia,
+    recebido,
+    taxas,
+    custo,
+    lucro: centavos(recebido - taxas - custo),
+    vendas: Number(row.vendas),
+    recebidoFiado: centavos(Number(row.recebido_fiado)),
+    cobertura: base > 0 ? coberta / base : null,
+  };
+}
+
+export async function carregarFechamentoPorDia(
+  supabase: SupabaseClient,
+  fromISO: string,
+  toISO: string,
+  timeZone: string,
+): Promise<FechamentoDia[]> {
+  const { data } = await supabase.rpc("fechamento_por_dia", {
+    p_from: fromISO,
+    p_to: toISO,
+    p_tz: timeZone,
+  });
+  return ((data ?? []) as FechamentoDiaRow[]).map(calcularDia);
+}
+
+/** Item de uma venda no detalhe do dia. */
+export type ItemDoDia = {
+  id: string;
+  nome: string;
+  quantidade: number;
+  valor: number;
+  /** `null` quando a venda não guardou custo daquele item. */
+  custo: number | null;
+};
+
+/** Uma venda (ou quitação a prazo) dentro do dia aberto. */
+export type VendaDoDia = {
+  id: string;
+  origem: "caixa" | "fiado";
+  vendidaEm: string;
+  metodo: string;
+  taxa: number;
+  valor: number;
+  /** Soma dos custos conhecidos. */
+  custo: number;
+  lucro: number;
+  /** Verdadeiro quando algum item não tinha custo — o lucro fica por cima. */
+  temItemSemCusto: boolean;
+  itens: ItemDoDia[];
+};
+
+export type VendaDoDiaRow = {
+  sale_id: string;
+  origem: string;
+  vendida_em: string;
+  metodo: string;
+  taxa: number;
+  item_id: string;
+  nome: string;
+  quantidade: number;
+  valor: number;
+  custo: number | null;
+};
+
+/**
+ * Agrupa as linhas (uma por item) em vendas. A RPC devolve plano porque uma
+ * ida ao banco basta; a forma de árvore é só apresentação.
+ */
+export function agruparVendasDoDia(linhas: VendaDoDiaRow[]): VendaDoDia[] {
+  const porVenda = new Map<string, VendaDoDia>();
+
+  for (const linha of linhas) {
+    let venda = porVenda.get(linha.sale_id);
+    if (!venda) {
+      venda = {
+        id: linha.sale_id,
+        origem: linha.origem === "fiado" ? "fiado" : "caixa",
+        vendidaEm: linha.vendida_em,
+        metodo: linha.metodo,
+        taxa: centavos(Number(linha.taxa)),
+        valor: 0,
+        custo: 0,
+        lucro: 0,
+        temItemSemCusto: false,
+        itens: [],
+      };
+      porVenda.set(linha.sale_id, venda);
+    }
+
+    const custo = linha.custo === null ? null : Number(linha.custo);
+    venda.itens.push({
+      id: linha.item_id,
+      nome: linha.nome,
+      quantidade: Number(linha.quantidade),
+      valor: Number(linha.valor),
+      custo,
+    });
+    venda.valor = centavos(venda.valor + Number(linha.valor));
+    if (custo === null) venda.temItemSemCusto = true;
+    else venda.custo = centavos(venda.custo + custo);
+  }
+
+  const vendas = Array.from(porVenda.values());
+  for (const venda of vendas) {
+    // Mesma conta do fechamento: a taxa sai do lucro, nunca do custo.
+    venda.lucro = centavos(venda.valor - venda.taxa - venda.custo);
+  }
+  // Mais recente primeiro, como na lista de vendas do Financeiro.
+  return vendas.sort((a, b) => b.vendidaEm.localeCompare(a.vendidaEm));
+}
+
+export async function carregarVendasDoDia(
+  supabase: SupabaseClient,
+  dia: string,
+  fromISO: string,
+  toISO: string,
+  timeZone: string,
+): Promise<VendaDoDia[]> {
+  const { data } = await supabase.rpc("fechamento_vendas_do_dia", {
+    p_dia: dia,
+    p_from: fromISO,
+    p_to: toISO,
+    p_tz: timeZone,
+  });
+  return agruparVendasDoDia((data ?? []) as VendaDoDiaRow[]);
+}

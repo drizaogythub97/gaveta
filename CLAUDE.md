@@ -42,6 +42,14 @@ npm run test:e2e   # Playwright
 - Nomes de variáveis/commits em inglês; **textos de interface em português** (claros e simples).
 - Commits no padrão Conventional Commits (`feat:`, `fix:`, `chore:`...).
 - Acessibilidade: seguir `docs/02-DESIGN-SYSTEM-IDOSOS.md` (contraste AA, alvos ≥44px, fontes grandes, rótulos aria).
+- **Filtro é sempre URL + transição.** O recorte (aba, período, ordenação,
+  página, tag) vive na query string, e quem filtra usa `useFiltroNav`
+  (`lib/hooks/use-filtro-nav.ts`), que preserva o resto da query e navega
+  dentro de um `startTransition`. Nunca usar `<form method="get">` para
+  filtrar: o navegador monta uma query NOVA só com os campos do formulário —
+  foi assim que o intervalo personalizado do Financeiro derrubava a aba
+  aberta — e recarrega o documento inteiro. Componentes prontos:
+  `FiltroChips` (chips de um parâmetro) e `Paginacao`.
 
 ## Estrutura de pastas (alvo)
 

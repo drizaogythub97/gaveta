@@ -1,11 +1,13 @@
-import Link from "next/link";
+import { Suspense } from "react";
 
 import { BotaoComprovanteVenda } from "@/components/app/botao-comprovante-venda";
+import { Paginacao } from "@/components/app/paginacao";
 
 import { createClient } from "@/lib/supabase/server";
 import {
   PERIOD_LABELS,
   type Period,
+  periodTimeZone,
   rangeForPeriod,
   toDateInputValue,
 } from "@/lib/dashboard/dates";
@@ -19,7 +21,6 @@ import {
   type SaleRow,
 } from "@/lib/types/sales";
 import type { PaymentMethod } from "@/app/(app)/caixa/actions";
-import { cn } from "@/lib/utils";
 
 import { SALE_SORTS, type SaleSort } from "@/lib/financeiro/sort";
 import {
@@ -27,9 +28,14 @@ import {
   recebidoViaFiadoNoPeriodo,
 } from "@/lib/financeiro/fiado";
 
-import { carregarFechamento } from "@/lib/financeiro/lucro-custo";
+import {
+  carregarFechamento,
+  carregarFechamentoPorDia,
+} from "@/lib/financeiro/lucro-custo";
 
 import { FechamentoView } from "./fechamento-view";
+import { TabNav } from "./tab-nav";
+import { parseTab, type Tab } from "./tabs";
 import { FiadoAReceberBlock } from "./fiado-a-receber";
 import { ExpensesClient } from "./expenses-client";
 import { ToggleSaleStatusButton } from "./toggle-sale-status-button";
@@ -38,20 +44,6 @@ import { SummaryView, type SummaryData } from "./summary-view";
 
 export const metadata = {
   title: "Financeiro",
-};
-
-type Tab = "vendas" | "despesas" | "fechamento" | "resumo";
-const VALID_TABS: ReadonlySet<Tab> = new Set([
-  "vendas",
-  "despesas",
-  "fechamento",
-  "resumo",
-]);
-const TAB_LABELS: Record<Tab, string> = {
-  vendas: "Vendas",
-  despesas: "Despesas",
-  fechamento: "Fechamento",
-  resumo: "Resumo",
 };
 
 const VALID_PERIODS: ReadonlySet<Period> = new Set([
@@ -122,9 +114,7 @@ export default async function FinancialPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const tabParam = pickString(params.tab);
-  const tab: Tab =
-    tabParam && VALID_TABS.has(tabParam as Tab) ? (tabParam as Tab) : "vendas";
+  const tab: Tab = parseTab(pickString(params.tab));
 
   const periodParam = pickString(params.period);
   const period: Period =
@@ -156,7 +146,7 @@ export default async function FinancialPage({
         </p>
       </header>
 
-      <TabNav current={tab} params={params} />
+      <TabNav current={tab} />
 
       <FinancialClient
         period={period}
@@ -168,68 +158,49 @@ export default async function FinancialPage({
         showSort={tab === "vendas"}
       />
 
-      {tab === "vendas" ? (
-        <VendasTab
-          from={from}
-          to={to}
-          period={period}
-          methods={methods}
-          sort={sort}
-          page={page}
-          params={params}
-        />
-      ) : tab === "despesas" ? (
-        <DespesasTab from={from} to={to} />
-      ) : tab === "fechamento" ? (
-        <FechamentoTab from={from} to={to} period={period} />
-      ) : (
-        <ResumoTab from={from} to={to} period={period} />
-      )}
+      {/* Só o conteúdo da aba espera pelo banco. O cabeçalho, as abas e os
+          filtros continuam na tela e utilizáveis — é o que evita a sensação
+          de "a página inteira recarregou" a cada filtro. A `key` reinicia o
+          limite a cada recorte novo, para o esqueleto aparecer no lugar do
+          resultado velho. */}
+      <Suspense
+        key={`${tab}|${from}|${to}|${methods.join(",")}|${sort}|${page}`}
+        fallback={<ConteudoCarregando />}
+      >
+        {tab === "vendas" ? (
+          <VendasTab
+            from={from}
+            to={to}
+            period={period}
+            methods={methods}
+            sort={sort}
+            page={page}
+          />
+        ) : tab === "despesas" ? (
+          <DespesasTab from={from} to={to} />
+        ) : tab === "fechamento" ? (
+          <FechamentoTab from={from} to={to} period={period} />
+        ) : (
+          <ResumoTab from={from} to={to} period={period} />
+        )}
+      </Suspense>
     </section>
   );
 }
 
-function buildTabHref(
-  params: Record<string, string | string[] | undefined>,
-  tab: Tab,
-): string {
-  const next = new URLSearchParams();
-  for (const key of ["period", "from", "to", "sort"] as const) {
-    const v = pickString(params[key]);
-    if (v) next.set(key, v);
-  }
-  next.set("tab", tab);
-  return `?${next.toString()}`;
-}
-
-function TabNav({
-  current,
-  params,
-}: {
-  current: Tab;
-  params: Record<string, string | string[] | undefined>;
-}) {
+/** Espaço reservado enquanto o recorte novo chega do servidor. */
+function ConteudoCarregando() {
   return (
-    <nav aria-label="Seções do financeiro" className="flex flex-wrap gap-2">
-      {(["vendas", "despesas", "fechamento", "resumo"] as Tab[]).map((t) => {
-        const active = t === current;
-        return (
-          <Link
-            key={t}
-            href={buildTabHref(params, t)}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex h-12 items-center rounded-lg px-5 text-base font-medium transition-colors",
-              active
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {TAB_LABELS[t]}
-          </Link>
-        );
-      })}
-    </nav>
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex flex-col gap-3 motion-safe:animate-pulse"
+    >
+      <span className="sr-only">Atualizando os dados do período…</span>
+      <div className="bg-muted h-32 rounded-xl" />
+      <div className="bg-muted/70 h-20 rounded-xl" />
+      <div className="bg-muted/70 h-20 rounded-xl" />
+    </div>
   );
 }
 
@@ -241,7 +212,6 @@ async function VendasTab({
   methods,
   sort,
   page,
-  params,
 }: {
   from: string;
   to: string;
@@ -249,7 +219,6 @@ async function VendasTab({
   methods: PaymentMethod[];
   sort: SaleSort;
   page: number;
-  params: Record<string, string | string[] | undefined>;
 }) {
   const supabase = await createClient();
 
@@ -380,84 +349,17 @@ async function VendasTab({
       ) : (
         <>
           <SalesList sales={sales} />
-          <SalesPagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalSales={totalSales}
-            params={params}
+          <Paginacao
+            paginaAtual={currentPage}
+            totalPaginas={totalPages}
+            total={totalSales}
+            singular="venda"
+            plural="vendas"
+            rotulo="Páginas da lista de vendas"
           />
         </>
       )}
     </>
-  );
-}
-
-// Navegação entre páginas da lista de vendas, preservando filtros/ordenação.
-function SalesPagination({
-  currentPage,
-  totalPages,
-  totalSales,
-  params,
-}: {
-  currentPage: number;
-  totalPages: number;
-  totalSales: number;
-  params: Record<string, string | string[] | undefined>;
-}) {
-  if (totalPages <= 1) return null;
-
-  const pageHref = (target: number) => {
-    const next = new URLSearchParams();
-    for (const key of [
-      "tab",
-      "period",
-      "from",
-      "to",
-      "methods",
-      "sort",
-    ] as const) {
-      const v = pickString(params[key]);
-      if (v) next.set(key, v);
-    }
-    if (target > 1) next.set("page", String(target));
-    const qs = next.toString();
-    return qs ? `?${qs}` : "?";
-  };
-
-  const linkClass =
-    "border-border text-foreground hover:bg-muted flex h-12 items-center justify-center rounded-lg border px-5 text-base font-medium";
-  const disabledClass =
-    "border-border text-muted-foreground flex h-12 cursor-not-allowed items-center justify-center rounded-lg border px-5 text-base font-medium opacity-50";
-
-  return (
-    <nav
-      aria-label="Páginas da lista de vendas"
-      className="flex flex-wrap items-center justify-between gap-3"
-    >
-      {currentPage > 1 ? (
-        <Link href={pageHref(currentPage - 1)} className={linkClass}>
-          ← Anterior
-        </Link>
-      ) : (
-        <span aria-disabled="true" className={disabledClass}>
-          ← Anterior
-        </span>
-      )}
-      <p className="text-muted-foreground text-base">
-        Página{" "}
-        <span className="text-foreground font-medium">{currentPage}</span> de{" "}
-        {totalPages} · {totalSales} {totalSales === 1 ? "venda" : "vendas"}
-      </p>
-      {currentPage < totalPages ? (
-        <Link href={pageHref(currentPage + 1)} className={linkClass}>
-          Próxima →
-        </Link>
-      ) : (
-        <span aria-disabled="true" className={disabledClass}>
-          Próxima →
-        </span>
-      )}
-    </nav>
   );
 }
 
@@ -506,8 +408,13 @@ async function FechamentoTab({
   const fromDate = toDateInputValue(from);
   const toDate = toDateInputValue(to);
 
-  const [{ fechamento, semCusto }, despesasRes] = await Promise.all([
+  // O mesmo fuso das bordas do período: é ele que faz a soma dos dias
+  // fechar com o total mostrado no topo da aba.
+  const timeZone = periodTimeZone();
+
+  const [{ fechamento, semCusto }, dias, despesasRes] = await Promise.all([
     carregarFechamento(supabase, from, to),
+    carregarFechamentoPorDia(supabase, from, to, timeZone),
     supabase.rpc("expenses_summary", { p_from: fromDate, p_to: toDate }),
   ]);
 
@@ -532,6 +439,9 @@ async function FechamentoTab({
       semCusto={semCusto}
       despesasSemCompras={despesasSemCompras}
       periodo={PERIOD_LABELS[period]}
+      dias={dias}
+      from={from}
+      to={to}
     />
   );
 }

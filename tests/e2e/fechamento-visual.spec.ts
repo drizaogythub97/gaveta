@@ -97,7 +97,12 @@ test("fechamento do dia: layout, alvos e regressão visual", async ({
   await alvosGrandes(page);
   await esperaContrasteAA(page);
 
-  await expect(page).toHaveScreenshot("fechamento.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("fechamento.png", {
+    fullPage: true,
+    // O "Dia a dia" carrega a data de hoje: sem máscara, o baseline
+    // quebraria sozinho na virada do dia.
+    mask: [page.getByTestId("fechamento-dias")],
+  });
 });
 
 test("fechamento sem venda no período explica o que aparece ali", async ({
@@ -144,5 +149,6 @@ test("celular no modo Minimalista mantém o padrão no fechamento", async ({
 
   await expect(page).toHaveScreenshot("fechamento-minimalista.png", {
     fullPage: true,
+    mask: [page.getByTestId("fechamento-dias")],
   });
 });
