@@ -99,6 +99,8 @@ export async function registrarCompra(
       unit_cost: item.unitCost,
       sale_price: item.salePrice,
       track_stock: item.trackStock,
+      tags: item.tagIds,
+      new_tags: item.newTags,
     })),
   });
 

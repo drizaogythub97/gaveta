@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { listarTags } from "@/lib/products/tags";
 import { createClient } from "@/lib/supabase/server";
 import type { Product } from "@/lib/types/db";
 
@@ -17,16 +18,22 @@ export default async function EditProductPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("products")
-    .select(
-      "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode)",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data }, tags] = await Promise.all([
+    supabase
+      .from("products")
+      .select(
+        "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode), product_tag_links(tag_id)",
+      )
+      .eq("id", id)
+      .maybeSingle(),
+    listarTags(supabase),
+  ]);
 
   const row = data as
-    | (Product & { product_barcodes: { barcode: string }[] | null })
+    | (Product & {
+        product_barcodes: { barcode: string }[] | null;
+        product_tag_links: { tag_id: string }[] | null;
+      })
     | null;
   if (!row) {
     notFound();
@@ -34,6 +41,7 @@ export default async function EditProductPage({
   const product = {
     ...row,
     barcodes: (row.product_barcodes ?? []).map((b) => b.barcode),
+    tagIds: (row.product_tag_links ?? []).map((l) => l.tag_id),
   };
 
   const boundAction = async (
@@ -54,6 +62,7 @@ export default async function EditProductPage({
       </header>
       <ProductForm
         action={boundAction}
+        tags={tags}
         initialValues={{
           name: product.name,
           barcodes: product.barcodes,
@@ -64,6 +73,7 @@ export default async function EditProductPage({
             product.stock_quantity === null
               ? ""
               : product.stock_quantity.toString().replace(".", ","),
+          tagIds: product.tagIds,
         }}
         submitLabel="Salvar alterações"
         submitPendingLabel="Salvando…"

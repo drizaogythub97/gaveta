@@ -17,6 +17,7 @@ import {
   isBarcodeCameraSupported,
 } from "@/components/app/barcode-scanner";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
+import { TagPicker } from "@/components/app/tag-picker";
 import { ErrorAlert } from "@/components/auth/form-feedback";
 import loaderStyles from "@/components/app/gaveta-loader.module.css";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ import {
   sanitizeDigits,
 } from "@/lib/products/format";
 import type { NotaConferencia, StatusItem } from "@/lib/compras/tipos";
-import type { Product } from "@/lib/types/db";
+import type { Product, ProductTag } from "@/lib/types/db";
 import type { PurchaseSource } from "@/lib/types/purchases";
 
 // A busca de produto é a MESMA da frente de caixa (por nome ou por código
@@ -52,6 +53,9 @@ type NotaItem = {
   costDigits: string;
   salePriceDigits: string;
   trackStock: boolean;
+  /** Categorias escolhidas para o produto novo (0019). */
+  tagIds: string[];
+  newTags: string[];
   /** Como o item se ligou ao catálogo (importação da G2b). */
   status: StatusItem;
   /**
@@ -114,7 +118,14 @@ function lineTotal(item: NotaItem): number {
   return Math.round(qty * cost * 100) / 100;
 }
 
-export function NotaForm({ iaLiberada }: { iaLiberada: boolean }) {
+export function NotaForm({
+  iaLiberada,
+  tags,
+}: {
+  iaLiberada: boolean;
+  /** Categorias já criadas pelo dono — o produto novo pode nascer com elas. */
+  tags: ProductTag[];
+}) {
   const router = useRouter();
 
   const [supplier, setSupplier] = useState("");
@@ -129,6 +140,13 @@ export function NotaForm({ iaLiberada }: { iaLiberada: boolean }) {
   const [novoCustoDigits, setNovoCustoDigits] = useState("");
   const [novoPrecoDigits, setNovoPrecoDigits] = useState("");
   const [novoQtd, setNovoQtd] = useState("1");
+  const [novoTags, setNovoTags] = useState<{
+    tagIds: string[];
+    newTags: string[];
+  }>({ tagIds: [], newTags: [] });
+  // Remonta o seletor a cada produto novo: sem isso ele guardaria as
+  // categorias do item anterior.
+  const [novoTagsKey, setNovoTagsKey] = useState(0);
 
   const [items, setItems] = useState<NotaItem[]>([]);
   const [erro, setErro] = useState<string | null>(null);
@@ -192,6 +210,8 @@ export function NotaForm({ iaLiberada }: { iaLiberada: boolean }) {
         key: makeKey(),
         productId: product.id,
         isNew: false,
+        tagIds: [],
+        newTags: [],
         name: product.name,
         barcode: "",
         quantity: "1",
@@ -258,6 +278,8 @@ export function NotaForm({ iaLiberada }: { iaLiberada: boolean }) {
     setNovoCustoDigits("");
     setNovoPrecoDigits("");
     setNovoQtd("1");
+    setNovoTags({ tagIds: [], newTags: [] });
+    setNovoTagsKey((k) => k + 1);
     setErro(null);
   }
 
@@ -296,6 +318,8 @@ export function NotaForm({ iaLiberada }: { iaLiberada: boolean }) {
         costDigits: novoCustoDigits,
         salePriceDigits: novoPrecoDigits,
         trackStock: true,
+        tagIds: novoTags.tagIds,
+        newTags: novoTags.newTags,
         status: "novo",
         descricaoNota: null,
       },
@@ -321,6 +345,8 @@ export function NotaForm({ iaLiberada }: { iaLiberada: boolean }) {
         key: makeKey(),
         productId: item.productId,
         isNew: item.status === "novo",
+        tagIds: [] as string[],
+        newTags: [] as string[],
         // Item ligado mostra o nome do produto do Gaveta (é ele que vai ser
         // atualizado); a descrição da nota fica ao lado, para comparar.
         name: item.productName ?? item.descricao,
@@ -436,6 +462,8 @@ export function NotaForm({ iaLiberada }: { iaLiberada: boolean }) {
           unitCost: digitsToNumber(item.costDigits),
           salePrice: item.isNew ? digitsToNumber(item.salePriceDigits) : null,
           trackStock: item.trackStock,
+          tagIds: item.tagIds,
+          newTags: item.newTags,
         })),
       });
 
@@ -776,6 +804,13 @@ export function NotaForm({ iaLiberada }: { iaLiberada: boolean }) {
                 />
               </div>
             </div>
+            {/* Mesmo seletor do cadastro de produto: quem lança a nota
+                categoriza na hora, sem passar por outra tela. */}
+            <TagPicker
+              key={novoTagsKey}
+              disponiveis={tags}
+              onChange={setNovoTags}
+            />
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"

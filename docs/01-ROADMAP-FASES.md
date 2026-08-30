@@ -330,9 +330,26 @@ independentes, cada uma com o seu PR e a sua validação no Preview.
   isso muda os números de todo o Financeiro e é decisão do dono; quando for,
   muda em `lib/dashboard/dates.ts` e o banco acompanha.
 
-### C — Produtos: paginação e tags
+### C — Produtos: paginação e categorias
 
-Em andamento.
+- **15 por página**, cortados no banco (`range` + `count` exato). A listagem
+  trazia o catálogo INTEIRO com os códigos de barras aninhados — com
+  centenas de itens ficava pesada, principalmente no celular. Usa a
+  `Paginacao` do PR B, então trocar de página não recarrega a tela.
+- **Categorias (migration 0019)**: `product_tags` + `product_tag_links`, as
+  duas com RLS por `user_id` (a de vínculo repete o `user_id`, como
+  `product_barcodes`, para a política não precisar de join).
+- A categoria nasce **organicamente**: quem cadastra digita o nome e ela
+  passa a existir — não há tela de "gerenciar categorias". Nome único por
+  dono ignorando caixa e espaços, então "Bebidas" digitado de novo
+  reaproveita a que existe em vez de criar uma quase igual.
+- `aplicar_tags_no_produto` deixa o produto com **exatamente** as categorias
+  informadas e cria as novas na mesma transação — uma função, e não inserts
+  soltos no app, porque criar-e-vincular não pode falhar pela metade.
+- A `registrar_compra` foi reemitida aceitando `tags`/`new_tags` por item:
+  o produto cadastrado pela **entrada por nota** já nasce categorizado, sem
+  passar por outra tela.
+- Filtro por categoria na listagem (`FiltroChips`, do PR B).
 
 ---
 
