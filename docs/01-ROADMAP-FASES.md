@@ -286,7 +286,20 @@ Fase 0 (você) → Fases 1–4 (Claude Code). Ao fim da Fase 4 já há um sistem
 ## Sprint de ajustes finos (2026-08-30)
 
 Pedidos do dono depois de usar o sistema no dia a dia. Três entregas
-independentes, cada uma com o seu PR e a sua validação no Preview.
+independentes, cada uma com o seu PR e a sua validação no Preview. **Todas
+mescladas na `main` em 2026-08-30** (migrations 0018 e 0019 já aplicadas no
+banco antes do merge).
+
+| Entrega | PR | Merge | Migration |
+|---|---|---|---|
+| A — Tema por conta + total do caixa | #36 | `d710c58` | — |
+| B — Filtro sem recarregar + Fechamento dia a dia | #37 | `02c1bae` | 0018 (só leitura) |
+| C — Produtos: 15/página + categorias | #38 | `13311eb` | 0019 (aditiva) |
+
+Validação: **141 unitários, 88 de RLS (9 arquivos) e a suíte e2e contra o
+Preview**, todos verdes, mais a conferência visual do dono nos quatro pontos
+de gosto (largura do caixa acima de 1280px, sensação do filtro, nível de
+detalhe do dia a dia e tema em aparelho real).
 
 ### A — Tema por conta e total do caixa (PR #36)
 
@@ -306,7 +319,7 @@ independentes, cada uma com o seu PR e a sua validação no Preview.
   estreito. Passou a container query com fonte fluida e quebra garantida, e
   a tela ganhou largura acima de 1280px.
 
-### B — Filtro sem recarregar e Fechamento dia a dia
+### B — Filtro sem recarregar e Fechamento dia a dia (PR #37)
 
 - **O padrão de filtragem do sistema** (ver `CLAUDE.md`): o recorte vive na
   URL e a navegação acontece dentro de um `startTransition`, via
@@ -330,7 +343,7 @@ independentes, cada uma com o seu PR e a sua validação no Preview.
   isso muda os números de todo o Financeiro e é decisão do dono; quando for,
   muda em `lib/dashboard/dates.ts` e o banco acompanha.
 
-### C — Produtos: paginação e categorias
+### C — Produtos: paginação e categorias (PR #38)
 
 - **15 por página**, cortados no banco (`range` + `count` exato). A listagem
   trazia o catálogo INTEIRO com os códigos de barras aninhados — com
@@ -350,6 +363,27 @@ independentes, cada uma com o seu PR e a sua validação no Preview.
   o produto cadastrado pela **entrada por nota** já nasce categorizado, sem
   passar por outra tela.
 - Filtro por categoria na listagem (`FiltroChips`, do PR B).
+
+### Achado fora da sprint — o backup do banco está quebrado
+
+Descoberto em 2026-08-30 ao encerrar a sprint, **não** causado por ela.
+O workflow `Backup do banco (criptografado)` falha em **toda** execução
+agendada desde 2026-06-28; o último backup bom é de **2026-06-25**.
+
+- O guard do workflow passa, então o secret `SUPABASE_DB_URL` **existe e não
+  está vazio**. O erro é do `pg_dump`: *connection to server on socket
+  "/var/run/postgresql/.s.PGSQL.5432" failed*.
+- Isso é o que o `pg_dump` faz quando a string recebida **não é uma URI**
+  `postgresql://…`: ele a interpreta como **nome de banco** e tenta o socket
+  local. O secret foi alterado em **2026-06-26** — um dia depois da única
+  execução bem-sucedida — e todas as posteriores falharam.
+- **Correção (só o dono pode fazer):** regravar o secret com a connection
+  string completa do **Session pooler** do Supabase (IPv4, porta 5432),
+  começando em `postgresql://`, sem aspas em volta. Depois disparar o
+  workflow na mão (`workflow_dispatch`) para confirmar.
+- Enquanto isso, **o sistema está em produção com usuários reais e sem
+  backup desde junho.** Procedimento de restauração em
+  `docs/06-QUALIDADE-FASE8.md`.
 
 ---
 
