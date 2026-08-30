@@ -35,7 +35,11 @@ export default async function CaixaPage() {
   const fiadoPdvAtivo = Boolean(prefs?.fiado_pdv_ativo);
 
   return (
-    <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
+    // O caixa é a tela mais densa do sistema (duas colunas com números
+    // grandes) e herdava o `max-w-5xl` do layout, apertando o total contra o
+    // botão de registrar. A partir de 1280px ele toma a folga que a tela já
+    // tem: o recuo é menor que a margem lateral do layout, então nada estoura.
+    <section className="minimal:max-sm:gap-4 flex flex-col gap-6 xl:-mx-24 2xl:-mx-40">
       <header>
         <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">
           Frente de caixa

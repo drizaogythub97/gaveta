@@ -1,10 +1,16 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { toPortugueseAuthError } from "@/lib/auth/errors";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import {
+  THEME_COOKIE,
+  THEME_COOKIE_MAX_AGE,
+  readThemeFromProfile,
+} from "@/lib/theme/cookie";
 import { loginSchema } from "@/lib/validations/auth";
 
 export type LoginState = {
@@ -51,6 +57,17 @@ export async function login(
       email: parsed.data.email,
     };
   }
+
+  // O tema é da CONTA. Gravar o cookie aqui faz duas coisas: o aparelho novo
+  // já entra com o tema certo, e um cookie deixado por OUTRA conta neste
+  // mesmo aparelho é sobrescrito em vez de continuar valendo.
+  const theme = (await readThemeFromProfile()) ?? "light";
+  const store = await cookies();
+  store.set(THEME_COOKIE, theme, {
+    path: "/",
+    maxAge: THEME_COOKIE_MAX_AGE,
+    sameSite: "lax",
+  });
 
   redirect("/dashboard");
 }
