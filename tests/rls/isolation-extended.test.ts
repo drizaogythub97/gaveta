@@ -818,34 +818,50 @@ describe("RLS — fechamento dia a dia (0018)", () => {
   const ATE = "2030-12-31T23:59:59.999Z";
   const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
-  it("Bob não enxerga os dias nem as vendas de Alice", async () => {
+  /**
+   * Aqui os DOIS têm movimento (Alice e Bob registram venda mais acima neste
+   * arquivo), então "Bob não vê nada" seria a asserção errada — ele vê o
+   * dele. O que prova o isolamento é que **nenhuma venda de Alice aparece
+   * para Bob**: os conjuntos de `sale_id` não se tocam.
+   */
+  it("cada um só enxerga as próprias vendas no mesmo dia", async () => {
     const aliceApp = userClient(alice.accessToken);
     const bobApp = userClient(bob.accessToken);
 
-    // Alice registrou venda mais acima neste arquivo: ela tem dia; Bob não.
-    const { data: dias, error } = await aliceApp.rpc("fechamento_por_dia", {
-      p_from: DE,
-      p_to: ATE,
-      p_tz: TZ,
-    });
+    const janela = { p_from: DE, p_to: ATE, p_tz: TZ };
+    const { data: diasDaAlice, error } = await aliceApp.rpc(
+      "fechamento_por_dia",
+      janela,
+    );
     expect(error).toBeNull();
-    expect((dias ?? []).length).toBeGreaterThan(0);
-    const dia = (dias as { dia: string }[])[0].dia;
+    expect((diasDaAlice ?? []).length).toBeGreaterThan(0);
+    const dia = (diasDaAlice as { dia: string }[])[0].dia;
 
-    const { data: diasDoBob } = await bobApp.rpc("fechamento_por_dia", {
-      p_from: DE,
-      p_to: ATE,
-      p_tz: TZ,
-    });
-    expect(diasDoBob ?? []).toHaveLength(0);
+    const itensDe = async (app: ReturnType<typeof userClient>) => {
+      const { data } = await app.rpc("fechamento_vendas_do_dia", {
+        p_dia: dia,
+        ...janela,
+      });
+      return (data ?? []) as { sale_id: string; valor: number }[];
+    };
 
-    // E nem pedindo o dia exato de Alice o detalhe vaza.
-    const { data: itensDoBob } = await bobApp.rpc("fechamento_vendas_do_dia", {
-      p_dia: dia,
-      p_from: DE,
-      p_to: ATE,
-      p_tz: TZ,
-    });
-    expect(itensDoBob ?? []).toHaveLength(0);
+    const daAlice = await itensDe(aliceApp);
+    const doBob = await itensDe(bobApp);
+    expect(daAlice.length).toBeGreaterThan(0);
+
+    const vendasDaAlice = new Set(daAlice.map((i) => i.sale_id));
+    for (const item of doBob) {
+      expect(vendasDaAlice.has(item.sale_id)).toBe(false);
+    }
+
+    // E o total do dia de Bob fecha com o detalhe DELE — sinal de que o
+    // dinheiro de Alice não entrou na conta em lugar nenhum.
+    const { data: diasDoBob } = await bobApp.rpc("fechamento_por_dia", janela);
+    const recebidoDoBob = (diasDoBob as { dia: string; recebido: number }[])
+      .filter((d) => d.dia === dia)
+      .reduce((s, d) => s + Number(d.recebido), 0);
+    const somaDoDetalhe =
+      Math.round(doBob.reduce((s, i) => s + Number(i.valor), 0) * 100) / 100;
+    expect(recebidoDoBob).toBe(somaDoDetalhe);
   });
 });
