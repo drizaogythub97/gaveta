@@ -19,6 +19,8 @@ test.describe.configure({ mode: "serial" });
 
 const PREFIXO = "Zproduto e2e";
 const CATEGORIA = "Zcategoria e2e";
+const CATEGORIA_A = "Zcategoria e2e A";
+const CATEGORIA_B = "Zcategoria e2e B";
 const QUANTOS = 17; // mais de uma página
 
 let user: TestUser;
@@ -58,7 +60,10 @@ test.afterAll(async () => {
   if (idsCriados.length > 0) {
     await app.from("products").delete().in("id", idsCriados);
   }
-  await app.from("product_tags").delete().eq("name", CATEGORIA);
+  await app
+    .from("product_tags")
+    .delete()
+    .in("name", [CATEGORIA, CATEGORIA_A, CATEGORIA_B]);
 });
 
 /** Marca o documento: se a página recarregar, a marca se perde. */
@@ -120,15 +125,20 @@ test("categoria criada no cadastro filtra a listagem", async ({ page }) => {
   await page.getByRole("button", { name: "Salvar alterações" }).click();
   await page.waitForURL(/\/produtos$/);
 
-  // 2. A categoria vira chip no produto e opção de filtro.
-  const filtro = page.getByRole("navigation", {
-    name: "Filtrar por categoria",
+  // 2. A categoria vira chip no produto e opção dentro da lista suspensa.
+  const abrirFiltro = page.getByRole("button", {
+    name: /^Filtrar por categoria:/,
   });
-  await expect(filtro.getByRole("link", { name: CATEGORIA })).toBeVisible();
+  await abrirFiltro.click();
+  const opcao = page.getByRole("checkbox", { name: CATEGORIA });
+  await expect(opcao).toBeVisible();
 
-  // 3. Filtrar deixa só o produto categorizado — e não recarrega a página.
+  // 3. Marcar deixa só o produto categorizado — e não recarrega a página.
   await marcarDocumento(page);
-  await filtro.getByRole("link", { name: CATEGORIA }).click();
+  await opcao.click();
+  // O painel fica aberto de propósito (quase sempre se marca mais de uma);
+  // aqui ele sai da frente para a lista poder ser conferida.
+  await page.keyboard.press("Escape");
 
   await expect(cartoes(page)).toHaveCount(1);
   await expect(cartoes(page).first()).toHaveAttribute(
@@ -192,4 +202,113 @@ test("produto cadastrado pela entrada por nota nasce com a categoria", async ({
   ).toEqual([CATEGORIA]);
 
   idsCriados.push(criado!.id);
+});
+
+
+test("busca por nome filtra conforme se digita, sem recarregar", async ({
+  page,
+}) => {
+  await page.goto("/produtos");
+  await expect(cartoes(page)).toHaveCount(15);
+
+  await marcarDocumento(page);
+  // Um nome que só existe em um dos 17 semeados.
+  await page.getByLabel("Buscar por nome").fill(`${PREFIXO} 03`);
+
+  await expect(cartoes(page)).toHaveCount(1);
+  await expect(cartoes(page).first()).toHaveAttribute(
+    "aria-label",
+    `Editar ${PREFIXO} 03`,
+  );
+  // O termo vai para a URL (endereço compartilhável) e a página volta à 1.
+  await expect(page).toHaveURL(/[?&]q=/);
+  expect(await documentoIntacto(page)).toBe(true);
+
+  // Limpar devolve a listagem inteira e tira o termo da URL.
+  await page.getByRole("button", { name: "Limpar a busca" }).click();
+  await expect(cartoes(page)).toHaveCount(15);
+  await expect(page).not.toHaveURL(/[?&]q=/);
+  expect(await documentoIntacto(page)).toBe(true);
+});
+
+test("busca sem resultado explica e oferece limpar", async ({ page }) => {
+  await page.goto("/produtos");
+  await page
+    .getByLabel("Buscar por nome")
+    .fill("Zzz produto que nao existe e2e");
+
+  await expect(cartoes(page)).toHaveCount(0);
+  await expect(
+    page.getByText(/Nenhum produto com .* no nome/),
+  ).toBeVisible();
+
+  await page.getByRole("link", { name: "Limpar filtros" }).click();
+  await expect(cartoes(page)).toHaveCount(15);
+});
+
+test("duas categorias marcadas somam (OU), não interseccionam", async ({
+  page,
+}) => {
+  // Duas categorias, cada uma em um produto diferente.
+  const { data: tagsData, error: erroTags } = await app
+    .from("product_tags")
+    .insert([
+      { user_id: user.id, name: CATEGORIA_A },
+      { user_id: user.id, name: CATEGORIA_B },
+    ])
+    .select("id, name");
+  expect(erroTags).toBeNull();
+  const tags = (tagsData ?? []) as { id: string; name: string }[];
+  const idA = tags.find((t) => t.name === CATEGORIA_A)!.id;
+  const idB = tags.find((t) => t.name === CATEGORIA_B)!.id;
+
+  await app.from("product_tag_links").insert([
+    { user_id: user.id, product_id: idsCriados[0], tag_id: idA },
+    { user_id: user.id, product_id: idsCriados[1], tag_id: idB },
+  ]);
+
+  await page.goto("/produtos");
+  const abrir = page.getByRole("button", { name: /^Filtrar por categoria:/ });
+  await abrir.click();
+
+  // Só a A: um produto.
+  await marcarDocumento(page);
+  await page.getByRole("checkbox", { name: CATEGORIA_A }).click();
+  await expect(cartoes(page)).toHaveCount(1);
+
+  // A e B juntas: DOIS produtos — se fosse "E", daria zero, porque nenhum
+  // produto tem as duas categorias. É esta a diferença que o teste guarda.
+  await page.getByRole("checkbox", { name: CATEGORIA_B }).click();
+  await expect(cartoes(page)).toHaveCount(2);
+  expect(await documentoIntacto(page)).toBe(true);
+
+  // As duas viajam na URL, repetindo o parâmetro.
+  const url = new URL(page.url());
+  expect(url.searchParams.getAll("tag").sort()).toEqual([idA, idB].sort());
+
+  // "Limpar" tira as duas de uma vez.
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Limpar" }).click();
+  await expect(cartoes(page)).toHaveCount(15);
+});
+
+test("busca e categoria se combinam (E entre os dois filtros)", async ({
+  page,
+}) => {
+  const { data } = await app
+    .from("product_tags")
+    .select("id")
+    .eq("name", CATEGORIA_A)
+    .maybeSingle();
+  const idA = (data as { id: string } | null)?.id;
+  expect(idA).toBeTruthy();
+
+  // A categoria A tem o produto 01. Buscar por um nome que não é o dele,
+  // dentro dessa categoria, tem de dar zero.
+  await page.goto(`/produtos?tag=${idA}&q=${encodeURIComponent(`${PREFIXO} 05`)}`);
+  await expect(cartoes(page)).toHaveCount(0);
+
+  // E buscar pelo nome certo, na mesma categoria, devolve o produto.
+  await page.goto(`/produtos?tag=${idA}&q=${encodeURIComponent(alvoNome)}`);
+  await expect(cartoes(page)).toHaveCount(1);
 });
