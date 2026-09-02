@@ -4,7 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { Product } from "@/lib/types/db";
 
-import { InventoryClient } from "./inventory-client";
+import { InventoryClient, type ProductWithBarcodes } from "./inventory-client";
 
 export const metadata = {
   title: "Estoque",
@@ -15,12 +15,19 @@ export default async function InventoryPage() {
   const { data } = await supabase
     .from("products")
     .select(
-      "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at",
+      "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode)",
     )
     .eq("track_stock", true)
     .order("name", { ascending: true });
 
-  const products = (data ?? []) as Product[];
+  // Os códigos vêm junto porque a busca da tela casa por nome OU por código:
+  // é o que permite achar o produto bipando com a câmera.
+  type ProductRow = Product & {
+    product_barcodes: { barcode: string }[] | null;
+  };
+  const products: ProductWithBarcodes[] = ((data ?? []) as ProductRow[]).map(
+    (p) => ({ ...p, barcodes: (p.product_barcodes ?? []).map((b) => b.barcode) }),
+  );
 
   return (
     <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
