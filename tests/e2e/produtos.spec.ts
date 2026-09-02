@@ -21,6 +21,7 @@ const PREFIXO = "Zproduto e2e";
 const CATEGORIA = "Zcategoria e2e";
 const CATEGORIA_A = "Zcategoria e2e A";
 const CATEGORIA_B = "Zcategoria e2e B";
+const CATEGORIA_NOTA = "Zcategoria da nota e2e";
 const QUANTOS = 17; // mais de uma página
 
 let user: TestUser;
@@ -63,7 +64,7 @@ test.afterAll(async () => {
   await app
     .from("product_tags")
     .delete()
-    .in("name", [CATEGORIA, CATEGORIA_A, CATEGORIA_B]);
+    .in("name", [CATEGORIA, CATEGORIA_A, CATEGORIA_B, CATEGORIA_NOTA]);
 });
 
 /** Marca o documento: se a página recarregar, a marca se perde. */
@@ -311,4 +312,80 @@ test("busca e categoria se combinam (E entre os dois filtros)", async ({
   // E buscar pelo nome certo, na mesma categoria, devolve o produto.
   await page.goto(`/produtos?tag=${idA}&q=${encodeURIComponent(alvoNome)}`);
   await expect(cartoes(page)).toHaveCount(1);
+});
+
+
+test("categoria criada num item da nota já aparece no item seguinte", async ({
+  page,
+}) => {
+  const bloco = 'section[aria-labelledby="nota-adicionar"]';
+  const primeiro = "Zproduto nota tag A e2e";
+  const segundo = "Zproduto nota tag B e2e";
+
+  await page.goto("/estoque/compras/nova");
+
+  // 1. Primeiro produto da nota: cria uma categoria que ainda não existe.
+  await page.locator("#nota-query").fill(primeiro);
+  await page.locator("#nota-query").press("Enter");
+  const novo = page.locator(bloco);
+  await expect(novo.getByText("Produto ainda não cadastrado")).toBeVisible();
+  await novo.getByLabel("Quantidade que chegou").fill("2");
+  await novo.getByLabel("Custo por unidade").fill("300");
+  await novo.getByLabel("Preço de venda").fill("500");
+
+  await novo.getByLabel("Criar categoria").fill(CATEGORIA_NOTA);
+  await novo.getByRole("button", { name: "Adicionar", exact: true }).click();
+
+  // Nasceu no banco AGORA, antes de a nota ser salva: por isso já aparece
+  // marcada por id, e não como etiqueta "nova".
+  await expect(
+    novo.getByRole("button", { name: CATEGORIA_NOTA, pressed: true }),
+  ).toBeVisible();
+  await expect(
+    novo.getByRole("button", { name: `Remover categoria ${CATEGORIA_NOTA}` }),
+  ).toHaveCount(0);
+
+  await novo.getByRole("button", { name: "Adicionar à nota" }).click();
+
+  // 2. Segundo produto da MESMA nota, sem recarregar a página: a categoria
+  // criada no primeiro tem de estar ali para marcar. Era exatamente isto
+  // que faltava.
+  await marcarDocumento(page);
+  await page.locator("#nota-query").fill(segundo);
+  await page.locator("#nota-query").press("Enter");
+  await expect(novo.getByText("Produto ainda não cadastrado")).toBeVisible();
+  await novo.getByLabel("Quantidade que chegou").fill("1");
+  await novo.getByLabel("Custo por unidade").fill("400");
+  await novo.getByLabel("Preço de venda").fill("700");
+
+  await novo.getByRole("button", { name: CATEGORIA_NOTA }).click();
+  await novo.getByRole("button", { name: "Adicionar à nota" }).click();
+  expect(await documentoIntacto(page)).toBe(true);
+
+  // 3. Lança e confere no banco: UMA categoria só, nos DOIS produtos.
+  await page.getByRole("button", { name: "Conferir e lançar nota" }).click();
+  await page.getByRole("button", { name: "Lançar nota", exact: true }).click();
+  await page.waitForURL(/\/estoque\/compras\/[0-9a-f-]+\?lancada=1/, {
+    timeout: 30_000,
+  });
+
+  const { data: tagsData } = await app
+    .from("product_tags")
+    .select("id, name, product_tag_links(product_id)")
+    .eq("name", CATEGORIA_NOTA);
+  const encontradas = (tagsData ?? []) as {
+    id: string;
+    product_tag_links: { product_id: string }[];
+  }[];
+  // Uma só: se cada item tivesse criado a sua, aqui viriam duas.
+  expect(encontradas).toHaveLength(1);
+  expect(encontradas[0].product_tag_links).toHaveLength(2);
+
+  const { data: criados } = await app
+    .from("products")
+    .select("id")
+    .in("name", [primeiro, segundo]);
+  const ids = ((criados ?? []) as { id: string }[]).map((p) => p.id);
+  expect(ids).toHaveLength(2);
+  idsCriados.push(...ids);
 });

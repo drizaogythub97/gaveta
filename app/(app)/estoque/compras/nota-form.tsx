@@ -39,6 +39,7 @@ import type { PurchaseSource } from "@/lib/types/purchases";
 // A busca de produto é a MESMA da frente de caixa (por nome ou por código
 // de barras) — sem duplicar lógica de busca.
 import { findProductByCode, searchProductsByName } from "../../caixa/actions";
+import { criarTag } from "../../produtos/actions";
 
 import { registrarCompra } from "./actions";
 import { ImportarNota } from "./importar-nota";
@@ -127,6 +128,11 @@ export function NotaForm({
   tags: ProductTag[];
 }) {
   const router = useRouter();
+
+  // As categorias que a tela oferece. Começa com as do servidor e CRESCE:
+  // categoria criada num item da nota vira opção para os itens seguintes,
+  // sem recarregar a página.
+  const [tagsDisponiveis, setTagsDisponiveis] = useState<ProductTag[]>(tags);
 
   const [supplier, setSupplier] = useState("");
   const [issuedOn, setIssuedOn] = useState(hoje);
@@ -281,6 +287,29 @@ export function NotaForm({
     setNovoTags({ tagIds: [], newTags: [] });
     setNovoTagsKey((k) => k + 1);
     setErro(null);
+  }
+
+  /**
+   * Cria a categoria no banco na hora e guarda na lista da tela.
+   *
+   * Antes, o nome digitado ficava preso no item que estava sendo montado e
+   * só virava categoria quando a nota inteira era salva — então o segundo
+   * produto da mesma nota não tinha como reaproveitá-la, e quem digitasse de
+   * novo acabaria com duas.
+   */
+  async function criarCategoria(nome: string) {
+    const resultado = await criarTag(nome);
+    if (resultado.tag) {
+      const criada = resultado.tag;
+      setTagsDisponiveis((anteriores) =>
+        anteriores.some((t) => t.id === criada.id)
+          ? anteriores
+          : [...anteriores, criada].sort((a, b) =>
+              a.name.localeCompare(b.name, "pt-BR"),
+            ),
+      );
+    }
+    return resultado;
   }
 
   function adicionarNovo() {
@@ -808,8 +837,9 @@ export function NotaForm({
                 categoriza na hora, sem passar por outra tela. */}
             <TagPicker
               key={novoTagsKey}
-              disponiveis={tags}
+              disponiveis={tagsDisponiveis}
               onChange={setNovoTags}
+              aoCriar={criarCategoria}
             />
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button

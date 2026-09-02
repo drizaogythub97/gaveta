@@ -6,6 +6,7 @@ import { ConfirmDeleteButton } from "@/components/app/confirm-delete-button";
 import { FiltroMulti } from "@/components/app/filtro-multi";
 import { Paginacao } from "@/components/app/paginacao";
 import { buttonVariants } from "@/components/ui/button";
+import { escaparLike } from "@/lib/db/like";
 import { formatBRL, formatQuantity } from "@/lib/products/format";
 import { listarTags } from "@/lib/products/tags";
 import { createClient } from "@/lib/supabase/server";
@@ -41,13 +42,6 @@ function parsePage(value: string | string[] | undefined): number {
   return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
-/**
- * `%` e `_` são curingas do LIKE. Sem escapar, quem digita "50%" pediria
- * "qualquer coisa" sem saber, e a busca devolveria o catálogo inteiro.
- */
-function escaparLike(termo: string): string {
-  return termo.replace(/[\\%_]/g, (c) => `\\${c}`);
-}
 
 type ProductRow = Product & {
   product_barcodes: { barcode: string }[] | null;
