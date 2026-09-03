@@ -490,7 +490,7 @@ explica o porquê em vez de sumir em silêncio.
 O dono conferiu no aparelho: **funcionando** em Produtos, Estoque e Frente de
 Caixa. Item encerrado.
 
-## Filtros do Estoque no servidor (2026-09-03) — PR #41
+## Filtros do Estoque no servidor (2026-09-03) — PR #41, merge `0fb6dbc`
 
 A inconsistência registrada acima virou decisão do dono: **unificar**. O
 Estoque passou a filtrar no banco, exatamente como Produtos.
