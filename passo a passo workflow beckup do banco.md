@@ -2,7 +2,9 @@
 
 > Documento operacional para o **dono** executar. Nenhum valor de segredo
 > aparece aqui, nem deve ser colado em conversa com o agente.
-> Escrito em 2026-09-02. Workflow: `.github/workflows/backup-db.yml`.
+> Escrito em 2026-09-02; **caminhos do painel do Supabase revisados em
+> 2026-09-03** (o painel mudou — ver o aviso no passo 1).
+> Workflow: `.github/workflows/backup-db.yml`.
 > Procedimento de restauração: `docs/06-QUALIDADE-FASE8.md`.
 
 ---
@@ -20,6 +22,8 @@ O secret `SUPABASE_DB_URL` do repositório **não está no formato de URI**
 - O backup falha em **toda** execução agendada desde **2026-06-28**.
 - Último backup bom: **2026-06-25**. Ou seja, o sistema está em produção,
   com 4 contas reais, **sem cópia há mais de dois meses**.
+- Conferido de novo em **2026-09-03**: as cinco últimas execuções agendadas
+  (02/08, 09/08, 16/08, 23/08 e 30/08) falharam, todas em ~15 segundos.
 - Última execução (30/08, id `33302008301`) morreu com:
 
   ```
@@ -57,44 +61,88 @@ O secret `SUPABASE_DB_URL` do repositório **não está no formato de URI**
 
 ## Passo 1 — Pegar a connection string certa no Supabase
 
-1. Abrir <https://supabase.com/dashboard> e entrar no projeto do Gaveta.
-   ⚠️ Lembrar: **esse projeto do Supabase é compartilhado com o FiadoApp**.
-   Não mexer em nada além do que este passo a passo pede.
-2. Menu lateral → **Project Settings** (engrenagem) → **Database**.
-3. Seção **Connection string** → aba **URI**.
-4. No seletor de modo, escolher **Session pooler** — *não* "Direct connection"
-   e *não* "Transaction pooler".
-   - **Direct connection** é IPv6 e o runner do GitHub Actions **não tem
-     IPv6** — se usar essa, volta a falhar (com outro erro).
-   - **Transaction pooler** (porta 6543) não aguenta o `pg_dump`.
-   - **Session pooler** é IPv4, porta **5432** — é o que funciona aqui.
-5. Copiar a string inteira. Ela tem esta cara:
+> ⚠️ **O painel do Supabase mudou de lugar** (conferido em 2026-09-03). A
+> antiga trilha *Project Settings → Database → Connection string* **não existe
+> mais**: agora as strings de conexão saem do botão **Connect**, no topo da
+> página do projeto. Os links abaixo já vão direto, sem precisar navegar.
 
-   ```
-   postgresql://postgres.abcdefghijklm:[YOUR-PASSWORD]@aws-0-sa-east-1.pooler.supabase.com:5432/postgres
-   ```
+### 1.1 — Link direto para a string do Session pooler
 
-   Confira, olhando a sua:
-   - começa com `postgresql://`
-   - o usuário tem um ponto: `postgres.<ref-do-projeto>`
-   - o host termina em `.pooler.supabase.com`
-   - a porta é `:5432`
-   - termina em `/postgres`
+Abrir este link (já entra no projeto certo, já abre o painel **Connect** e já
+seleciona o modo **Session pooler**):
+
+<https://supabase.com/dashboard/project/jipavekxqsbzslcqpxmb/?showConnect=true&method=session>
+
+⚠️ Esse é o projeto **compartilhado com o FiadoApp**. Só copiar a string; não
+mexer em mais nada.
+
+Se o link cair na página do projeto sem abrir a janela, é porque o painel
+lembrou outra aba. Nesse caso: botão **Connect** (topo da página, perto do
+nome do projeto) → seção **Session pooler**.
+
+### 1.2 — Conferir que é o modo certo
+
+O painel oferece três modos. Só um serve aqui:
+
+| Modo | Porta | Serve? | Por quê |
+|---|---|---|---|
+| Direct connection | 5432 | ❌ | É **IPv6**, e o runner do GitHub Actions não tem IPv6 |
+| Transaction pooler | 6543 | ❌ | Não aguenta o `pg_dump` |
+| **Session pooler** | **5432** | ✅ | IPv4, é o que funciona aqui |
+
+### 1.3 — Conferir a cara da string
+
+Copiar a string inteira (há um botão de copiar ao lado). Ela tem esta forma —
+o **usuário e o final já são os do seu projeto**, então dá para conferir letra
+por letra:
+
+```
+postgresql://postgres.jipavekxqsbzslcqpxmb:[YOUR-PASSWORD]@aws-1-sa-east-1.pooler.supabase.com:5432/postgres
+```
+
+Checklist rápido, olhando a **sua**:
+
+- começa com `postgresql://` (se o painel entregar `postgres://`, também vale —
+  o que **não** vale é começar com outra coisa)
+- o usuário é exatamente `postgres.jipavekxqsbzslcqpxmb`
+- o host termina em `.pooler.supabase.com` — o pedaço do meio
+  (`aws-1-sa-east-1`, `aws-0-sa-east-1`, outra região…) é o que o painel
+  mostrar; **não invente, copie**
+- a porta é `:5432` (se vier `:6543`, você pegou o Transaction pooler)
+- termina em `/postgres`
 
 ## Passo 2 — Trocar `[YOUR-PASSWORD]` pela senha real do banco
 
 O painel entrega a string com o marcador `[YOUR-PASSWORD]`. Substituir esse
 trecho **inteiro** (inclusive os colchetes) pela senha do banco.
 
-Se você não tem a senha em mãos: **Project Settings → Database → Database
-password → Reset database password**. Isso gera uma senha nova.
+A senha **não aparece em lugar nenhum do painel** — ela só é mostrada uma vez,
+quando é criada. Se você não a tem em mãos, o caminho é gerar uma nova:
+
+### Link direto para o reset da senha
+
+<https://supabase.com/dashboard/project/jipavekxqsbzslcqpxmb/database/settings>
+
+Nessa página, seção **Database password** → botão **Reset database password**.
+
+> ℹ️ Esta página também mudou de endereço: era `/settings/database` e agora é
+> `/database/settings` (no menu lateral: **Database** → **Settings**, e não
+> mais a engrenagem de *Project Settings*). O endereço antigo costuma
+> redirecionar, mas se der 404 é por isso.
 
 > ⚠️ Se você resetar a senha, o `SUPABASE_DB_URL` do seu `.env.local` (usado
 > para aplicar migrations) também precisa ser atualizado com a senha nova, ou
-> os scripts de migration param de conectar.
+> os scripts de migration param de conectar. O `.env.local` fica na raiz do
+> projeto, em `C:\Users\adria\Documents\gaveta`.
+>
+> ⚠️ E se o **FiadoApp** também usar a senha do banco em algum `.env` ou na
+> Vercel, ele quebra junto. Vale conferir antes de resetar.
 >
 > ⏱️ O reset leva cerca de **1 minuto** para propagar no pooler. Se testar
 > antes disso e falhar autenticação, esperar e tentar de novo.
+
+**Dica que evita o passo 4 inteiro:** ao gerar a senha nova, use uma senha
+longa **só com letras e números**. Aí não há caractere para codificar.
 
 ## Passo 3 — Testar ANTES de gravar (opcional, mas evita uma volta)
 
@@ -102,17 +150,30 @@ Vale a pena provar a string antes de virar secret — senão o erro só aparece 
 próxima execução do workflow.
 
 **Nunca cole a string com a senha na conversa com o agente.** Se quiser
-testar, faça no seu terminal, com um comando que não imprime a senha:
+testar, faça no seu terminal, com um comando que não imprime a senha.
+
+No **PowerShell** (o seu terminal padrão), com o Docker Desktop aberto:
+
+```powershell
+$s = Read-Host "cole a URI" -AsSecureString
+$env:U = [System.Net.NetworkCredential]::new("", $s).Password
+docker run --rm -e U postgres:17-alpine sh -c 'pg_dump --schema-only "$U" | head -5'
+Remove-Item Env:U
+```
+
+No **Git Bash**, se preferir:
 
 ```bash
-read -s -p "cole a URI: " U; echo
+read -s -p "cole a URI: " U; echo; export U
 docker run --rm -e U postgres:17-alpine sh -c 'pg_dump --schema-only "$U" | head -5'
+unset U
 ```
 
 Se aparecerem linhas de SQL, a string está certa. Se aparecer o erro do
 socket, ela **não é uma URI válida** — volte ao passo 1.
 
-Sem docker instalado, pule este passo: o passo 7 valida do mesmo jeito.
+Sem Docker instalado, **pule este passo**: o passo 7 valida do mesmo jeito, só
+custa uma volta a mais se a string estiver errada.
 
 ## Passo 4 — Codificar caracteres especiais da senha
 
