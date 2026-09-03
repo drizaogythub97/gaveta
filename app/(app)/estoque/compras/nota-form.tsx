@@ -2,7 +2,6 @@
 
 import {
   AlertTriangle,
-  Camera,
   HelpCircle,
   Package,
   PackagePlus,
@@ -12,10 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
-import {
-  BarcodeScanner,
-  isBarcodeCameraSupported,
-} from "@/components/app/barcode-scanner";
+import { BarcodeCameraButton } from "@/components/app/barcode-camera-button";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { TagPicker } from "@/components/app/tag-picker";
 import { ErrorAlert } from "@/components/auth/form-feedback";
@@ -23,7 +19,6 @@ import loaderStyles from "@/components/app/gaveta-loader.module.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useClientFlag } from "@/lib/hooks/use-client-flag";
 import {
   digitsToBRL,
   digitsToNumber,
@@ -156,7 +151,6 @@ export function NotaForm({
 
   const [items, setItems] = useState<NotaItem[]>([]);
   const [erro, setErro] = useState<string | null>(null);
-  const [showScanner, setShowScanner] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isSaving, startSaving] = useTransition();
 
@@ -178,7 +172,6 @@ export function NotaForm({
   // IA sabe dizer isso). É o sinal mais barato de leitura incoerente.
   const [somaNaoFecha, setSomaNaoFecha] = useState(false);
 
-  const scannerSupported = useClientFlag(isBarcodeCameraSupported);
   const queryRef = useRef<HTMLInputElement>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchSeq = useRef(0);
@@ -711,17 +704,11 @@ export function NotaForm({
           ) : null}
         </div>
 
-        {scannerSupported ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setShowScanner(true)}
-            className="h-12 gap-2 self-start px-4 text-base"
-          >
-            <Camera aria-hidden="true" className="size-5" />
-            Escanear com a câmera
-          </Button>
-        ) : null}
+        <BarcodeCameraButton
+          onDetect={(code) => void submitTermo(code)}
+          aoFechar={refocus}
+          className="self-start"
+        />
 
         {suggestions.length > 0 && novoNome === null ? (
           <ul
@@ -1119,15 +1106,6 @@ export function NotaForm({
         }}
       />
 
-      {showScanner ? (
-        <BarcodeScanner
-          onDetect={(code) => {
-            setShowScanner(false);
-            void submitTermo(code);
-          }}
-          onClose={() => setShowScanner(false)}
-        />
-      ) : null}
     </div>
   );
 }

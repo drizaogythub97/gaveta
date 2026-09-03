@@ -124,7 +124,12 @@ test("categoria criada no cadastro filtra a listagem", async ({ page }) => {
     page.getByRole("button", { name: `Remover categoria ${CATEGORIA}` }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Salvar alterações" }).click();
-  await page.waitForURL(/\/produtos$/);
+  // A confirmação viaja na URL e quem a mostra é a tela de destino: antes,
+  // salvar devolvia a lista em silêncio.
+  await page.waitForURL(/\/produtos\?salvo=editado/);
+  await expect(
+    page.getByRole("status").filter({ hasText: "atualizado" }),
+  ).toBeVisible();
 
   // 2. A categoria vira chip no produto e opção dentro da lista suspensa.
   const abrirFiltro = page.getByRole("button", {

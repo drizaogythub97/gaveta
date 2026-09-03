@@ -90,6 +90,13 @@ export function FiltroMulti({
 
   return (
     <div className="flex flex-col gap-2" ref={caixaRef}>
+      {/* Rótulo visível, como o campo de busca ao lado: controle sem rótulo
+          obriga a adivinhar, e adivinhar é exatamente o que este público não
+          deveria precisar fazer. O `aria-label` do botão repete o rótulo e
+          acrescenta o que está marcado. */}
+      <span id={`${painelId}-rotulo`} className="text-base font-medium">
+        {rotulo}
+      </span>
       <div className="relative flex flex-wrap items-center gap-2">
         <button
           type="button"

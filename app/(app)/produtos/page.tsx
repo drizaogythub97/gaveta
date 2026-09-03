@@ -185,7 +185,7 @@ export default async function ProductsPage({
             />
           </div>
           {tags.length > 0 ? (
-            <div className="sm:pt-8">
+            <div>
               <FiltroMulti
                 param="tag"
                 rotulo="Filtrar por categoria"
