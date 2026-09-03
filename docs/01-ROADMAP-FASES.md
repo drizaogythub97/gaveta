@@ -387,7 +387,68 @@ agendada desde 2026-06-28; o último backup bom é de **2026-06-25**.
 
 ---
 
-## PRÓXIMOS PASSOS ESCOLHIDOS (2026-08-29) — começar por aqui
+## Sprint de usabilidade (2026-09-02) — ENTREGUE
+
+Cinco itens pedidos pelo dono, mais uma emenda que a pergunta dele revelou.
+Tudo num PR só (#39), sem migration: nada a aplicar no banco.
+
+| Item | O que era | O que ficou |
+|---|---|---|
+| 1 | Categoria digitada num item da nota só nascia ao salvar a nota inteira — o item seguinte não a encontrava | Server Action `criarTag` cria (ou reaproveita) na hora; o `TagPicker` ganhou `aoCriar` e o formulário da nota faz a lista de categorias crescer |
+| 2 | Categorias em fileira de chips, um valor só | `FiltroMulti`: lista suspensa com seleção múltipla. Duas marcadas mostram o que for de **qualquer uma** (OU) — decisão do dono. Viajam repetidas na URL |
+| 3 | Não havia busca por nome | `BuscaNome`: filtra conforme se digita, com pausa de 300 ms; corte no banco (`ilike`), para contagem e paginação seguirem certas |
+| 4 | Só um loader, ligado em um lugar só | Quatro níveis de feedback de carregamento (abaixo) |
+| 5 | Câmera só na Frente de Caixa e na entrada por nota | `BarcodeCameraButton` nas quatro telas; em Produtos e Estoque pela primeira vez |
+
+### Os quatro níveis de feedback de carregamento
+
+A varredura achou **20 janelas de espera**. O mesmo fluxo não serve para
+todas — a animação de tela cheia acolhe quem acabou de entrar, mas apagaria
+a lista de quem só trocou um filtro.
+
+1. **Loader de marca, tela cheia** — entrar, criar conta, trocar de seção.
+   Login e cadastro seguram o loader entre o botão e a próxima tela (o botão
+   voltava ao normal e a tela ficava parada). O loader passou a esperar
+   **400 ms** antes de aparecer; login e cadastro passam `0`, porque ali a
+   demora é garantida.
+2. **Região esmaecida** (`RegiaoEmEspera`) — busca, categorias, páginas,
+   movimentações. O `pendente` do `useFiltroNav` virou retorno visível.
+   Como `useTransition` é local ao componente e a espera precisa aparecer
+   nos RESULTADOS, o estado passou a ser publicado num store do módulo
+   (`useFiltroPendente`), sem espalhar contexto pelas páginas.
+3. **Botão que fala** — já estava certo; só padronizados os textos
+   (`confirmPendingLabel` no `ConfirmDialog`, em vez de "Aguarde…").
+4. **Espera longa** (`LeituraEmAndamento`) — leitura de nota, de 5 a 70 s.
+
+### A emenda: salvar quando a tela troca
+
+Buraco achado por uma pergunta do dono: salvar um produto devolvia a lista
+**sem dizer que salvou**. O aviso nascia no formulário — a tela que está indo
+embora — e morria com ela.
+
+Regra que passou a valer: **a resposta nasce no botão, fica nele durante a
+viagem inteira, e a confirmação aparece na tela de destino.** A confirmação
+viaja na URL (`?salvo=novo&nome=…`), generalizando o que o lançamento de
+nota já fazia com `?lancada=1`.
+
+### Duas decisões honestas que valem registro
+
+- O painel da leitura de nota **não marca etapa como concluída**. A leitura é
+  uma ida só ao servidor: o navegador não sabe em que passo ela está, e
+  riscar etapas no relógio seria inventar progresso. No lugar entrou o
+  **tempo corrido**, que é real e é o que desmente o "travou", mais a
+  expectativa medida por via e um aviso quando passa dela.
+- O nível 2 respeita "reduzir movimento" (o fio para; o esmaecer basta). O
+  loader de marca continua animando sempre, como foi decidido quando nasceu.
+
+### O que a câmera ainda precisa
+
+A leitura por câmera depende do `BarcodeDetector`, que o navegador de teste
+não tem — **essa parte não dá para provar por e2e**. O que o código garante é
+que o botão aparece onde a API existe e que, onde não existe, uma linha
+explica o porquê em vez de sumir em silêncio. **Confirmar no celular.**
+
+## PRÓXIMOS PASSOS ESCOLHIDOS (2026-08-29) — ainda de pé
 
 O plano 08 (nota de compra + Lucro × Custo) está inteiro entregue e em
 produção. Estes dois itens foram escolhidos pelo dono como o que vem a
