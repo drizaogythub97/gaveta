@@ -3,6 +3,7 @@
 import { Search, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { BarcodeCameraButton } from "@/components/app/barcode-camera-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFiltroNav } from "@/lib/hooks/use-filtro-nav";
@@ -22,6 +23,10 @@ const ESPERA_MS = 300;
  * O valor visível é do cliente (o campo responde na hora, sem esperar o
  * servidor); o `termoAtual` só reposiciona o campo quando a URL muda por
  * fora — botão voltar, ou o "limpar filtros" da página.
+ *
+ * Com `comCamera`, o campo ganha o botão de ler código de barras ao lado: o
+ * código lido vira o termo de busca. Quem bipa não precisa saber se o produto
+ * é achado pelo nome ou pelo código — a consulta procura nos dois.
  */
 export function BuscaNome({
   param = "q",
@@ -29,6 +34,7 @@ export function BuscaNome({
   rotulo,
   dica,
   placeholder,
+  comCamera = false,
 }: {
   param?: string;
   /** Termo que está na URL agora (vem do servidor). */
@@ -36,6 +42,8 @@ export function BuscaNome({
   rotulo: string;
   dica?: string;
   placeholder?: string;
+  /** Mostra o botão de leitura por câmera ao lado do campo. */
+  comCamera?: boolean;
 }) {
   const { pendente, aplicar } = useFiltroNav();
   const [texto, setTexto] = useState(termoAtual);
@@ -75,6 +83,15 @@ export function BuscaNome({
     relogio.current = setTimeout(() => navegar(valor), ESPERA_MS);
   }
 
+  // Código lido pela câmera não espera a pausa: bipar já é o gesto
+  // completo, não há "terminar de digitar".
+  function bipou(codigo: string) {
+    const limpo = codigo.trim();
+    if (relogio.current) clearTimeout(relogio.current);
+    setTexto(limpo);
+    navegar(limpo);
+  }
+
   function limpar() {
     if (relogio.current) clearTimeout(relogio.current);
     setTexto("");
@@ -86,39 +103,48 @@ export function BuscaNome({
       <Label htmlFor={campoId} className="text-base">
         {rotulo}
       </Label>
-      <div className="relative flex items-center">
-        <Search
-          aria-hidden="true"
-          className="text-muted-foreground pointer-events-none absolute left-4 size-5"
-        />
-        <Input
-          id={campoId}
-          type="search"
-          autoComplete="off"
-          value={texto}
-          onChange={(e) => digitou(e.target.value)}
-          onKeyDown={(e) => {
-            // Enter aplica na hora, sem esperar a pausa: quem aperta Enter
-            // está dizendo que terminou de digitar.
-            if (e.key !== "Enter") return;
-            e.preventDefault();
-            if (relogio.current) clearTimeout(relogio.current);
-            navegar(texto);
-          }}
-          placeholder={placeholder}
-          aria-describedby={dica ? dicaId : undefined}
-          aria-busy={pendente}
-          className="h-12 pr-12 pl-12 text-base"
-        />
-        {texto !== "" ? (
-          <button
-            type="button"
-            onClick={limpar}
-            aria-label="Limpar a busca"
-            className="text-muted-foreground hover:text-foreground absolute right-1 flex size-11 items-center justify-center rounded-lg"
-          >
-            <X aria-hidden="true" className="size-5" />
-          </button>
+      <div className="flex items-center gap-2">
+        <div className="relative flex flex-1 items-center">
+          <Search
+            aria-hidden="true"
+            className="text-muted-foreground pointer-events-none absolute left-4 size-5"
+          />
+          <Input
+            id={campoId}
+            type="search"
+            autoComplete="off"
+            value={texto}
+            onChange={(e) => digitou(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter aplica na hora, sem esperar a pausa: quem aperta Enter
+              // está dizendo que terminou de digitar.
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              if (relogio.current) clearTimeout(relogio.current);
+              navegar(texto);
+            }}
+            placeholder={placeholder}
+            aria-describedby={dica ? dicaId : undefined}
+            aria-busy={pendente}
+            className="h-12 pr-12 pl-12 text-base"
+          />
+          {texto !== "" ? (
+            <button
+              type="button"
+              onClick={limpar}
+              aria-label="Limpar a busca"
+              className="text-muted-foreground hover:text-foreground absolute right-1 flex size-11 items-center justify-center rounded-lg"
+            >
+              <X aria-hidden="true" className="size-5" />
+            </button>
+          ) : null}
+        </div>
+        {comCamera ? (
+          <BarcodeCameraButton
+            variante="icone"
+            rotulo="Escanear código de barras com a câmera"
+            onDetect={bipou}
+          />
         ) : null}
       </div>
       {dica ? (
