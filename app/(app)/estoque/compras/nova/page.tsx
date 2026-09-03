@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { LinkAcao } from "@/components/app/link-acao";
 
 import { iaLiberadaPara } from "@/lib/compras/ia-visao";
 import { listarTags } from "@/lib/products/tags";
@@ -28,13 +28,13 @@ export default async function NovaCompraPage() {
   return (
     <section className="minimal:max-sm:gap-4 mx-auto flex w-full max-w-3xl flex-col gap-6">
       <header className="flex flex-col gap-3">
-        <Link
+        <LinkAcao
           href="/estoque"
           className="text-primary inline-flex w-fit items-center gap-2 text-base font-medium underline-offset-4 hover:underline"
+          icone={<ArrowLeft aria-hidden="true" className="size-5" />}
         >
-          <ArrowLeft aria-hidden="true" className="size-5" />
           Voltar ao estoque
-        </Link>
+        </LinkAcao>
         <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">
           Entrada por nota
         </h1>

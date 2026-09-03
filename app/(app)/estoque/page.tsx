@@ -1,5 +1,6 @@
 import { FileText, History } from "lucide-react";
-import Link from "next/link";
+
+import { LinkAcao } from "@/components/app/link-acao";
 
 import { createClient } from "@/lib/supabase/server";
 import type { Product } from "@/lib/types/db";
@@ -41,20 +42,20 @@ export default async function InventoryPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Link
+          <LinkAcao
             href="/estoque/compras/nova"
             className="border-border hover:bg-muted inline-flex h-12 w-fit shrink-0 flex-1 items-center justify-center gap-2 rounded-lg border px-4 text-base font-medium transition-colors sm:flex-initial"
+            icone={<FileText aria-hidden="true" className="size-5" />}
           >
-            <FileText aria-hidden="true" className="size-5" />
             Entrada por nota
-          </Link>
-          <Link
+          </LinkAcao>
+          <LinkAcao
             href="/estoque/movimentacoes"
             className="border-border hover:bg-muted inline-flex h-12 w-fit shrink-0 flex-1 items-center justify-center gap-2 rounded-lg border px-4 text-base font-medium transition-colors sm:flex-initial"
+            icone={<History aria-hidden="true" className="size-5" />}
           >
-            <History aria-hidden="true" className="size-5" />
             Ver movimentação
-          </Link>
+          </LinkAcao>
         </div>
       </header>
       <InventoryClient products={products} />

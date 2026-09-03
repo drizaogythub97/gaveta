@@ -1,13 +1,13 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import { ErrorAlert } from "@/components/auth/form-feedback";
 import { SubmitButton } from "@/components/auth/submit-button";
 import { BarcodeCameraButton } from "@/components/app/barcode-camera-button";
 import { CurrencyInput } from "@/components/app/currency-input";
+import { LinkAcao } from "@/components/app/link-acao";
 import { TagPicker } from "@/components/app/tag-picker";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -358,7 +358,7 @@ export function ProductForm({
       {/* Rodapé no padrão do sistema (h-12 text-base, largura natural no
           desktop) — os h-14 text-lg esticados destoavam das outras telas. */}
       <div className="mt-2 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <Link
+        <LinkAcao
           href="/produtos"
           className={cn(
             buttonVariants({ variant: "outline" }),
@@ -366,7 +366,7 @@ export function ProductForm({
           )}
         >
           Cancelar
-        </Link>
+        </LinkAcao>
         <SubmitButton
           className="h-12 px-6 text-base font-semibold sm:w-auto"
           pendingText={submitPendingLabel}
