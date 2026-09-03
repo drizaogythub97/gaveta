@@ -126,8 +126,18 @@ test("o dia a dia abre nas vendas daquele dia, com custo e lucro", async ({
 }) => {
   await page.goto("/financeiro?tab=fechamento&period=today");
 
+  // O dia NÃO é procurado pela data local de propósito. O Financeiro fecha o
+  // dia no fuso do SERVIDOR (UTC na Vercel) — limitação conhecida e escrita
+  // em `lib/dashboard/dates.ts`. Depois das 21h de Brasília o servidor já
+  // virou o dia, e caçar "02/09" aqui reprovava o teste toda noite contra o
+  // Preview, sem nada de errado no sistema. Com `period=today` a lista tem o
+  // dia corrente do servidor, e é nele que a venda recém-registrada está.
+  // `[aria-expanded]` e não `{ expanded: false }`: o filtro por estado
+  // deixaria de casar assim que o dia abrisse, e o localizador precisa
+  // sobreviver ao clique.
   const dia = page
-    .getByRole("button", { name: new RegExp(hoje().split("-").reverse().join("/")) })
+    .getByTestId("fechamento-dias")
+    .locator("button[aria-expanded]")
     .first();
   await expect(dia).toBeVisible();
   await expect(dia).toHaveAttribute("aria-expanded", "false");
