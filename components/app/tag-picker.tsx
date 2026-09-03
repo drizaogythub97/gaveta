@@ -27,6 +27,14 @@ export function TagPicker({
   nomeCampoNovas = "newTags",
   /** Quando presente, o componente vira controlado (formulário sem <form>). */
   onChange,
+  /**
+   * Quando presente, a categoria digitada é criada NO SERVIDOR na hora, em
+   * vez de esperar o formulário ser salvo. É o que a entrada por nota
+   * precisa: quem cadastra vários produtos seguidos tem de encontrar, no
+   * segundo, a categoria que criou no primeiro. Devolve a categoria (nova ou
+   * já existente) ou uma mensagem de erro.
+   */
+  aoCriar,
   max = 12,
 }: {
   disponiveis: ProductTag[];
@@ -34,11 +42,14 @@ export function TagPicker({
   nomeCampoIds?: string;
   nomeCampoNovas?: string;
   onChange?: (valor: { tagIds: string[]; newTags: string[] }) => void;
+  aoCriar?: (nome: string) => Promise<{ tag?: ProductTag; error?: string }>;
   max?: number;
 }) {
   const [marcadas, setMarcadas] = useState<string[]>(idsIniciais);
   const [novas, setNovas] = useState<string[]>([]);
   const [rascunho, setRascunho] = useState("");
+  const [criando, setCriando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
   const campoId = useId();
 
   const total = marcadas.length + novas.length;
@@ -60,7 +71,8 @@ export function TagPicker({
 
   function adicionarRascunho() {
     const nome = rascunho.trim();
-    if (nome === "" || cheio) return;
+    if (nome === "" || cheio || criando) return;
+    setErro(null);
 
     // Se já existe uma categoria com esse nome, marca a existente em vez de
     // criar uma quase igual — é o que o índice único do banco faria de
@@ -76,6 +88,27 @@ export function TagPicker({
     }
     if (novas.some((n) => n.toLocaleLowerCase("pt-BR") === chave)) {
       setRascunho("");
+      return;
+    }
+
+    // Com `aoCriar`, a categoria nasce no banco agora e já entra marcada por
+    // id — some da lista de "novas", porque de nova não tem mais nada.
+    if (aoCriar) {
+      setCriando(true);
+      void aoCriar(nome)
+        .then(({ tag, error }) => {
+          if (!tag) {
+            setErro(error ?? "Não foi possível criar a categoria.");
+            return;
+          }
+          setRascunho("");
+          if (!marcadas.includes(tag.id)) {
+            const prox = [...marcadas, tag.id];
+            setMarcadas(prox);
+            avisar(prox, novas);
+          }
+        })
+        .finally(() => setCriando(false));
       return;
     }
 
@@ -179,7 +212,7 @@ export function TagPicker({
             type="text"
             autoComplete="off"
             value={rascunho}
-            disabled={cheio}
+            disabled={cheio || criando}
             maxLength={30}
             placeholder="Ex.: Bebidas"
             onChange={(e) => setRascunho(e.target.value)}
@@ -196,13 +229,20 @@ export function TagPicker({
         <button
           type="button"
           onClick={adicionarRascunho}
-          disabled={cheio || rascunho.trim() === ""}
+          disabled={cheio || criando || rascunho.trim() === ""}
+          aria-busy={criando}
           className="border-border text-foreground hover:bg-muted flex h-12 items-center justify-center gap-2 rounded-lg border px-4 text-base font-medium disabled:opacity-50"
         >
           <Plus aria-hidden="true" className="size-5" />
-          Adicionar
+          {criando ? "Criando…" : "Adicionar"}
         </button>
       </div>
+
+      {erro ? (
+        <p className="text-destructive text-sm" role="alert">
+          {erro}
+        </p>
+      ) : null}
 
       {cheio ? (
         <p className="text-muted-foreground text-sm" role="status">

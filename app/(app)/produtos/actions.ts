@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 
 import type { ZodIssue } from "zod";
 
+import { escaparLike } from "@/lib/db/like";
 import { createClient } from "@/lib/supabase/server";
+import type { ProductTag } from "@/lib/types/db";
 import { productSchema } from "@/lib/validations/products";
 
 export type ProductFormState = {
@@ -216,7 +218,12 @@ export async function createProduct(
   }
 
   revalidatePath("/produtos");
-  redirect("/produtos");
+  // A confirmação viaja na URL e quem a mostra é a tela de DESTINO. Um aviso
+  // montado aqui morreria junto com o formulário que está saindo — era por
+  // isso que salvar um produto devolvia a lista em silêncio.
+  redirect(
+    `/produtos?salvo=novo&nome=${encodeURIComponent(parsed.data.name)}`,
+  );
 }
 
 export async function updateProduct(
@@ -278,7 +285,9 @@ export async function updateProduct(
 
   revalidatePath("/produtos");
   revalidatePath(`/produtos/${id}/editar`);
-  redirect("/produtos");
+  redirect(
+    `/produtos?salvo=editado&nome=${encodeURIComponent(parsed.data.name)}`,
+  );
 }
 
 export async function deleteProduct(formData: FormData): Promise<void> {
@@ -295,4 +304,67 @@ export async function deleteProduct(formData: FormData): Promise<void> {
 
   await supabase.from("products").delete().eq("id", id).eq("user_id", user.id);
   revalidatePath("/produtos");
+}
+
+/**
+ * Cria (ou reaproveita) uma categoria na hora, fora do salvamento de um
+ * produto.
+ *
+ * Existe para a entrada por nota: quem lança uma nota cadastra vários
+ * produtos em sequência, e a categoria digitada no primeiro tem de estar
+ * disponível para marcar no segundo. Antes, ela só nascia quando a nota
+ * inteira era salva — e cada item repetia o mesmo nome sem saber do outro.
+ *
+ * Reaproveita a existente comparando sem diferenciar caixa, que é o mesmo
+ * critério do índice único do banco (`lower(btrim(name))`), para a pessoa
+ * não acabar com "Bebidas" e "bebidas".
+ */
+export async function criarTag(
+  nomeBruto: string,
+): Promise<{ tag?: ProductTag; error?: string }> {
+  const nome = String(nomeBruto ?? "").trim();
+  if (nome === "") return { error: "Escreva o nome da categoria." };
+  if (nome.length > 30) {
+    return { error: "Categoria muito longa (máx. 30 caracteres)." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sessão expirada. Entre de novo." };
+
+  // `ilike` com o termo exato (e curingas escapados) é igualdade sem
+  // diferenciar caixa — o mesmo critério do índice único da tabela.
+  const procurar = async () => {
+    const { data } = await supabase
+      .from("product_tags")
+      .select("id, name")
+      .ilike("name", escaparLike(nome))
+      .limit(1);
+    return ((data ?? []) as ProductTag[])[0];
+  };
+
+  const existente = await procurar();
+  if (existente) return { tag: existente };
+
+  const { data, error } = await supabase
+    .from("product_tags")
+    .insert({ user_id: user.id, name: nome })
+    .select("id, name")
+    .single();
+
+  if (error) {
+    // 23505: outra aba (ou um clique duplo) criou a mesma categoria entre a
+    // busca e o insert. Não é erro para quem está usando — é a categoria que
+    // ela queria, já existindo.
+    if (error.code === "23505") {
+      const criadaAgora = await procurar();
+      if (criadaAgora) return { tag: criadaAgora };
+    }
+    return { error: "Não foi possível criar a categoria. Tente de novo." };
+  }
+
+  revalidatePath("/produtos");
+  return { tag: data as ProductTag };
 }

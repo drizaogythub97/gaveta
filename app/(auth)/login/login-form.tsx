@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
+import { GavetaLoader } from "@/components/app/gaveta-loader";
 import { ErrorAlert } from "@/components/auth/form-feedback";
 import { PasswordField } from "@/components/auth/password-field";
 import { SubmitButton } from "@/components/auth/submit-button";
@@ -14,7 +15,19 @@ import { login, type LoginState } from "./actions";
 const initialState: LoginState = {};
 
 export function LoginForm() {
-  const [state, formAction] = useActionState(login, initialState);
+  const [state, formAction, entrando] = useActionState(login, initialState);
+
+  // O buraco que este bloco tapa: o servidor confere a senha e redireciona
+  // para o painel, mas até o painel montar a tela de login ficava PARADA,
+  // com o botão já de volta ao normal. No celular com internet fraca são
+  // alguns segundos sem sinal nenhum de vida — e é aí que a pessoa toca de
+  // novo achando que não pegou.
+  //
+  // Sem atraso, ao contrário do resto do sistema: aqui a demora é garantida,
+  // porque o sistema inteiro monta depois de entrar.
+  if (entrando) {
+    return <GavetaLoader atrasoMs={0} mensagem="Entrando" />;
+  }
 
   return (
     <form action={formAction} className="flex flex-col gap-5" noValidate>

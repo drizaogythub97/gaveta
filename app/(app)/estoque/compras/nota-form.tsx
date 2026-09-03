@@ -2,7 +2,6 @@
 
 import {
   AlertTriangle,
-  Camera,
   HelpCircle,
   Package,
   PackagePlus,
@@ -12,10 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
-import {
-  BarcodeScanner,
-  isBarcodeCameraSupported,
-} from "@/components/app/barcode-scanner";
+import { BarcodeCameraButton } from "@/components/app/barcode-camera-button";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { TagPicker } from "@/components/app/tag-picker";
 import { ErrorAlert } from "@/components/auth/form-feedback";
@@ -23,7 +19,6 @@ import loaderStyles from "@/components/app/gaveta-loader.module.css";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useClientFlag } from "@/lib/hooks/use-client-flag";
 import {
   digitsToBRL,
   digitsToNumber,
@@ -39,6 +34,7 @@ import type { PurchaseSource } from "@/lib/types/purchases";
 // A busca de produto é a MESMA da frente de caixa (por nome ou por código
 // de barras) — sem duplicar lógica de busca.
 import { findProductByCode, searchProductsByName } from "../../caixa/actions";
+import { criarTag } from "../../produtos/actions";
 
 import { registrarCompra } from "./actions";
 import { ImportarNota } from "./importar-nota";
@@ -128,6 +124,11 @@ export function NotaForm({
 }) {
   const router = useRouter();
 
+  // As categorias que a tela oferece. Começa com as do servidor e CRESCE:
+  // categoria criada num item da nota vira opção para os itens seguintes,
+  // sem recarregar a página.
+  const [tagsDisponiveis, setTagsDisponiveis] = useState<ProductTag[]>(tags);
+
   const [supplier, setSupplier] = useState("");
   const [issuedOn, setIssuedOn] = useState(hoje);
   const [accessKey, setAccessKey] = useState("");
@@ -150,7 +151,6 @@ export function NotaForm({
 
   const [items, setItems] = useState<NotaItem[]>([]);
   const [erro, setErro] = useState<string | null>(null);
-  const [showScanner, setShowScanner] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isSaving, startSaving] = useTransition();
 
@@ -172,7 +172,6 @@ export function NotaForm({
   // IA sabe dizer isso). É o sinal mais barato de leitura incoerente.
   const [somaNaoFecha, setSomaNaoFecha] = useState(false);
 
-  const scannerSupported = useClientFlag(isBarcodeCameraSupported);
   const queryRef = useRef<HTMLInputElement>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchSeq = useRef(0);
@@ -281,6 +280,29 @@ export function NotaForm({
     setNovoTags({ tagIds: [], newTags: [] });
     setNovoTagsKey((k) => k + 1);
     setErro(null);
+  }
+
+  /**
+   * Cria a categoria no banco na hora e guarda na lista da tela.
+   *
+   * Antes, o nome digitado ficava preso no item que estava sendo montado e
+   * só virava categoria quando a nota inteira era salva — então o segundo
+   * produto da mesma nota não tinha como reaproveitá-la, e quem digitasse de
+   * novo acabaria com duas.
+   */
+  async function criarCategoria(nome: string) {
+    const resultado = await criarTag(nome);
+    if (resultado.tag) {
+      const criada = resultado.tag;
+      setTagsDisponiveis((anteriores) =>
+        anteriores.some((t) => t.id === criada.id)
+          ? anteriores
+          : [...anteriores, criada].sort((a, b) =>
+              a.name.localeCompare(b.name, "pt-BR"),
+            ),
+      );
+    }
+    return resultado;
   }
 
   function adicionarNovo() {
@@ -682,17 +704,11 @@ export function NotaForm({
           ) : null}
         </div>
 
-        {scannerSupported ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setShowScanner(true)}
-            className="h-12 gap-2 self-start px-4 text-base"
-          >
-            <Camera aria-hidden="true" className="size-5" />
-            Escanear com a câmera
-          </Button>
-        ) : null}
+        <BarcodeCameraButton
+          onDetect={(code) => void submitTermo(code)}
+          aoFechar={refocus}
+          className="self-start"
+        />
 
         {suggestions.length > 0 && novoNome === null ? (
           <ul
@@ -808,8 +824,9 @@ export function NotaForm({
                 categoriza na hora, sem passar por outra tela. */}
             <TagPicker
               key={novoTagsKey}
-              disponiveis={tags}
+              disponiveis={tagsDisponiveis}
               onChange={setNovoTags}
+              aoCriar={criarCategoria}
             />
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
@@ -1040,6 +1057,7 @@ export function NotaForm({
         onClose={() => setConfirmOpen(false)}
         title="Conferir a nota antes de lançar"
         confirmLabel="Lançar nota"
+        confirmPendingLabel="Lançando a nota…"
         cancelLabel="Voltar e revisar"
         pending={isSaving}
         onConfirm={lancarNota}
@@ -1088,15 +1106,6 @@ export function NotaForm({
         }}
       />
 
-      {showScanner ? (
-        <BarcodeScanner
-          onDetect={(code) => {
-            setShowScanner(false);
-            void submitTermo(code);
-          }}
-          onClose={() => setShowScanner(false)}
-        />
-      ) : null}
     </div>
   );
 }

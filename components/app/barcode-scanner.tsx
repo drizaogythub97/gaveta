@@ -55,6 +55,15 @@ export function BarcodeScanner({ onDetect, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // O efeito abaixo LIGA A CÂMERA. Se ele dependesse de `onDetect`, bastaria
+  // o pai renderizar de novo (o que acontece a cada tecla digitada no
+  // formulário) para a câmera desligar e religar — a imagem pisca e a leitura
+  // recomeça do zero. Guardando o callback num ref, o efeito roda uma vez só.
+  const onDetectRef = useRef(onDetect);
+  useEffect(() => {
+    onDetectRef.current = onDetect;
+  }, [onDetect]);
+
   useEffect(() => {
     let stream: MediaStream | null = null;
     let interval: ReturnType<typeof setInterval> | null = null;
@@ -93,7 +102,7 @@ export function BarcodeScanner({ onDetect, onClose }: Props) {
           const value = codes[0]?.rawValue?.trim();
           if (value) {
             stopped = true;
-            onDetect(value);
+            onDetectRef.current(value);
           }
         } catch {
           // Falha pontual de leitura de frame: ignora e tenta no próximo.
@@ -108,7 +117,7 @@ export function BarcodeScanner({ onDetect, onClose }: Props) {
       if (interval) clearInterval(interval);
       if (stream) stream.getTracks().forEach((t) => t.stop());
     };
-  }, [onDetect]);
+  }, []);
 
   return (
     <div

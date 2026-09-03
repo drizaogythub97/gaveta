@@ -36,6 +36,7 @@ export function LogoutButton() {
         title="Sair da Gaveta?"
         description="Você precisará entrar de novo com seu e-mail e senha para acessar o sistema."
         confirmLabel="Sair"
+        confirmPendingLabel="Saindo…"
         confirmVariant="destructive"
         onConfirm={confirm}
         pending={submitting}

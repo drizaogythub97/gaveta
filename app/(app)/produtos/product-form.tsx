@@ -6,6 +6,7 @@ import { useActionState, useState } from "react";
 
 import { ErrorAlert } from "@/components/auth/form-feedback";
 import { SubmitButton } from "@/components/auth/submit-button";
+import { BarcodeCameraButton } from "@/components/app/barcode-camera-button";
 import { CurrencyInput } from "@/components/app/currency-input";
 import { TagPicker } from "@/components/app/tag-picker";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -58,6 +59,29 @@ export function ProductForm({
   const [stockQuantity, setStockQuantity] = useState(
     initialValues?.stockQuantity ?? "",
   );
+  const [scannerAviso, setScannerAviso] = useState<string | null>(null);
+
+  /**
+   * Código lido pela câmera. Vai para a primeira linha vazia; se todas
+   * estiverem preenchidas, abre uma nova. Código repetido não entra duas
+   * vezes — a pessoa só bipou de novo o mesmo produto.
+   */
+  function handleScannerDetect(code: string) {
+    const lido = code.trim();
+    if (lido === "") return;
+
+    if (barcodes.some((b) => b.trim() === lido)) {
+      setScannerAviso(`O código ${lido} já está na lista.`);
+      return;
+    }
+    const vazia = barcodes.findIndex((b) => b.trim() === "");
+    setBarcodes(
+      vazia === -1
+        ? [...barcodes, lido]
+        : barcodes.map((b, i) => (i === vazia ? lido : b)),
+    );
+    setScannerAviso(`Código ${lido} adicionado.`);
+  }
 
   function setBarcodeAt(index: number, value: string) {
     setBarcodes((prev) => prev.map((b, i) => (i === index ? value : b)));
@@ -161,15 +185,28 @@ export function ProductForm({
             </li>
           ))}
         </ul>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={addBarcode}
-          className="h-12 self-start px-4 text-base"
-        >
-          <Plus aria-hidden="true" className="size-4" />
-          Adicionar outro código
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addBarcode}
+            className="h-12 px-4 text-base"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            Adicionar outro código
+          </Button>
+          {/* Só aparece onde a câmera existe (celular/TWA). No desktop o
+              caminho continua sendo o leitor USB, que digita no campo. */}
+          <BarcodeCameraButton
+            onDetect={handleScannerDetect}
+            avisoSemSuporte="Este aparelho não lê código pela câmera. Use um leitor ou digite o código acima."
+          />
+        </div>
+        {scannerAviso ? (
+          <p className="text-muted-foreground text-sm" role="status">
+            {scannerAviso}
+          </p>
+        ) : null}
         {state.fieldErrors?.barcodes ? (
           <p className="text-destructive text-sm" role="alert">
             {state.fieldErrors.barcodes}

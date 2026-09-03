@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
+import { BarcodeCameraButton } from "@/components/app/barcode-camera-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,10 @@ import { cn } from "@/lib/utils";
 
 import { updateStock } from "./actions";
 
-type Props = { products: Product[] };
+/** Produto do estoque com os códigos de barras, para a busca por bipe. */
+export type ProductWithBarcodes = Product & { barcodes: string[] };
+
+type Props = { products: ProductWithBarcodes[] };
 
 export function InventoryClient({ products }: Props) {
   const [name, setName] = useState("");
@@ -39,7 +43,15 @@ export function InventoryClient({ products }: Props) {
     const maxN = maxQty === "" ? null : Number(maxQty.replace(",", "."));
 
     return products.filter((p) => {
-      if (term && !p.name.toLowerCase().includes(term)) return false;
+      // Nome OU código: quem bipa com a câmera cai aqui com o código no
+      // campo, e o produto aparece sem precisar saber como foi cadastrado.
+      if (
+        term &&
+        !p.name.toLowerCase().includes(term) &&
+        !p.barcodes.some((b) => b.toLowerCase().includes(term))
+      ) {
+        return false;
+      }
       const created = new Date(p.created_at).getTime();
       if (fromDate && created < fromDate.getTime()) return false;
       if (toDate && created > toDate.getTime()) return false;
@@ -75,16 +87,25 @@ export function InventoryClient({ products }: Props) {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div className="flex flex-col gap-2">
             <Label htmlFor="filter-name" className="text-base">
-              Nome
+              Nome ou código
             </Label>
-            <Input
-              id="filter-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex.: refrigerante"
-              className="h-12 text-base"
-            />
+            <div className="flex gap-2">
+              <Input
+                id="filter-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex.: refrigerante"
+                className="h-12 flex-1 text-base"
+              />
+              {/* O código lido vira o termo de busca: a lista já filtra por
+                  código, então o produto bipado aparece sozinho na tela. */}
+              <BarcodeCameraButton
+                variante="icone"
+                rotulo="Escanear código de barras com a câmera"
+                onDetect={(code) => setName(code.trim())}
+              />
+            </div>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="filter-from" className="text-base">

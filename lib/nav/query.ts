@@ -12,13 +12,18 @@
  * estava no formulário (`tab`, `sort`) sumia da URL.
  */
 
-export type QueryOverrides = Record<string, string | null | undefined>;
+export type QueryOverrides = Record<
+  string,
+  string | string[] | null | undefined
+>;
 
 /**
  * Aplica alterações sobre a query ATUAL, preservando o resto.
  *
  * `null` remove a chave (é assim que se zera a paginação ao filtrar);
- * `undefined` é ignorado, para dar para montar overrides condicionais.
+ * `undefined` é ignorado, para dar para montar overrides condicionais;
+ * um **array** grava a chave repetida (`?tag=a&tag=b`), que é como o filtro
+ * de várias categorias viaja, e array vazio equivale a remover.
  */
 export function buildQuery(
   base: URLSearchParams | string,
@@ -29,8 +34,14 @@ export function buildQuery(
   );
   for (const [key, value] of Object.entries(overrides)) {
     if (value === undefined) continue;
-    if (value === null) next.delete(key);
-    else next.set(key, value);
+    if (value === null) {
+      next.delete(key);
+    } else if (Array.isArray(value)) {
+      next.delete(key);
+      for (const item of value) next.append(key, item);
+    } else {
+      next.set(key, value);
+    }
   }
   const qs = next.toString();
   return qs ? `?${qs}` : "?";

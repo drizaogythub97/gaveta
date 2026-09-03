@@ -2,7 +2,6 @@
 
 import {
   AlertCircle,
-  Camera,
   CheckCircle2,
   FileText,
   Image as ImageIcon,
@@ -38,10 +37,7 @@ import { cn } from "@/lib/utils";
 
 import { FiadoappBadge } from "@/components/app/fiadoapp-badge";
 import loaderStyles from "@/components/app/gaveta-loader.module.css";
-import {
-  BarcodeScanner,
-  isBarcodeCameraSupported,
-} from "@/components/app/barcode-scanner";
+import { BarcodeCameraButton } from "@/components/app/barcode-camera-button";
 import {
   isDesktop,
   useEmissorComprovante,
@@ -122,8 +118,6 @@ export function PosClient({
   const [isRegistering, startRegister] = useTransition();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [printSaleId, setPrintSaleId] = useState<string | null>(null);
-  const [showScanner, setShowScanner] = useState(false);
-  const scannerSupported = useClientFlag(isBarcodeCameraSupported);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const printPromptRef = useRef<HTMLDivElement>(null);
@@ -295,9 +289,7 @@ export function PosClient({
   }
 
   function handleScannerDetect(code: string) {
-    setShowScanner(false);
     void submitCode(code);
-    refocus();
   }
 
   function handleManualSubmit() {
@@ -591,17 +583,14 @@ export function PosClient({
               ) : null}
             </div>
 
-            {scannerSupported ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowScanner(true)}
-                className="h-12 gap-2 self-start px-4 text-base"
-              >
-                <Camera aria-hidden="true" className="size-5" />
-                Escanear com a câmera
-              </Button>
-            ) : null}
+            <BarcodeCameraButton
+              onDetect={handleScannerDetect}
+              aoFechar={refocus}
+              avisoSemSuporte="Este aparelho não lê código pela câmera. Use um leitor ou digite acima."
+              className="self-start"
+            />
+            {/* O aviso acima é proposital: antes, onde a câmera não existia,
+                o botão simplesmente não aparecia e não havia como saber por quê. */}
 
             {suggestions.length > 0 && manualName === null ? (
               <ul
@@ -1026,16 +1015,6 @@ export function PosClient({
           </section>
         </div>
       </div>
-
-      {showScanner ? (
-        <BarcodeScanner
-          onDetect={handleScannerDetect}
-          onClose={() => {
-            setShowScanner(false);
-            refocus();
-          }}
-        />
-      ) : null}
 
       {printSaleId ? (
         <div

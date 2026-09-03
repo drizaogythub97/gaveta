@@ -1,9 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import styles from "./gaveta-loader.module.css";
+
+/**
+ * Espera antes de mostrar a animação.
+ *
+ * Numa conexão boa a troca de tela leva menos que isso, e um lampejo de
+ * animação chama mais atenção do que a espera que ele deveria explicar. Quem
+ * está no celular ruim — que é quem precisa — passa dos 400 ms e vê o loader
+ * normalmente.
+ */
+const ATRASO_PADRAO_MS = 400;
 
 const VARIANTS = ["pulse", "growth", "ring"] as const;
 type Variant = (typeof VARIANTS)[number];
@@ -185,9 +195,36 @@ function RingScene() {
  * cada transição), revezando-os entre as telas. Anuncia "Carregando…" para
  * leitores de tela. Por decisão de produto, a animação roda mesmo com
  * "reduzir movimento" ativo no sistema (é um estado breve de carregamento).
+ *
+ * Só aparece depois de `atrasoMs`. Quem quer resposta imediata — o login, em
+ * que a espera é garantida porque o sistema inteiro monta — passa `0`.
  */
-export function GavetaLoader() {
+export function GavetaLoader({
+  atrasoMs = ATRASO_PADRAO_MS,
+  mensagem = "Carregando",
+}: {
+  atrasoMs?: number;
+  /** Texto sob a animação, sem as reticências (elas piscam à parte). */
+  mensagem?: string;
+} = {}) {
   const [variant] = useState<Variant>(pickVariant);
+  const [visivel, setVisivel] = useState(atrasoMs === 0);
+
+  useEffect(() => {
+    if (atrasoMs === 0) return;
+    const relogio = setTimeout(() => setVisivel(true), atrasoMs);
+    return () => clearTimeout(relogio);
+  }, [atrasoMs]);
+
+  // Antes do atraso: nada na tela, mas o aviso para leitor de tela já vale —
+  // quem não enxerga não deve esperar 400 ms para saber que está carregando.
+  if (!visivel) {
+    return (
+      <div role="status" aria-live="polite" className="min-h-[60vh]">
+        <span className="sr-only">{mensagem}…</span>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -195,7 +232,7 @@ export function GavetaLoader() {
       aria-live="polite"
       className="flex min-h-[60vh] flex-col items-center justify-center gap-4"
     >
-      <span className="sr-only">Carregando…</span>
+      <span className="sr-only">{mensagem}…</span>
       {variant === "pulse" ? (
         <PulseScene />
       ) : variant === "growth" ? (
@@ -207,7 +244,8 @@ export function GavetaLoader() {
         aria-hidden="true"
         className={`text-muted-foreground text-base font-semibold ${styles.dots}`}
       >
-        Carregando<span>.</span>
+        {mensagem}
+        <span>.</span>
         <span>.</span>
         <span>.</span>
       </p>

@@ -1,10 +1,13 @@
-import { Box, Pencil, Plus, Tag, UtensilsCrossed } from "lucide-react";
+import { Box, Check, Pencil, Plus, Tag, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 
+import { BuscaNome } from "@/components/app/busca-nome";
 import { ConfirmDeleteButton } from "@/components/app/confirm-delete-button";
-import { FiltroChips } from "@/components/app/filtro-chips";
+import { FiltroMulti } from "@/components/app/filtro-multi";
 import { Paginacao } from "@/components/app/paginacao";
+import { RegiaoEmEspera } from "@/components/app/regiao-em-espera";
 import { buttonVariants } from "@/components/ui/button";
+import { escaparLike } from "@/lib/db/like";
 import { formatBRL, formatQuantity } from "@/lib/products/format";
 import { listarTags } from "@/lib/products/tags";
 import { createClient } from "@/lib/supabase/server";
@@ -29,10 +32,17 @@ function pickString(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+/** O filtro de categorias viaja repetido na URL (`?tag=a&tag=b`). */
+function pickAll(value: string | string[] | undefined): string[] {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
 function parsePage(value: string | string[] | undefined): number {
   const n = Number.parseInt(pickString(value) ?? "1", 10);
   return Number.isFinite(n) && n >= 1 ? n : 1;
 }
+
 
 type ProductRow = Product & {
   product_barcodes: { barcode: string }[] | null;
@@ -48,22 +58,28 @@ export default async function ProductsPage({
   const supabase = await createClient();
 
   const tags = await listarTags(supabase);
-  const tagParam = pickString(params.tag);
-  // Só vale filtro por categoria que existe: parâmetro inventado na URL cai
-  // para "todas" em vez de devolver uma lista vazia sem explicação.
-  const tagAtual = tags.some((t) => t.id === tagParam) ? tagParam! : "todas";
+  // Só vale filtro por categoria que existe: parâmetro inventado na URL é
+  // descartado em vez de devolver uma lista vazia sem explicação.
+  const tagsAtuais = pickAll(params.tag).filter((id) =>
+    tags.some((t) => t.id === id),
+  );
+  const termo = (pickString(params.q) ?? "").trim();
 
-  // Quando há filtro, a página vem dos vínculos: o Postgrest não pagina
-  // direito por tabela aninhada, então os ids saem primeiro.
+  // Quando há filtro de categoria, a página vem dos vínculos: o PostgREST não
+  // pagina direito por tabela aninhada, então os ids saem primeiro. Várias
+  // categorias marcadas somam (OU): o produto entra se tiver QUALQUER uma
+  // delas — decisão do dono do produto.
   let idsDaTag: string[] | null = null;
-  if (tagAtual !== "todas") {
+  if (tagsAtuais.length > 0) {
     const { data } = await supabase
       .from("product_tag_links")
       .select("product_id")
-      .eq("tag_id", tagAtual);
-    idsDaTag = ((data ?? []) as { product_id: string }[]).map(
-      (l) => l.product_id,
-    );
+      .in("tag_id", tagsAtuais);
+    idsDaTag = [
+      ...new Set(
+        ((data ?? []) as { product_id: string }[]).map((l) => l.product_id),
+      ),
+    ];
   }
 
   const paginaPedida = parsePage(params.page);
@@ -82,6 +98,11 @@ export default async function ProductsPage({
     .order("created_at", { ascending: false });
   if (idsDaTag !== null && idsDaTag.length > 0) {
     query = query.in("id", idsDaTag);
+  }
+  if (termo !== "") {
+    // A busca corta no banco, não no cliente: só assim a contagem e a
+    // paginação continuam certas com o catálogo inteiro.
+    query = query.ilike("name", `%${escaparLike(termo)}%`);
   }
 
   const { data, error, count } = semResultado
@@ -106,7 +127,19 @@ export default async function ProductsPage({
     }),
   );
 
-  const semNenhumProduto = totalProdutos === 0 && tagAtual === "todas";
+  const temFiltro = tagsAtuais.length > 0 || termo !== "";
+  const semNenhumProduto = totalProdutos === 0 && !temFiltro;
+
+  // Confirmação de quem acabou de salvar e foi trazido para cá. O aviso não
+  // pode nascer no formulário: ele some junto com a tela que sai.
+  const salvo = pickString(params.salvo);
+  const nomeSalvo = pickString(params.nome)?.slice(0, 60);
+  const confirmacao =
+    salvo === "novo"
+      ? `Produto ${nomeSalvo ? `“${nomeSalvo}” ` : ""}cadastrado.`
+      : salvo === "editado"
+        ? `Produto ${nomeSalvo ? `“${nomeSalvo}” ` : ""}atualizado.`
+        : null;
 
   return (
     <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
@@ -131,17 +164,38 @@ export default async function ProductsPage({
         </Link>
       </header>
 
-      {tags.length > 0 ? (
-        <FiltroChips
-          param="tag"
-          rotulo="Filtrar por categoria"
-          atual={tagAtual}
-          valorPadrao="todas"
-          opcoes={[
-            { value: "todas", label: "Todas" },
-            ...tags.map((t) => ({ value: t.id, label: t.name })),
-          ]}
-        />
+      {confirmacao ? (
+        <p
+          role="status"
+          className="border-primary/35 bg-primary/10 text-primary flex items-center gap-2 rounded-xl border px-4 py-3 text-base font-medium"
+        >
+          <Check aria-hidden="true" className="size-5 shrink-0" />
+          {confirmacao}
+        </p>
+      ) : null}
+
+      {!semNenhumProduto ? (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+          <div className="sm:max-w-sm sm:flex-1">
+            <BuscaNome
+              termoAtual={termo}
+              rotulo="Buscar por nome"
+              placeholder="Comece a digitar…"
+              dica="A lista vai se ajustando conforme você digita."
+            />
+          </div>
+          {tags.length > 0 ? (
+            <div>
+              <FiltroMulti
+                param="tag"
+                rotulo="Filtrar por categoria"
+                selecionados={tagsAtuais}
+                textoVazio="Todas as categorias"
+                opcoes={tags.map((t) => ({ value: t.id, label: t.name }))}
+              />
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       {error ? (
@@ -151,13 +205,24 @@ export default async function ProductsPage({
       ) : semNenhumProduto ? (
         <EmptyState />
       ) : products.length === 0 ? (
-        <div className="bg-muted/40 rounded-xl p-8 text-center">
+        <div className="bg-muted/40 flex flex-col items-center gap-3 rounded-xl p-8 text-center">
           <p className="text-base">
-            Nenhum produto nesta categoria.
+            {termo !== ""
+              ? `Nenhum produto com “${termo}” no nome${tagsAtuais.length > 0 ? " nas categorias marcadas" : ""}.`
+              : "Nenhum produto nas categorias marcadas."}
           </p>
+          <Link
+            href="/produtos"
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-12 px-5 text-base",
+            )}
+          >
+            Limpar filtros
+          </Link>
         </div>
       ) : (
-        <>
+        <RegiaoEmEspera>
           <ul className="minimal:max-sm:gap-2 flex flex-col gap-3">
             {products.map((p) => (
               <li
@@ -236,7 +301,7 @@ export default async function ProductsPage({
             plural="produtos"
             rotulo="Páginas da lista de produtos"
           />
-        </>
+        </RegiaoEmEspera>
       )}
     </section>
   );
