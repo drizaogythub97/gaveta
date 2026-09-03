@@ -1,9 +1,9 @@
 import { Box, Check, Pencil, Plus, Tag, UtensilsCrossed } from "lucide-react";
-import Link from "next/link";
 
 import { BuscaNome } from "@/components/app/busca-nome";
 import { ConfirmDeleteButton } from "@/components/app/confirm-delete-button";
 import { FiltroMulti } from "@/components/app/filtro-multi";
+import { LinkAcao } from "@/components/app/link-acao";
 import { Paginacao } from "@/components/app/paginacao";
 import { RegiaoEmEspera } from "@/components/app/regiao-em-espera";
 import { buttonVariants } from "@/components/ui/button";
@@ -152,16 +152,16 @@ export default async function ProductsPage({
             Cadastre e organize o que você vende.
           </p>
         </div>
-        <Link
+        <LinkAcao
           href="/produtos/novo"
           className={cn(
             buttonVariants(),
             "minimal:max-sm:h-11 minimal:max-sm:text-base h-14 px-6 text-lg font-medium sm:self-start",
           )}
+          icone={<Plus aria-hidden="true" className="size-5" />}
         >
-          <Plus aria-hidden="true" className="size-5" />
           Novo produto
-        </Link>
+        </LinkAcao>
       </header>
 
       {confirmacao ? (
@@ -211,7 +211,7 @@ export default async function ProductsPage({
               ? `Nenhum produto com “${termo}” no nome${tagsAtuais.length > 0 ? " nas categorias marcadas" : ""}.`
               : "Nenhum produto nas categorias marcadas."}
           </p>
-          <Link
+          <LinkAcao
             href="/produtos"
             className={cn(
               buttonVariants({ variant: "outline" }),
@@ -219,7 +219,7 @@ export default async function ProductsPage({
             )}
           >
             Limpar filtros
-          </Link>
+          </LinkAcao>
         </div>
       ) : (
         <RegiaoEmEspera>
@@ -273,17 +273,17 @@ export default async function ProductsPage({
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Link
+                  <LinkAcao
                     href={`/produtos/${p.id}/editar`}
                     className={cn(
                       buttonVariants({ variant: "outline" }),
                       "minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 flex-1 px-4 text-base sm:flex-initial",
                     )}
                     aria-label={`Editar ${p.name}`}
+                    icone={<Pencil aria-hidden="true" className="size-4" />}
                   >
-                    <Pencil aria-hidden="true" className="size-4" />
                     Editar
-                  </Link>
+                  </LinkAcao>
                   <ConfirmDeleteButton
                     id={p.id}
                     productName={p.name}
@@ -317,16 +317,16 @@ function EmptyState() {
       <p className="text-muted-foreground text-base">
         Crie seu primeiro produto para começar a vender.
       </p>
-      <Link
+      <LinkAcao
         href="/produtos/novo"
         className={cn(
           buttonVariants(),
           "minimal:max-sm:h-11 minimal:max-sm:text-base mt-2 h-14 px-6 text-lg font-medium",
         )}
+        icone={<Plus aria-hidden="true" className="size-5" />}
       >
-        <Plus aria-hidden="true" className="size-5" />
         Cadastrar produto
-      </Link>
+      </LinkAcao>
     </div>
   );
 }
