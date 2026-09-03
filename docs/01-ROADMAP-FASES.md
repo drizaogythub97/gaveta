@@ -389,8 +389,13 @@ agendada desde 2026-06-28; o último backup bom é de **2026-06-25**.
 
 ## Sprint de usabilidade (2026-09-02) — ENTREGUE
 
-Cinco itens pedidos pelo dono, mais uma emenda que a pergunta dele revelou.
-Tudo num PR só (#39), sem migration: nada a aplicar no banco.
+Cinco itens pedidos pelo dono, mais duas emendas que vieram das perguntas e
+do teste dele. **Sem migration**: nada a aplicar no banco.
+
+| PR | Merge | O que traz |
+|---|---|---|
+| #39 | `097cc17` | os cinco itens + a confirmação na tela de destino |
+| #40 | `e327998` | o giro no link que faltava nas trocas de tela |
 
 | Item | O que era | O que ficou |
 |---|---|---|
@@ -440,6 +445,39 @@ nota já fazia com `?lancada=1`.
   expectativa medida por via e um aviso quando passa dela.
 - O nível 2 respeita "reduzir movimento" (o fio para; o esmaecer basta). O
   loader de marca continua animando sempre, como foi decidido quando nasceu.
+
+### A emenda do PR #40: o loader não cobria as trocas de tela
+
+O dono testou o #39 e apontou telas que continuavam sem resposta. **Medido em
+produção**, com usuário descartável — não era "rápido demais para aparecer":
+
+| Navegação | Tempo | Loader apareceu? |
+|---|---|---|
+| Produtos → Novo produto | 862 ms | não |
+| Produtos → Editar (card) | 1072 ms | não |
+| Estoque → Entrada por nota | 1058 ms | não |
+| Entrada por nota → Voltar ao estoque | 819 ms | não |
+| Estoque → Ver movimentação | 838 ms | não |
+| Movimentação → Voltar ao estoque | 21 ms | não |
+
+**Por que o nível 1 não pegava esses casos** (vale entender antes de mexer):
+o Next **pré-carrega** essas rotas, então a navegação não *suspende* — o
+tempo é o navegador montando a tela nova, e um boundary de Suspense
+(`app/(app)/loading.tsx`) não enxerga isso. Baixar o atraso de 400 ms não
+mudaria nada, porque o loader não chega a ser considerado.
+
+A correção aplica a regra do nível 3: **falar onde a pessoa tocou**.
+`LinkAcao` usa `useLinkStatus` (Next 16) e troca o ícone do link por um giro
+no instante do clique, sem atraso. Medido de novo: giro nas seis.
+
+Dois casos da lista **já estavam certos**, e a medição provou:
+
+- **Lançar a nota** — 2968 ms com o botão dizendo "Lançando a nota…" o tempo
+  inteiro. É o nível 3 segurando a resposta durante a viagem.
+- **Filtros do Estoque** — não há espera: eles filtram **no navegador**
+  (`useMemo` sobre a lista já carregada), sem ir ao servidor. Animação ali
+  seria decorativa. Fica registrada a inconsistência com os filtros de
+  Produtos (que vão ao banco); o dono ainda não decidiu se quer unificar.
 
 ### O que a câmera ainda precisa
 
