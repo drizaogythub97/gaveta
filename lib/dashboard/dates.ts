@@ -46,7 +46,15 @@ export function todayStartISO(): string {
 
 export function monthStartISO(): string {
   const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0).toISOString();
+  return new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    1,
+    0,
+    0,
+    0,
+    0,
+  ).toISOString();
 }
 
 export function rangeForPeriod(
@@ -81,6 +89,24 @@ export function rangeForPeriod(
     from: startOfDay(fromDate).toISOString(),
     to: endOfDay(toDate).toISOString(),
   };
+}
+
+/**
+ * Borda inicial de um dia digitado em `<input type="date">`, em ISO.
+ *
+ * Devolve `null` quando o valor não é uma data no formato `AAAA-MM-DD` —
+ * parâmetro inventado na URL não deve virar filtro silencioso. O dia é
+ * calculado no fuso do servidor, com a ressalva do topo deste arquivo.
+ */
+export function dayStartISO(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  return startOfDay(parseDateInput(value)).toISOString();
+}
+
+/** Borda final (23:59:59.999) do mesmo dia. Ver {@link dayStartISO}. */
+export function dayEndISO(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  return endOfDayFromInput(value).toISOString();
 }
 
 function parseDateInput(value: string): Date {
