@@ -1070,6 +1070,7 @@ export function NotaForm({
         onClose={() => setConfirmOpen(false)}
         title="Conferir a nota antes de lançar"
         confirmLabel="Lançar nota"
+        confirmPendingLabel="Lançando a nota…"
         cancelLabel="Voltar e revisar"
         pending={isSaving}
         onConfirm={lancarNota}

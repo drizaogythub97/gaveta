@@ -1,0 +1,45 @@
+/* Fio de progresso da região em espera (nível 2 do feedback de
+   carregamento). Indeterminado de propósito: o servidor não diz quanto
+   falta, e barra que finge porcentagem mente. */
+
+.fita {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  z-index: 2;
+}
+
+.fita::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: 2px;
+  background: var(--color-primary);
+  animation: desliza 1.05s ease-in-out infinite;
+}
+
+@keyframes desliza {
+  0% {
+    transform: translateX(-105%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+/* Diferente do loader de marca (que anima sempre, por decisão de produto),
+   aqui a redução de movimento é respeitada: o fio fica parado e cheio, e o
+   esmaecer da região já comunica a espera sozinho. */
+@media (prefers-reduced-motion: reduce) {
+  .fita::after {
+    animation: none;
+    width: 100%;
+    opacity: 0.7;
+  }
+}

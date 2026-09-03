@@ -218,7 +218,12 @@ export async function createProduct(
   }
 
   revalidatePath("/produtos");
-  redirect("/produtos");
+  // A confirmação viaja na URL e quem a mostra é a tela de DESTINO. Um aviso
+  // montado aqui morreria junto com o formulário que está saindo — era por
+  // isso que salvar um produto devolvia a lista em silêncio.
+  redirect(
+    `/produtos?salvo=novo&nome=${encodeURIComponent(parsed.data.name)}`,
+  );
 }
 
 export async function updateProduct(
@@ -280,7 +285,9 @@ export async function updateProduct(
 
   revalidatePath("/produtos");
   revalidatePath(`/produtos/${id}/editar`);
-  redirect("/produtos");
+  redirect(
+    `/produtos?salvo=editado&nome=${encodeURIComponent(parsed.data.name)}`,
+  );
 }
 
 export async function deleteProduct(formData: FormData): Promise<void> {

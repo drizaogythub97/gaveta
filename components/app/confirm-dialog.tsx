@@ -12,6 +12,12 @@ type Props = {
   title: string;
   description?: React.ReactNode;
   confirmLabel: string;
+  /**
+   * O que o botão diz enquanto a ação corre. Sempre o verbo da PRÓPRIA
+   * ação ("Estornando…", "Excluindo…"): "Aguarde…" não conta o que está
+   * acontecendo, e é justamente isso que a pessoa quer saber.
+   */
+  confirmPendingLabel?: string;
   cancelLabel?: string;
   confirmVariant?: Variant;
   onConfirm: () => void;
@@ -25,6 +31,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  confirmPendingLabel = "Aguarde…",
   cancelLabel = "Cancelar",
   confirmVariant = "default",
   onConfirm,
@@ -116,7 +123,7 @@ export function ConfirmDialog({
             aria-busy={pending}
             className="h-12 px-5 text-base"
           >
-            {pending ? "Aguarde…" : confirmLabel}
+            {pending ? confirmPendingLabel : confirmLabel}
           </Button>
         </div>
       </div>

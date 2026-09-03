@@ -8,6 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import type { NotaConferencia } from "@/lib/compras/tipos";
 
+import {
+  LeituraEmAndamento,
+  type ViaDeLeitura,
+} from "./leitura-em-andamento";
+
 import { importarNotaComIa, importarNotaDeArquivo } from "./import-actions";
 
 /**
@@ -80,6 +85,19 @@ export function ImportarNota({
     });
   }
 
+  /**
+   * Por onde a leitura está indo, para o painel de espera saber o que
+   * prometer de tempo. Vem do tipo do arquivo, que é informação real — não
+   * de suposição.
+   */
+  function viaDoArquivo(arquivo: File | null): ViaDeLeitura {
+    const tipo = arquivo?.type ?? "";
+    const nome = arquivo?.name.toLowerCase() ?? "";
+    if (tipo.includes("xml") || nome.endsWith(".xml")) return "xml";
+    if (tipo === "application/pdf" || nome.endsWith(".pdf")) return "pdf";
+    return "foto";
+  }
+
   /** A IA lê imagem e PDF; XML já é exato e não precisa dela. */
   const arquivoServeParaIa =
     arquivoAtual !== null &&
@@ -145,6 +163,15 @@ export function ImportarNota({
         )}
       </Button>
 
+      {/* Nível 4 do feedback de carregamento: um giro sozinho não sustenta
+          uma espera que chega a 70 segundos — parece travamento. */}
+      {pendente ? (
+        <LeituraEmAndamento
+          via={viaDoArquivo(arquivoAtual)}
+          nomeArquivo={arquivoAtual?.name}
+        />
+      ) : null}
+
       {erro ? (
         <p role="alert" className="text-destructive text-base">
           {erro}
@@ -187,6 +214,10 @@ export function ImportarNota({
               </>
             )}
           </Button>
+
+          {pendenteIa ? (
+            <LeituraEmAndamento via="ia" nomeArquivo={arquivoAtual?.name} />
+          ) : null}
         </div>
       ) : null}
 
@@ -212,6 +243,7 @@ export function ImportarNota({
           </>
         }
         confirmLabel="Enviar e ler"
+        confirmPendingLabel="Enviando…"
         cancelLabel="Não enviar"
         onConfirm={lerComIa}
       />

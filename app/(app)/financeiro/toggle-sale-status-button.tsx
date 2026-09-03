@@ -28,6 +28,7 @@ export function ToggleSaleStatusButton({ saleId, status }: Props) {
       type="button"
       onClick={handleClick}
       disabled={isPending}
+      aria-busy={isPending}
       className={
         voided
           ? "bg-success text-success-foreground h-12 w-full rounded-lg px-5 text-base font-medium hover:opacity-90 disabled:opacity-60"

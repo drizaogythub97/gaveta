@@ -460,6 +460,7 @@ export function AccountClient({
           </span>
         }
         confirmLabel="Excluir conta"
+        confirmPendingLabel="Excluindo a conta…"
         confirmVariant="destructive"
         onConfirm={submitDelete}
         pending={deleting}

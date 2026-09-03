@@ -93,6 +93,7 @@ export function EstornoNotaButton({
           </>
         }
         confirmLabel="Cancelar a nota"
+        confirmPendingLabel="Cancelando a nota…"
         cancelLabel="Voltar"
         confirmVariant="destructive"
         onConfirm={cancelar}

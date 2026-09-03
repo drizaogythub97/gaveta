@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
+import { GavetaLoader } from "@/components/app/gaveta-loader";
 import { ErrorAlert, SuccessAlert } from "@/components/auth/form-feedback";
 import { PasswordField } from "@/components/auth/password-field";
 import { SubmitButton } from "@/components/auth/submit-button";
@@ -16,7 +17,13 @@ import { signup, type SignupState } from "./actions";
 const initialState: SignupState = {};
 
 export function SignupForm() {
-  const [state, formAction] = useActionState(signup, initialState);
+  const [state, formAction, criando] = useActionState(signup, initialState);
+
+  // Mesma razão do login: criar a conta leva um tempo em que a tela ficava
+  // parada. Sem atraso — a espera aqui é garantida.
+  if (criando) {
+    return <GavetaLoader atrasoMs={0} mensagem="Criando sua conta" />;
+  }
 
   if (state.success) {
     return (

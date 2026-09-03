@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 import { FiltroChips } from "@/components/app/filtro-chips";
+import { RegiaoEmEspera } from "@/components/app/regiao-em-espera";
 import { createClient } from "@/lib/supabase/server";
 import { formatQuantity } from "@/lib/products/format";
 import {
@@ -101,11 +102,13 @@ export default async function StockMovementsPage({
           </p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {movements.map((m) => (
-            <MovementRow key={m.id} movement={m} />
-          ))}
-        </ul>
+        <RegiaoEmEspera>
+          <ul className="flex flex-col gap-2">
+            {movements.map((m) => (
+              <MovementRow key={m.id} movement={m} />
+            ))}
+          </ul>
+        </RegiaoEmEspera>
       )}
     </section>
   );

@@ -73,6 +73,7 @@ export function FiadoAReceberDeleteButton({
           </>
         }
         confirmLabel="Excluir"
+        confirmPendingLabel="Excluindo…"
         confirmVariant="destructive"
         onConfirm={excluir}
         pending={pending}

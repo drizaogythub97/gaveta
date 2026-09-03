@@ -138,6 +138,7 @@ export function FiadoPdvToggle({
           )
         }
         confirmLabel="Desativar"
+        confirmPendingLabel="Desativando…"
         confirmVariant="destructive"
         onConfirm={confirmarDesativar}
         pending={pending}

@@ -1,10 +1,11 @@
-import { Box, Pencil, Plus, Tag, UtensilsCrossed } from "lucide-react";
+import { Box, Check, Pencil, Plus, Tag, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 
 import { BuscaNome } from "@/components/app/busca-nome";
 import { ConfirmDeleteButton } from "@/components/app/confirm-delete-button";
 import { FiltroMulti } from "@/components/app/filtro-multi";
 import { Paginacao } from "@/components/app/paginacao";
+import { RegiaoEmEspera } from "@/components/app/regiao-em-espera";
 import { buttonVariants } from "@/components/ui/button";
 import { escaparLike } from "@/lib/db/like";
 import { formatBRL, formatQuantity } from "@/lib/products/format";
@@ -129,6 +130,17 @@ export default async function ProductsPage({
   const temFiltro = tagsAtuais.length > 0 || termo !== "";
   const semNenhumProduto = totalProdutos === 0 && !temFiltro;
 
+  // Confirmação de quem acabou de salvar e foi trazido para cá. O aviso não
+  // pode nascer no formulário: ele some junto com a tela que sai.
+  const salvo = pickString(params.salvo);
+  const nomeSalvo = pickString(params.nome)?.slice(0, 60);
+  const confirmacao =
+    salvo === "novo"
+      ? `Produto ${nomeSalvo ? `“${nomeSalvo}” ` : ""}cadastrado.`
+      : salvo === "editado"
+        ? `Produto ${nomeSalvo ? `“${nomeSalvo}” ` : ""}atualizado.`
+        : null;
+
   return (
     <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -151,6 +163,16 @@ export default async function ProductsPage({
           Novo produto
         </Link>
       </header>
+
+      {confirmacao ? (
+        <p
+          role="status"
+          className="border-primary/35 bg-primary/10 text-primary flex items-center gap-2 rounded-xl border px-4 py-3 text-base font-medium"
+        >
+          <Check aria-hidden="true" className="size-5 shrink-0" />
+          {confirmacao}
+        </p>
+      ) : null}
 
       {!semNenhumProduto ? (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
@@ -200,7 +222,7 @@ export default async function ProductsPage({
           </Link>
         </div>
       ) : (
-        <>
+        <RegiaoEmEspera>
           <ul className="minimal:max-sm:gap-2 flex flex-col gap-3">
             {products.map((p) => (
               <li
@@ -279,7 +301,7 @@ export default async function ProductsPage({
             plural="produtos"
             rotulo="Páginas da lista de produtos"
           />
-        </>
+        </RegiaoEmEspera>
       )}
     </section>
   );
