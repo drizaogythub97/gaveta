@@ -478,13 +478,65 @@ Dois casos da lista **já estavam certos**, e a medição provou:
   (`useMemo` sobre a lista já carregada), sem ir ao servidor. Animação ali
   seria decorativa. Fica registrada a inconsistência com os filtros de
   Produtos (que vão ao banco); o dono ainda não decidiu se quer unificar.
+  → **Decidido em 2026-09-03: unificar.** Ver a seção seguinte.
 
-### O que a câmera ainda precisa
+### A câmera — conferida no celular em 2026-09-03 ✅
 
 A leitura por câmera depende do `BarcodeDetector`, que o navegador de teste
 não tem — **essa parte não dá para provar por e2e**. O que o código garante é
 que o botão aparece onde a API existe e que, onde não existe, uma linha
-explica o porquê em vez de sumir em silêncio. **Confirmar no celular.**
+explica o porquê em vez de sumir em silêncio.
+
+O dono conferiu no aparelho: **funcionando** em Produtos, Estoque e Frente de
+Caixa. Item encerrado.
+
+## Filtros do Estoque no servidor (2026-09-03) — PR #41
+
+A inconsistência registrada acima virou decisão do dono: **unificar**. O
+Estoque passou a filtrar no banco, exatamente como Produtos.
+
+**O que muda para quem usa.** O recorte vive na query string
+(`?q=&from=&to=&min=&max=&low=&page=`), então o endereço de um filtro é
+compartilhável e o botão voltar funciona; a lista vem **15 por página**, com
+contagem exata do banco, em vez de o celular receber o catálogo inteiro
+controlado por estoque a cada visita; e filtrar mostra o nível 2 (a lista
+esmaece no lugar) em vez de não mostrar nada.
+
+**Sem migration.** Nenhuma alteração de esquema.
+
+### Decisões que a próxima sessão não deve refazer
+
+- **A busca casa por nome OU código de barras** num `or()` do PostgREST — é
+  o que faz o produto bipado aparecer. A gramática do `or` separa condições
+  por vírgula e delimita listas por parênteses, então um termo com esses
+  caracteres quebraria a consulta, ou acrescentaria condição. `valorParaOr`
+  (`lib/db/like.ts`) envolve o valor em aspas duplas; a sintaxe foi
+  **conferida contra o banco real** com termos hostis (`a,b`, `a)b`, `a"b`,
+  `50%`) antes de entrar. Não confundir com `escaparLike`: um protege o
+  curinga do SQL, o outro protege a sintaxe da query string — e a busca usa
+  os dois, nessa ordem.
+- **Parâmetro inválido na URL não vira filtro.** Data fora de `AAAA-MM-DD`,
+  quantidade negativa ou não numérica: descartadas em `lib/estoque/filtros.ts`
+  e a lista sai inteira. O campo continua mostrando o que a pessoa digitou,
+  para o "limpar filtros" aparecer.
+- **`BuscaNome` ganhou o botão de câmera** (`comCamera`), então a busca do
+  Estoque é a MESMA peça de Produtos. Código lido não espera a pausa de
+  digitação: bipar já é o gesto completo.
+- **`InventoryClient` virou `StockRow`** — só a linha, com o formulário de
+  quantidade, precisa de cliente.
+- **A contagem "N produtos no recorte atual" some quando a paginação
+  aparece**, porque a barra já mostra o total. Com uma página só a barra não
+  é renderizada, e aí a contagem fica: era o que a tela sempre mostrou.
+- As bordas do dia dos filtros de data saem no **fuso do servidor** (UTC na
+  Vercel) — a mesma ressalva conhecida do Financeiro, documentada em
+  `lib/dashboard/dates.ts`.
+
+### Testes
+
+- **159 unitários** (+12: leitura dos filtros e `valorParaOr`).
+- **92 e2e** (+7 em `tests/e2e/estoque.spec.ts`: paginação, busca por nome
+  sem recarregar o documento, busca por código, estoque baixo, faixa de
+  quantidade e limpar filtros).
 
 ## PRÓXIMOS PASSOS ESCOLHIDOS (2026-08-29) — ainda de pé
 
