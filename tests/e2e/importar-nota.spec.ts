@@ -6,6 +6,7 @@ import { STATE_FUNCIONAL } from "../../playwright.config";
 
 import {
   chaveFicticia,
+  enviarNota,
   hojeISO,
   loadUsers,
   userClient,
@@ -151,7 +152,7 @@ test("1. XML da NF-e preenche a tela com os três tipos de item", async ({
   await page.goto("/estoque/compras/nova");
   await expect(page.getByText("Tem o arquivo da nota?")).toBeVisible();
 
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "nota.xml",
     mimeType: "text/xml",
     buffer: Buffer.from(xmlDaNota(chaveXml), "utf8"),
@@ -198,7 +199,7 @@ test("2. depois de conferir, a nota importada é lançada como 'xml'", async ({
   page,
 }) => {
   await page.goto("/estoque/compras/nova");
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "nota.xml",
     mimeType: "text/xml",
     buffer: Buffer.from(xmlDaNota(chaveXml), "utf8"),
@@ -305,7 +306,7 @@ test("3. PDF do DANFE também preenche a tela e registra a origem", async ({
   page,
 }) => {
   await page.goto("/estoque/compras/nova");
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "danfe.pdf",
     mimeType: "application/pdf",
     buffer: pdfDaNota(chavePdf),
@@ -356,7 +357,7 @@ test("4. arquivo que não serve é recusado com explicação simples", async ({
   await page.goto("/estoque/compras/nova");
 
   // Imagem: não tem texto nenhum para ler.
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "foto.png",
     mimeType: "image/png",
     buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
@@ -366,7 +367,7 @@ test("4. arquivo que não serve é recusado com explicação simples", async ({
   ).toBeVisible();
 
   // XML que não é NF-e.
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "qualquer.xml",
     mimeType: "text/xml",
     buffer: Buffer.from("<?xml version='1.0'?><lista><a>1</a></lista>", "utf8"),
@@ -390,7 +391,7 @@ test("5. importar não apaga o que já foi digitado sem perguntar", async ({
   await expect(page.locator(`${sel.itens} li`)).toHaveCount(1);
 
   // …e então importa um arquivo com outros itens.
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "nota.xml",
     mimeType: "text/xml",
     buffer: Buffer.from(xmlDaNota(chaveFicticia()), "utf8"),
@@ -404,7 +405,7 @@ test("5. importar não apaga o que já foi digitado sem perguntar", async ({
   await expect(page.locator(`${sel.itens} li`)).toHaveCount(1);
 
   // Importando de novo e aceitando, os itens do arquivo tomam o lugar.
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "nota.xml",
     mimeType: "text/xml",
     buffer: Buffer.from(xmlDaNota(chaveFicticia()), "utf8"),
@@ -445,7 +446,7 @@ test("6. foto da nota traz só os nomes, e a tela avisa a limitação", async ({
   const foto = await fotoDeUmaNota(page);
 
   await page.goto("/estoque/compras/nova");
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "nota.png",
     mimeType: "image/png",
     buffer: foto,
@@ -538,7 +539,7 @@ test("7. PDF digitalizado (só imagem) nunca derruba a tela", async ({
   await page.locator("#nota-query").press("Enter");
   await expect(page.locator(`${sel.itens} li`)).toHaveCount(1);
 
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "digitalizada.pdf",
     mimeType: "application/pdf",
     buffer: pdfQueEhSoUmaFoto(foto),

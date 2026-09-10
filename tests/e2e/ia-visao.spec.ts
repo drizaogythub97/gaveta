@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { STATE_FUNCIONAL } from "../../playwright.config";
 
-import { loadUsers, userClient, type TestUser } from "./helpers";
+import { enviarNota, loadUsers, userClient, type TestUser } from "./helpers";
 
 /**
  * Leitura de nota por IA de visão (plano 08, fase G2d).
@@ -79,7 +79,7 @@ test("1. conta fora da lista não vê a leitura por IA", async ({ page }) => {
   const foto = await fotografarNota(page);
 
   await page.goto("/estoque/compras/nova");
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "nota.png",
     mimeType: "image/png",
     buffer: foto,
@@ -113,7 +113,7 @@ test("2. a IA lê a foto com nomes E valores", async ({ page }) => {
   const foto = await fotografarNota(page);
 
   await page.goto("/estoque/compras/nova");
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "nota.png",
     mimeType: "image/png",
     buffer: foto,

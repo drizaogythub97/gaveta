@@ -83,3 +83,31 @@ export function chaveFicticia(): string {
   const base = `${Date.now()}${Math.floor(Math.random() * 1e12)}`;
   return (base + "0".repeat(44)).slice(0, 44);
 }
+
+/**
+ * Coloca o arquivo no seletor da nota — depois de a tela estar VIVA.
+ *
+ * `setInputFiles` dispara o evento `change` UMA vez só. Se o React ainda não
+ * terminou de hidratar a tela, não há handler preso ao input: o evento se
+ * perde, a leitura nunca começa e o teste espera para sempre por um painel
+ * que não vem. Provado no log do servidor — no teste que reprovava, a ação
+ * `importarNotaDeArquivo` sequer chegava a ser chamada. Só acontece com o
+ * servidor de desenvolvimento ocupado, ou seja, quando a spec roda **depois
+ * de outras**; sozinha ela sempre passou, e foi isso que escondeu a corrida.
+ *
+ * A espera observa as chaves internas que o React pendura no nó do DOM ao
+ * hidratar (`__reactProps$…`, `__reactFiber$…`): é o sinal mais próximo de
+ * "o handler já está aí" que dá para ver de fora.
+ */
+export async function enviarNota(
+  page: Page,
+  arquivo: { name: string; mimeType: string; buffer: Buffer },
+): Promise<void> {
+  const input = page.locator("#nota-arquivo");
+  await input.waitFor({ state: "attached" });
+  await page.waitForFunction(() => {
+    const el = document.querySelector("#nota-arquivo");
+    return !!el && Object.keys(el).some((k) => k.startsWith("__react"));
+  });
+  await input.setInputFiles(arquivo);
+}

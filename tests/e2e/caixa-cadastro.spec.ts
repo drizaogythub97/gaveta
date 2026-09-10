@@ -34,7 +34,21 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  // Outros arquivos contam o catálogo: o que este criou sai daqui.
+  // Outros arquivos contam o catálogo E as vendas do usuário descartável:
+  // o que este criou sai daqui. As duas vendas em dinheiro, se ficassem,
+  // entrariam na conta de quem roda depois (a `compras.spec.ts` procurava a
+  // venda à vista dela e achava as minhas).
+  const { data: linhas } = await app
+    .from("sale_items")
+    .select("sale_id")
+    .in("name_snapshot", [NOVO, AVULSO]);
+  const vendas = [
+    ...new Set(((linhas ?? []) as { sale_id: string }[]).map((l) => l.sale_id)),
+  ];
+  if (vendas.length > 0) {
+    await app.from("sale_items").delete().in("sale_id", vendas);
+    await app.from("sales").delete().in("id", vendas);
+  }
   await app.from("products").delete().eq("name", NOVO);
   await app.from("product_tags").delete().eq("name", CATEGORIA);
 });
