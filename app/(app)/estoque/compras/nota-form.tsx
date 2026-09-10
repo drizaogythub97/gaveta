@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { BarcodeCameraButton } from "@/components/app/barcode-camera-button";
+import { hojeNaLoja } from "@/lib/dashboard/dates";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { TagPicker } from "@/components/app/tag-picker";
 import { ErrorAlert } from "@/components/auth/form-feedback";
@@ -101,10 +102,9 @@ function StatusDoItem({ status }: { status: StatusItem }) {
 }
 
 function hoje(): string {
-  const agora = new Date();
-  const mes = String(agora.getMonth() + 1).padStart(2, "0");
-  const dia = String(agora.getDate()).padStart(2, "0");
-  return `${agora.getFullYear()}-${mes}-${dia}`;
+  // Fuso da loja, não o do aparelho: a validação do servidor recusa data no
+  // futuro usando o MESMO calendário, e quem viaja não pode ficar sem lançar.
+  return hojeNaLoja();
 }
 
 function lineTotal(item: NotaItem): number {
