@@ -364,26 +364,24 @@ detalhe do dia a dia e tema em aparelho real).
   passar por outra tela.
 - Filtro por categoria na listagem (`FiltroChips`, do PR B).
 
-### Achado fora da sprint — o backup do banco está quebrado
+### Achado fora da sprint — o backup do banco, quebrado e RESOLVIDO
 
-Descoberto em 2026-08-30 ao encerrar a sprint, **não** causado por ela.
-O workflow `Backup do banco (criptografado)` falha em **toda** execução
-agendada desde 2026-06-28; o último backup bom é de **2026-06-25**.
+Descoberto em 2026-08-30 e **resolvido em 2026-09-10** pelo dono.
 
-- O guard do workflow passa, então o secret `SUPABASE_DB_URL` **existe e não
-  está vazio**. O erro é do `pg_dump`: *connection to server on socket
-  "/var/run/postgresql/.s.PGSQL.5432" failed*.
-- Isso é o que o `pg_dump` faz quando a string recebida **não é uma URI**
-  `postgresql://…`: ele a interpreta como **nome de banco** e tenta o socket
-  local. O secret foi alterado em **2026-06-26** — um dia depois da única
-  execução bem-sucedida — e todas as posteriores falharam.
-- **Correção (só o dono pode fazer):** regravar o secret com a connection
-  string completa do **Session pooler** do Supabase (IPv4, porta 5432),
-  começando em `postgresql://`, sem aspas em volta. Depois disparar o
-  workflow na mão (`workflow_dispatch`) para confirmar.
-- Enquanto isso, **o sistema está em produção com usuários reais e sem
-  backup desde junho.** Procedimento de restauração em
-  `docs/06-QUALIDADE-FASE8.md`.
+O workflow `Backup do banco (criptografado)` falhava em **toda** execução
+agendada desde 2026-06-28 (o secret `SUPABASE_DB_URL` fora alterado em 26/06,
+um dia depois da única execução verde). O guard passava, então o secret
+existia; quem falhava era o `pg_dump`, com *connection to server on socket
+"/var/run/postgresql/.s.PGSQL.5432" failed* — que é o que ele faz quando a
+string **não é uma URI** `postgresql://…`: interpreta como nome de banco e
+tenta o socket local.
+
+**A correção, que é a lição a guardar:** o secret precisa ser a connection
+string completa do **Session pooler** do Supabase (IPv4, porta 5432),
+começando em `postgresql://` e **sem aspas em volta**. Regravado, duas
+execuções manuais (`workflow_dispatch`) fecharam verdes em 10/09 — dump,
+criptografia GPG AES-256 e artifact publicado. Procedimento de restauração em
+`docs/06-QUALIDADE-FASE8.md`.
 
 ---
 
@@ -700,17 +698,17 @@ Medido antes de corrigir: **63 dos 136 itens vendidos sem custo (R$
 1.464,90)** — 44 com produto cadastrado, **19 avulsos**. Validação: 171
 unitários, 101 de RLS, 99 e2e.
 
-## EM ANDAMENTO — cadastrar produto na frente de caixa (branch `feat/cadastro-no-caixa`)
+## Cadastrar produto na frente de caixa ✅ ENTREGUE (PR #44, `519eede`)
 
-**Interrompido por queda de energia em 2026-09-10, 12:23.** Código completo e
-commitado na branch; **falta rodar o e2e, conferir na tela e abrir o PR.**
+**Sem migration** (seguem 0001–0021), sem mudança de RLS. **171 unitários** e
+**102 e2e** (eram 99) verdes localmente e contra o Preview.
 
-**Por quê.** É a metade que o #43 não alcança: dos 63 itens sem custo, **19
-são avulsos** — item avulso não tem produto por trás, logo **nunca** poderá
-ter custo e fica para sempre no aviso do Fechamento. A correção da causa é
-deixar de produzir avulso.
+**Por quê.** É a metade que o #43 não alcança: dos 63 itens vendidos sem
+custo, **19 são avulsos** — item avulso não tem produto por trás, logo
+**nunca** poderá ter custo e fica para sempre no aviso do Fechamento. A
+correção da causa é deixar de produzir avulso.
 
-**O que muda.** A busca do caixa que não acha nada passa a oferecer **duas
+**O que mudou.** A busca do caixa que não acha nada passou a oferecer **duas
 saídas**, com o cadastro na frente: *Cadastrar e vender* (nome, código de
 barras, preço, custo, estoque e categoria; o produto entra no carrinho já
 vinculado) e *Só vender agora* (o avulso de sempre). A tela diz, em cada
@@ -731,6 +729,22 @@ caminho, o que ele custa.
   seguida).
 - **Categoria criada ali vira opção para o próximo item** sem recarregar a
   tela (`criarTag` + `TagPicker aoCriar`, como na nota).
+
+### Duas corridas antigas da suíte e2e que este PR consertou
+
+Apareceram porque um arquivo novo (`caixa-cadastro.spec.ts`) passou a rodar
+**antes** dos outros — não eram regressão:
+
+- **`compras.spec.ts` procurava "a única venda em dinheiro"** do usuário
+  descartável. Agora acha a venda **pelo produto da própria spec**, e a spec
+  nova apaga as vendas que cria. Regra: teste consulta o que ELE criou, nunca
+  "o único registro" do usuário.
+- **`setInputFiles` dispara o `change` uma vez só**: com o React ainda sem
+  hidratar, o handler não existe, o evento se perde e a leitura da nota nunca
+  começa — 150 s esperando um painel que não vem, sem erro na tela. Provado no
+  log do servidor (a ação `importarNotaDeArquivo` sequer era chamada). O
+  helper `enviarNota` (`tests/e2e/helpers.ts`) espera a hidratação nos 11
+  pontos que enviam nota.
 
 ## Evoluções pós-MVP (fora do escopo das 9 fases)
 
