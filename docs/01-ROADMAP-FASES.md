@@ -678,6 +678,60 @@ produto está subindo?*
   número exato com qualquer volume e a RLS valendo.
 - Notas **canceladas ficam de fora** dos totais.
 
+## Fora da sprint (2026-09-10) — o custo que não corrigia o passado ✅ PR #43
+
+**Merge `e792d23`** (branch `feat/custo-retroativo`), **migration 0021**,
+em produção. Queixa do dono: cadastrar o custo depois da venda não tirava o
+aviso do Fechamento, e nunca tiraria — o Fechamento lê o **retrato**
+`sale_items.unit_cost` (G1/0013), não `products.cost_price`.
+
+O que a 0021 traz: trigger em `products` que preenche os retratos **vazios**
+daquele produto quando o custo sai de "em branco"; trigger de guarda em
+`sale_items` que só autoriza essa única mudança (a tabela é exposta pelo
+PostgREST — sem a trava, um PATCH reescreveria o histórico de lucro);
+preenchimento único do que já estava gravado; índice em
+`sale_items(product_id)`.
+
+**Preencher, não calcular na leitura** (`coalesce(retrato, custo_atual)`):
+assim o lucro de um dia passado não muda toda vez que alguém edita um custo
+— que é exatamente o que o retrato existe para evitar.
+
+Medido antes de corrigir: **63 dos 136 itens vendidos sem custo (R$
+1.464,90)** — 44 com produto cadastrado, **19 avulsos**. Validação: 171
+unitários, 101 de RLS, 99 e2e.
+
+## EM ANDAMENTO — cadastrar produto na frente de caixa (branch `feat/cadastro-no-caixa`)
+
+**Interrompido por queda de energia em 2026-09-10, 12:23.** Código completo e
+commitado na branch; **falta rodar o e2e, conferir na tela e abrir o PR.**
+
+**Por quê.** É a metade que o #43 não alcança: dos 63 itens sem custo, **19
+são avulsos** — item avulso não tem produto por trás, logo **nunca** poderá
+ter custo e fica para sempre no aviso do Fechamento. A correção da causa é
+deixar de produzir avulso.
+
+**O que muda.** A busca do caixa que não acha nada passa a oferecer **duas
+saídas**, com o cadastro na frente: *Cadastrar e vender* (nome, código de
+barras, preço, custo, estoque e categoria; o produto entra no carrinho já
+vinculado) e *Só vender agora* (o avulso de sempre). A tela diz, em cada
+caminho, o que ele custa.
+
+**Decisões que não devem ser refeitas:**
+
+- **O avulso continua existindo.** Forçar o cadastro trava o caixa com o
+  cliente esperando — e caixa travado é o que faz alguém desistir do sistema.
+- **Sem migration.** `criarProdutoRapido` (`app/(app)/produtos/actions.ts`)
+  passa pelo **mesmo `productSchema`** e pelas mesmas sincronias de código de
+  barras e categorias do cadastro normal; muda só a saída, que devolve o
+  produto inteiro em vez de redirecionar. Regra de validação é uma só.
+- **Termo que parece código de barras** (8–14 dígitos) já entra no campo do
+  código e deixa o nome em branco — mesma solução da entrada por nota.
+- **Estoque em branco = a quantidade que está sendo vendida**: é o palpite
+  certo para quem acabou de receber a mercadoria (a venda desconta em
+  seguida).
+- **Categoria criada ali vira opção para o próximo item** sem recarregar a
+  tela (`criarTag` + `TagPicker aoCriar`, como na nota).
+
 ## Evoluções pós-MVP (fora do escopo das 9 fases)
 
 - ~~**Preferências do usuário — taxas por forma de pagamento.**~~ ✅ **JÁ

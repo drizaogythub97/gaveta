@@ -399,12 +399,23 @@ test("10. regressão: venda à vista no PDV continua normal depois da compra", a
 
   // Banco: venda à vista, estoque baixado e — ponte com a G1 — o custo da
   // nota virou snapshot no item vendido.
+  // A venda é achada pelo PRODUTO desta spec, e não como "a única venda em
+  // dinheiro": qualquer arquivo que rode antes e venda à vista derruba esse
+  // pressuposto — foi o que aconteceu quando a frente de caixa ganhou o
+  // cadastro na hora.
+  const { data: linha } = await app
+    .from("sale_items")
+    .select("sale_id, sales!inner(payment_method)")
+    .eq("product_id", produtoId)
+    .eq("sales.payment_method", "dinheiro")
+    .single();
+  const vendaId = (linha as { sale_id: string }).sale_id;
+
   const { data: venda } = await app
     .from("sales")
-    .select("id, total, payment_method, fiado_venda_id")
-    .eq("payment_method", "dinheiro")
+    .select("total")
+    .eq("id", vendaId)
     .single();
-  const vendaId = (venda as { id: string }).id;
   expect(Number((venda as { total: number }).total)).toBe(28);
 
   const { data: itens } = await app
@@ -451,10 +462,17 @@ test("10b. regressão: venda a prazo (FiadoApp) continua normal depois da compra
 
   // Banco: venda 'fiado' fora do caixa, ligada ao a-receber do FiadoApp,
   // com estoque baixado e o custo da nota no snapshot.
+  const { data: linhaFiado } = await app
+    .from("sale_items")
+    .select("sale_id, sales!inner(payment_method)")
+    .eq("product_id", produtoId)
+    .eq("sales.payment_method", "fiado")
+    .single();
+
   const { data: venda } = await app
     .from("sales")
     .select("id, total, payment_method, fiado_venda_id, cash_session_id")
-    .eq("payment_method", "fiado")
+    .eq("id", (linhaFiado as { sale_id: string }).sale_id)
     .single();
   const fiado = venda as {
     id: string;

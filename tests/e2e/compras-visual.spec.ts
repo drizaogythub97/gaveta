@@ -4,7 +4,7 @@ import { STATE_VISUAL } from "../../playwright.config";
 
 import { esperaContrasteAA } from "./a11y";
 
-import { loadUsers } from "./helpers";
+import { enviarNota, loadUsers } from "./helpers";
 
 /**
  * Verificação visual da fase G2a (protocolo docs/09 §2): as telas novas não
@@ -146,7 +146,7 @@ test("conferência da nota importada: layout, alvos e regressão visual", async 
   if (ehMobile()) await usarModo(page, "simples");
 
   await page.goto("/estoque/compras/nova");
-  await page.locator("#nota-arquivo").setInputFiles({
+  await enviarNota(page, {
     name: "nota.xml",
     mimeType: "text/xml",
     buffer: Buffer.from(XML_FIXO, "utf8"),
