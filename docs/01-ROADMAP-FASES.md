@@ -538,13 +538,98 @@ esmaece no lugar) em vez de não mostrar nada.
   sem recarregar o documento, busca por código, estoque baixo, faixa de
   quantidade e limpar filtros).
 
+## H1 — Corrigir uma nota de compra já lançada (2026-09-10)
+
+Entregue. Antes, o único jeito de arrumar uma nota era **cancelar e
+relançar**; agora a nota lançada tem um botão **Corrigir nota**, que abre o
+mesmo formulário do lançamento já preenchido com o que está gravado. Dá para
+mudar fornecedor, data, chave, valores e quantidades, tirar item e acrescentar
+item — inclusive cadastrando produto novo ali dentro.
+
+Migration **0020** (aditiva): coluna `purchases.edited_at`, política de DELETE
+em `purchase_items` com trigger de guarda, `purchases_guard_update` reemitido
+e a RPC `editar_compra` (security invoker, `search_path = ''`, como todas).
+
+### As três decisões que sustentam a entrega
+
+**1. O estoque anda pela DIFERENÇA, não por "estorna e relança".** Era o
+caminho sugerido no plano, e ele está errado para este caso: o estorno corta
+a saída em zero (por causa do `check stock_quantity >= 0`) e o relançamento
+devolveria a quantidade inteira. Quem comprou 10, vendeu 8 e corrige a nota
+para 12 acabaria com 12 no estoque em vez de 4 — a venda sumiria da conta. A
+RPC compara o que a nota trazia com o que ela passa a trazer e mexe só o
+delta, produto por produto. Redução maior que o estoque existente é cortada
+em zero e o retorno sinaliza `estoque_parcial`, como no estorno.
+
+**2. A venda já fechada não é tocada.** `sale_items.unit_cost` é snapshot do
+momento da venda (G1). Corrigir o custo de uma compra muda
+`products.cost_price` daqui para a frente; o fechamento Lucro × Custo de dias
+passados continua igual. Há teste guardando exatamente isso.
+
+**3. O gasto é o MESMO lançamento, corrigido** (`update` em `expenses`, não
+apagar e recriar). Recriar mudaria o `id`, a nota perderia o vínculo e o
+Financeiro mostraria um gasto novo, como se fosse outra compra. Se o dono
+tiver apagado o gasto à mão, a correção o recria; se a nota virar valor zero,
+o gasto sai (a tabela exige `amount > 0`).
+
+Regras menores que valem lembrar:
+
+- **A origem da nota é histórico** (`manual`, `pdf`, `xml`, `foto`, `ia`): a
+  correção não a reescreve, e o guard barra. O schema Zod da edição nem
+  aceita o campo.
+- **O último custo só muda se a nota ainda for a dona dele.** Se o dono
+  digitou outro custo depois — ou se uma nota mais nova mandou —, o valor
+  deles é respeitado. Mesma regra do estorno. Item retirado da nota devolve o
+  custo ao da compra ativa mais recente.
+- **Nota cancelada não se corrige**: a RPC barra, e a tela nem oferece (o
+  endereço direto devolve para a nota).
+- **A linha sem produto vinculado sobrevive.** Quando o produto é apagado,
+  `purchase_items.product_id` vira null; a correção mantém a linha como
+  histórico, com um selo próprio, em vez de fazê-la desaparecer. Por isso o
+  schema da edição aceita o que o do lançamento recusa.
+- **A leitura de arquivo fica fora da correção**: a nota já existe, e reler o
+  PDF trocaria a lista inteira sem a pessoa comparar com o que gravou.
+
+### Como a tabela continua protegida
+
+`purchase_items` ganhou política de DELETE (sem ela a RPC, que é *security
+invoker*, teria a troca de itens silenciosamente ignorada pela RLS). Para o
+DELETE não virar porta aberta na API, um trigger só o autoriza quando a RPC
+sinaliza pelo GUC `gaveta.edicao` — mesma técnica do `gaveta.estorno` da
+0015. Duas saídas explícitas: cascata (a nota ou a conta indo embora, senão
+apagar usuário falharia) e chamada sem `auth.uid()` (chave de serviço; o
+anônimo não passa pela política). O mesmo GUC abre o cabeçalho da nota no
+`purchases_guard_update` — fora da edição, ela segue sendo histórico.
+
+### Testes
+
+- **166 unitários** (+7: o schema da correção — linha sem vínculo, nota sem
+  itens, origem recusada, data e chave).
+- **97 de RLS** (+9): um arquivo novo (`tests/rls/editar-compra.test.ts`) com
+  o acerto pela diferença, o corte em zero, a devolução do custo, o custo
+  digitado à mão sendo respeitado, a nota cancelada, os guards de PATCH e
+  DELETE e a venda fechada intocada; mais o acesso cruzado em
+  `isolation-extended.test.ts`.
+- **e2e**: `tests/e2e/corrigir-nota.spec.ts` (jornada completa, com
+  conferência no banco) e um baseline visual novo em
+  `compras-visual.spec.ts`, que roda **desktop e celular**. O baseline
+  `nota-detalhe` foi regerado: a tela ganhou o botão de corrigir.
+- ⚠️ **A suíte de RLS passou a criar 34 usuários descartáveis** (era 33). Foi
+  medida e passou; o teto conhecido continua perto — 35 já reprovou por
+  limite de taxa. Ao acrescentar teste, criar usuário **uma vez por arquivo**
+  e mandar acesso cruzado para `isolation-extended.test.ts`.
+
 ## PRÓXIMOS PASSOS ESCOLHIDOS (2026-08-29) — ainda de pé
 
 O plano 08 (nota de compra + Lucro × Custo) está inteiro entregue e em
 produção. Estes dois itens foram escolhidos pelo dono como o que vem a
 seguir. Nenhum depende de decisão pendente; ordem sugerida abaixo.
 
-### H1 — Editar uma nota de compra já lançada
+### H1 — Editar uma nota de compra já lançada ✅ ENTREGUE em 2026-09-10
+
+> Ver a seção **"H1 — Corrigir uma nota de compra já lançada"** acima: o que
+> foi entregue, e por que o caminho sugerido aqui (estornar e relançar por
+> dentro) foi **trocado** pelo acerto por diferença.
 
 **Por quê.** Hoje o único jeito de corrigir uma nota é **estornar e
 relançar** (G2a.1). Funciona e é seguro, mas é ríspido para o caso comum:

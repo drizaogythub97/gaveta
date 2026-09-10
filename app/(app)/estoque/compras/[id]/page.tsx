@@ -1,7 +1,8 @@
-import { ArrowLeft, Undo2 } from "lucide-react";
+import { ArrowLeft, PencilLine, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { LinkAcao } from "@/components/app/link-acao";
 import { SuccessAlert } from "@/components/auth/form-feedback";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -31,12 +32,13 @@ export default async function CompraDetalhePage({
   const { id } = await params;
   const query = await searchParams;
   const recemLancada = query.lancada === "1";
+  const recemCorrigida = query.corrigida === "1";
 
   const supabase = await createClient();
   const { data } = await supabase
     .from("purchases")
     .select(
-      "id, supplier_name, access_key, issued_on, total, source, created_at, voided_at",
+      "id, supplier_name, access_key, issued_on, total, source, created_at, voided_at, edited_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -79,10 +81,19 @@ export default async function CompraDetalhePage({
           {PURCHASE_SOURCE_LABELS[compra.source]} · {itens.length}{" "}
           {itens.length === 1 ? "item" : "itens"}
         </p>
+        {compra.edited_at && !cancelada ? (
+          <p className="text-muted-foreground text-sm">
+            Corrigida em {formatDate(compra.edited_at)}.
+          </p>
+        ) : null}
       </header>
 
       {recemLancada && !cancelada ? (
         <SuccessAlert message="Nota lançada. O estoque já entrou, o custo dos produtos foi atualizado e o valor virou um gasto em insumos / mercadorias." />
+      ) : null}
+
+      {recemCorrigida && !cancelada ? (
+        <SuccessAlert message="Correção salva. O estoque foi acertado pela diferença, e o custo dos produtos e o gasto no Financeiro já refletem os novos valores. As vendas já feitas continuam como estavam." />
       ) : null}
 
       {cancelada ? (
@@ -147,12 +158,28 @@ export default async function CompraDetalhePage({
       ) : null}
 
       {cancelada ? null : (
-        <div className="border-border flex flex-col gap-2 border-t pt-6">
-          <p className="text-muted-foreground minimal:max-sm:text-sm text-base">
-            Lançou esta nota por engano? Cancele para desfazer a entrada de
-            estoque, o custo e o gasto.
-          </p>
-          <EstornoNotaButton purchaseId={compra.id} fornecedor={fornecedor} />
+        <div className="border-border flex flex-col gap-6 border-t pt-6">
+          <div className="flex flex-col gap-2">
+            <p className="text-muted-foreground minimal:max-sm:text-sm text-base">
+              Algum valor, quantidade ou data saiu errado? Corrija a nota: o
+              estoque anda só a diferença e o gasto no Financeiro acompanha.
+            </p>
+            <LinkAcao
+              href={`/estoque/compras/${compra.id}/editar`}
+              className="ring-foreground/15 hover:bg-muted minimal:max-sm:h-12 minimal:max-sm:text-base inline-flex h-14 w-fit items-center gap-2 rounded-md px-5 text-lg font-medium ring-1"
+              icone={<PencilLine aria-hidden="true" className="size-5" />}
+            >
+              Corrigir nota
+            </LinkAcao>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <p className="text-muted-foreground minimal:max-sm:text-sm text-base">
+              Lançou esta nota por engano? Cancele para desfazer a entrada de
+              estoque, o custo e o gasto.
+            </p>
+            <EstornoNotaButton purchaseId={compra.id} fornecedor={fornecedor} />
+          </div>
         </div>
       )}
     </section>

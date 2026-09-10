@@ -216,6 +216,38 @@ test("detalhe da nota: layout e regressão visual", async ({ page }) => {
   await expect(page).toHaveScreenshot("nota-detalhe.png", { fullPage: true });
 });
 
+test("correção da nota: layout, alvos e regressão visual (H1)", async ({
+  page,
+}) => {
+  if (ehMobile()) await usarModo(page, "simples");
+
+  const { visualPurchaseId } = loadUsers();
+  await page.goto(`/estoque/compras/${visualPurchaseId}/editar`);
+  await expect(
+    page.getByRole("heading", { name: "Corrigir nota" }),
+  ).toBeVisible();
+
+  // É o formulário do lançamento, preenchido com o que já está gravado —
+  // e sem o bloco de ler arquivo, que ali não faria sentido.
+  await expect(page.locator("#supplier")).toHaveValue("Distribuidora Modelo");
+  await expect(
+    page.getByRole("heading", { name: "Tem o arquivo da nota?" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Conferir e salvar correção" }),
+  ).toBeVisible();
+
+  // Sem tocar em nada: esta tela é só conferida, para o estado semeado do
+  // usuário visual continuar valendo para os outros baselines.
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await semRolagemHorizontal(page);
+  await alvosGrandes(page);
+  await esperaContrasteAA(page);
+  await escondeOverlayDoNext(page);
+
+  await expect(page).toHaveScreenshot("nota-correcao.png", { fullPage: true });
+});
+
 test("confirmação de cancelamento: layout, alvos e regressão visual", async ({
   page,
 }) => {
