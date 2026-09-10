@@ -538,7 +538,7 @@ esmaece no lugar) em vez de não mostrar nada.
   sem recarregar o documento, busca por código, estoque baixo, faixa de
   quantidade e limpar filtros).
 
-## H1 — Corrigir uma nota de compra já lançada (2026-09-10)
+## H1 — Corrigir uma nota de compra já lançada (2026-09-10) — PR #42, merge `5772da1`
 
 Entregue. Antes, o único jeito de arrumar uma nota era **cancelar e
 relançar**; agora a nota lançada tem um botão **Corrigir nota**, que abre o
@@ -625,7 +625,7 @@ O plano 08 (nota de compra + Lucro × Custo) está inteiro entregue e em
 produção. Estes dois itens foram escolhidos pelo dono como o que vem a
 seguir. Nenhum depende de decisão pendente; ordem sugerida abaixo.
 
-### H1 — Editar uma nota de compra já lançada ✅ ENTREGUE em 2026-09-10
+### H1 — Editar uma nota de compra já lançada ✅ ENTREGUE (PR #42, `5772da1`)
 
 > Ver a seção **"H1 — Corrigir uma nota de compra já lançada"** acima: o que
 > foi entregue, e por que o caminho sugerido aqui (estornar e relançar por
