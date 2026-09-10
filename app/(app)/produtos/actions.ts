@@ -7,7 +7,7 @@ import type { ZodIssue } from "zod";
 
 import { escaparLike } from "@/lib/db/like";
 import { createClient } from "@/lib/supabase/server";
-import type { ProductTag } from "@/lib/types/db";
+import type { Product, ProductTag } from "@/lib/types/db";
 import { productSchema } from "@/lib/validations/products";
 
 export type ProductFormState = {
@@ -389,4 +389,99 @@ export async function criarTag(
 
   revalidatePath("/produtos");
   return { tag: data as ProductTag };
+}
+
+/**
+ * Cadastra um produto fora do formulário de Produtos — hoje, a partir da
+ * frente de caixa (o produto que o cliente trouxe e ainda não existe).
+ *
+ * Passa pelo MESMO `productSchema` e pelas mesmas sincronias de código de
+ * barras e categorias do cadastro normal: a regra de validação é uma só,
+ * mude ela onde mudar. O que muda é a saída — aqui o produto criado volta
+ * inteiro, para entrar direto no carrinho, em vez de redirecionar.
+ */
+export async function criarProdutoRapido(valores: {
+  name: string;
+  barcodes?: string[];
+  price: string;
+  costPrice?: string;
+  trackStock: "true" | "false";
+  stockQuantity?: string;
+  tagIds?: string[];
+  newTags?: string[];
+}): Promise<{ produto?: Product; error?: string }> {
+  const parsed = productSchema.safeParse(valores);
+  if (!parsed.success) {
+    return {
+      error: parsed.error.issues[0]?.message ?? "Confira os dados do produto.",
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Sessão expirada. Entre novamente." };
+  }
+
+  const tracks = parsed.data.trackStock === "true";
+  const { data: inserted, error } = await supabase
+    .from("products")
+    .insert({
+      user_id: user.id,
+      name: parsed.data.name,
+      price: parsed.data.price,
+      cost_price: parsed.data.costPrice,
+      track_stock: tracks,
+      stock_quantity: tracks ? (parsed.data.stockQuantity ?? 0) : null,
+    })
+    .select(
+      "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at",
+    )
+    .single();
+
+  if (error || !inserted) {
+    return { error: dbErrorToPortuguese(error?.message) };
+  }
+
+  const produto = inserted as Product;
+
+  const syncResult = await syncBarcodes(
+    produto.id,
+    user.id,
+    parsed.data.barcodes,
+  );
+  if (syncResult.error) {
+    // Mesma regra do cadastro normal: código repetido não deixa produto
+    // órfão para trás.
+    await supabase
+      .from("products")
+      .delete()
+      .eq("id", produto.id)
+      .eq("user_id", user.id);
+    return { error: syncResult.error };
+  }
+
+  const tagResult = await syncTags(
+    produto.id,
+    parsed.data.tagIds,
+    parsed.data.newTags,
+  );
+  if (tagResult.error) {
+    await supabase
+      .from("products")
+      .delete()
+      .eq("id", produto.id)
+      .eq("user_id", user.id);
+    return { error: tagResult.error };
+  }
+
+  // O produto novo muda as listas e as contagens — inclusive o "estoque
+  // baixo" do Painel, se ele nasceu com pouca coisa.
+  revalidatePath("/produtos");
+  revalidatePath("/estoque");
+  revalidatePath("/dashboard");
+
+  return { produto };
 }

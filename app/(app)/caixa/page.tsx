@@ -2,6 +2,7 @@ import { LockKeyhole, Unlock } from "lucide-react";
 import Link from "next/link";
 
 import { CaixaFullscreenTip } from "@/components/app/caixa-fullscreen-tip";
+import { listarTags } from "@/lib/products/tags";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_FEES, type PaymentFees } from "@/lib/preferences/types";
 
@@ -34,6 +35,9 @@ export default async function CaixaPage() {
   ]);
   const fiadoPdvAtivo = Boolean(prefs?.fiado_pdv_ativo);
 
+  // O produto cadastrado no caixa pode nascer já categorizado.
+  const tags = await listarTags(supabase);
+
   return (
     // O caixa é a tela mais densa do sistema (duas colunas com números
     // grandes) e herdava o `max-w-5xl` do layout, apertando o total contra o
@@ -51,7 +55,7 @@ export default async function CaixaPage() {
 
       <CashSessionBanner open={Boolean(openSession)} />
 
-      <PosClient fees={fees} fiadoPdvAtivo={fiadoPdvAtivo} />
+      <PosClient fees={fees} fiadoPdvAtivo={fiadoPdvAtivo} tags={tags} />
       <CaixaFullscreenTip />
     </section>
   );

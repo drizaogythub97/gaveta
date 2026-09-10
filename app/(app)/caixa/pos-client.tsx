@@ -15,7 +15,6 @@ import {
 import {
   useCallback,
   useEffect,
-  useId,
   useRef,
   useState,
   useTransition,
@@ -32,12 +31,15 @@ import {
   sanitizeDigits,
 } from "@/lib/products/format";
 import { computeFeeAmount, type PaymentFees } from "@/lib/preferences/types";
-import type { Product, SaleItemInput } from "@/lib/types/db";
+import type { Product, ProductTag, SaleItemInput } from "@/lib/types/db";
 import { cn } from "@/lib/utils";
 
 import { FiadoappBadge } from "@/components/app/fiadoapp-badge";
 import loaderStyles from "@/components/app/gaveta-loader.module.css";
 import { BarcodeCameraButton } from "@/components/app/barcode-camera-button";
+
+import { criarTag } from "../produtos/actions";
+import { ProdutoNaoEncontrado } from "./produto-nao-encontrado";
 import {
   isDesktop,
   useEmissorComprovante,
@@ -69,14 +71,15 @@ type Feedback =
   | { kind: "error"; message: string }
   | null;
 
-const PAYMENT_METHODS: ReadonlyArray<{ value: PaymentMethod; label: string }> = [
-  { value: "dinheiro", label: "Dinheiro" },
-  { value: "pix", label: "Pix" },
-  { value: "debito", label: "Cartão de débito" },
-  { value: "credito_avista", label: "Cartão de crédito à vista" },
-  { value: "credito_parcelado", label: "Cartão de crédito parcelado" },
-  { value: "vale", label: "Vale alimentação / refeição" },
-];
+const PAYMENT_METHODS: ReadonlyArray<{ value: PaymentMethod; label: string }> =
+  [
+    { value: "dinheiro", label: "Dinheiro" },
+    { value: "pix", label: "Pix" },
+    { value: "debito", label: "Cartão de débito" },
+    { value: "credito_avista", label: "Cartão de crédito à vista" },
+    { value: "credito_parcelado", label: "Cartão de crédito parcelado" },
+    { value: "vale", label: "Vale alimentação / refeição" },
+  ];
 
 const INSTALLMENT_OPTIONS = Array.from({ length: 11 }, (_, i) => i + 2); // 2x..12x
 
@@ -97,17 +100,27 @@ function toItem(product: Product): CartItem {
 export function PosClient({
   fees,
   fiadoPdvAtivo = false,
+  tags,
 }: {
   fees: PaymentFees;
   fiadoPdvAtivo?: boolean;
+  /** Categorias já criadas — o cadastro no caixa nasce com elas. */
+  tags: ProductTag[];
 }) {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [manualName, setManualName] = useState<string | null>(null);
-  const [manualPriceDigits, setManualPriceDigits] = useState("");
-  const [manualQty, setManualQty] = useState("1");
+  // A lista CRESCE: categoria criada no cadastro de um produto vira opção
+  // para o próximo, sem recarregar a tela (mesmo padrão da entrada por nota).
+  const [tagsDisponiveis, setTagsDisponiveis] = useState<ProductTag[]>(tags);
+
+  /**
+   * Termo que a pessoa buscou e não existe no catálogo. Enquanto está
+   * preenchido, a tela mostra as duas saídas (cadastrar ou vender avulso) —
+   * ver `produto-nao-encontrado.tsx`.
+   */
+  const [naoEncontrado, setNaoEncontrado] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] =
     useState<PosPaymentMethod>("dinheiro");
   const [installments, setInstallments] = useState<number>(2);
@@ -124,8 +137,6 @@ export function PosClient({
   const posRef = useRef<HTMLDivElement>(null);
   const fetchSeq = useRef(0);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const manualPriceId = useId();
-  const manualQtyId = useId();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -214,9 +225,7 @@ export function PosClient({
   }
 
   function clearManual() {
-    setManualName(null);
-    setManualPriceDigits("");
-    setManualQty("1");
+    setNaoEncontrado(null);
   }
 
   function addProductToCart(product: Product) {
@@ -224,9 +233,7 @@ export function PosClient({
       const existing = prev.find((it) => it.product_id === product.id);
       if (existing) {
         return prev.map((it) =>
-          it.key === existing.key
-            ? { ...it, quantity: it.quantity + 1 }
-            : it,
+          it.key === existing.key ? { ...it, quantity: it.quantity + 1 } : it,
         );
       }
       return [...prev, toItem(product)];
@@ -241,7 +248,7 @@ export function PosClient({
   function handleQueryChange(value: string) {
     setQuery(value);
     setFeedback(null);
-    if (manualName) clearManual();
+    if (naoEncontrado) clearManual();
 
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     const term = value.trim();
@@ -278,9 +285,7 @@ export function PosClient({
 
     setQuery(term);
     setSuggestions([]);
-    setManualName(term);
-    setManualPriceDigits("");
-    setManualQty("1");
+    setNaoEncontrado(term);
     setFeedback(null);
   }
 
@@ -292,31 +297,49 @@ export function PosClient({
     void submitCode(code);
   }
 
-  function handleManualSubmit() {
-    if (!manualName) return;
-    const price = digitsToNumber(manualPriceDigits);
-    const qty = parseDecimalPtBR(manualQty);
-    if (!Number.isFinite(price) || price <= 0) {
-      setFeedback({ kind: "error", message: "Informe um valor válido." });
-      return;
+  async function criarCategoria(nome: string) {
+    const resultado = await criarTag(nome);
+    if (resultado.tag) {
+      const criada = resultado.tag;
+      setTagsDisponiveis((anteriores) =>
+        anteriores.some((t) => t.id === criada.id)
+          ? anteriores
+          : [...anteriores, criada].sort((a, b) =>
+              a.name.localeCompare(b.name, "pt-BR"),
+            ),
+      );
     }
-    if (!Number.isFinite(qty) || qty <= 0) {
-      setFeedback({ kind: "error", message: "Informe uma quantidade válida." });
-      return;
-    }
+    return resultado;
+  }
+
+  /** Item avulso: sem produto por trás, como sempre foi. */
+  function adicionarAvulso(nome: string, valor: number, quantidade: number) {
     setCart((prev) => [
       ...prev,
       {
         key: makeKey(),
         product_id: null,
-        name: manualName,
-        unit_price: Math.round(price * 100) / 100,
-        quantity: qty,
+        name: nome,
+        unit_price: valor,
+        quantity: quantidade,
       },
     ]);
     setQuery("");
     clearManual();
     setFeedback(null);
+    refocus();
+  }
+
+  /** Produto cadastrado na hora: entra no carrinho já vinculado. */
+  function adicionarCadastrado(produto: Product, quantidade: number) {
+    setCart((prev) => [...prev, { ...toItem(produto), quantity: quantidade }]);
+    setQuery("");
+    setSuggestions([]);
+    clearManual();
+    setFeedback({
+      kind: "success",
+      message: `“${produto.name}” foi cadastrado e entrou na venda.`,
+    });
     refocus();
   }
 
@@ -443,9 +466,7 @@ export function PosClient({
       return;
     }
     const changeMessage =
-      isCash && changeAmount > 0
-        ? ` Troco: ${formatBRL(changeAmount)}.`
-        : "";
+      isCash && changeAmount > 0 ? ` Troco: ${formatBRL(changeAmount)}.` : "";
     startRegister(async () => {
       const result = await registerSale(
         items,
@@ -532,7 +553,7 @@ export function PosClient({
         <div className="flex flex-col gap-6">
           <section
             aria-labelledby="add-item-heading"
-            className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
+            className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1"
           >
             <h2
               id="add-item-heading"
@@ -567,7 +588,7 @@ export function PosClient({
               <p id="pos-query-hint" className="text-muted-foreground text-sm">
                 O leitor USB envia o código e aperta Enter automaticamente.
               </p>
-              {isSearching && manualName === null ? (
+              {isSearching && naoEncontrado === null ? (
                 <p
                   role="status"
                   aria-live="polite"
@@ -592,7 +613,7 @@ export function PosClient({
             {/* O aviso acima é proposital: antes, onde a câmera não existia,
                 o botão simplesmente não aparecia e não havia como saber por quê. */}
 
-            {suggestions.length > 0 && manualName === null ? (
+            {suggestions.length > 0 && naoEncontrado === null ? (
               <ul
                 role="listbox"
                 aria-label="Sugestões de produtos"
@@ -617,79 +638,30 @@ export function PosClient({
               </ul>
             ) : null}
 
-            {manualName ? (
-              <div className="border-border flex flex-col gap-3 rounded-lg border border-dashed p-4">
-                <p className="text-base">
-                  Nenhum produto encontrado para{" "}
-                  <strong className="font-medium">
-                    &ldquo;{manualName}&rdquo;
-                  </strong>
-                  . Adicionar como item avulso?
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor={manualPriceId} className="text-sm">
-                      Valor
-                    </Label>
-                    <Input
-                      id={manualPriceId}
-                      type="text"
-                      inputMode="numeric"
-                      value={
-                        manualPriceDigits === ""
-                          ? ""
-                          : digitsToBRL(manualPriceDigits)
-                      }
-                      onChange={(e) =>
-                        setManualPriceDigits(sanitizeDigits(e.target.value))
-                      }
-                      placeholder="R$ 0,00"
-                      className="h-12 text-base"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor={manualQtyId} className="text-sm">
-                      Quantidade
-                    </Label>
-                    <Input
-                      id={manualQtyId}
-                      type="text"
-                      inputMode="decimal"
-                      value={manualQty}
-                      onChange={(e) => setManualQty(e.target.value)}
-                      className="h-12 text-base"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      clearManual();
-                      refocus();
-                    }}
-                    className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-5 text-base"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleManualSubmit}
-                    className="minimal:max-sm:h-10 minimal:max-sm:px-3 minimal:max-sm:text-sm h-12 px-5 text-base"
-                  >
-                    Adicionar avulso
-                  </Button>
-                </div>
-              </div>
+            {naoEncontrado !== null ? (
+              <ProdutoNaoEncontrado
+                termo={naoEncontrado}
+                tags={tagsDisponiveis}
+                desabilitado={isRegistering}
+                aoCadastrar={adicionarCadastrado}
+                aoVenderAvulso={adicionarAvulso}
+                aoCancelar={() => {
+                  clearManual();
+                  refocus();
+                }}
+                aoCriarCategoria={criarCategoria}
+              />
             ) : null}
           </section>
 
           <section
             aria-labelledby="payment-heading"
-            className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
+            className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1"
           >
-            <h2 id="payment-heading" className="minimal:max-sm:text-lg text-xl font-semibold">
+            <h2
+              id="payment-heading"
+              className="minimal:max-sm:text-lg text-xl font-semibold"
+            >
               Forma de pagamento
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -818,9 +790,12 @@ export function PosClient({
         <div className="flex flex-col gap-6">
           <section
             aria-labelledby="cart-heading"
-            className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
+            className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1"
           >
-            <h2 id="cart-heading" className="minimal:max-sm:text-lg text-xl font-semibold">
+            <h2
+              id="cart-heading"
+              className="minimal:max-sm:text-lg text-xl font-semibold"
+            >
               Itens da venda
             </h2>
             {cart.length === 0 ? (
@@ -926,7 +901,9 @@ export function PosClient({
                   id="discount-amount"
                   type="text"
                   inputMode="numeric"
-                  value={discountDigits === "" ? "" : digitsToBRL(discountDigits)}
+                  value={
+                    discountDigits === "" ? "" : digitsToBRL(discountDigits)
+                  }
                   onChange={(e) =>
                     setDiscountDigits(sanitizeDigits(e.target.value))
                   }
@@ -962,7 +939,7 @@ export function PosClient({
               {/* flex-auto (base no conteúdo), não flex-1: com base 0 o bloco
                   encolheria a zero em vez de empurrar o botão para a linha
                   de baixo, e a quebra nunca aconteceria. */}
-              <div className="@lg:basis-auto min-w-0 flex-auto basis-full">
+              <div className="min-w-0 flex-auto basis-full @lg:basis-auto">
                 <p id="total-heading" className="text-base opacity-90">
                   Total da venda
                 </p>
@@ -985,7 +962,7 @@ export function PosClient({
                   (isFiado && !fiadoCliente)
                 }
                 aria-busy={isRegistering}
-                className="bg-background text-primary hover:bg-background/90 @lg:w-auto h-16 w-full shrink-0 px-8 text-xl font-semibold whitespace-nowrap"
+                className="bg-background text-primary hover:bg-background/90 h-16 w-full shrink-0 px-8 text-xl font-semibold whitespace-nowrap @lg:w-auto"
               >
                 {isRegistering
                   ? "Registrando…"
@@ -1033,7 +1010,9 @@ export function PosClient({
                 id="print-prompt-title"
                 className="minimal:max-sm:text-lg text-2xl font-semibold tracking-tight"
               >
-                {celular ? "Comprovante para o cliente?" : "Imprimir comprovante?"}
+                {celular
+                  ? "Comprovante para o cliente?"
+                  : "Imprimir comprovante?"}
               </h2>
               <p className="minimal:max-sm:text-sm text-muted-foreground text-base">
                 {celular
