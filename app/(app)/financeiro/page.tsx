@@ -8,6 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 import {
   PERIOD_LABELS,
   type Period,
+  hojeNaLoja,
+  monthStartISO,
   periodTimeZone,
   rangeForPeriod,
   toDateInputValue,
@@ -535,16 +537,11 @@ async function ResumoTab({
   const closedSessions = (closedRes.data ?? []) as CashSession[];
 
   // Projeção do mês (estimativa), independente do período selecionado.
-  const now = new Date();
-  const monthStart = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    1,
-    0,
-    0,
-    0,
-    0,
-  ).toISOString();
+  // Mês, dia corrente e dias restantes saem do calendário da LOJA: com o do
+  // servidor (UTC), no dia 1º antes das 21h a projeção usava o mês anterior.
+  const monthStart = monthStartISO();
+  const hojeLoja = hojeNaLoja();
+  const [anoLoja, mesLoja, diaLoja] = hojeLoja.split("-").map(Number);
   const { data: monthSummaryData } = await supabase
     .rpc("sales_summary", {
       p_from: monthStart,
@@ -558,12 +555,8 @@ async function ResumoTab({
       (Number(monthSummary.gross_total) - Number(monthSummary.fees_total)) *
         100,
     ) / 100;
-  const daysElapsed = now.getDate();
-  const daysInMonth = new Date(
-    now.getFullYear(),
-    now.getMonth() + 1,
-    0,
-  ).getDate();
+  const daysElapsed = diaLoja;
+  const daysInMonth = new Date(Date.UTC(anoLoja, mesLoja, 0)).getUTCDate();
   const daysRemaining = daysInMonth - daysElapsed;
   const dailyAvg =
     daysElapsed > 0 ? Math.round((monthSoFarNet / daysElapsed) * 100) / 100 : 0;

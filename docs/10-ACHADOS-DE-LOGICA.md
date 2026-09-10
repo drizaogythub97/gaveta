@@ -18,7 +18,7 @@ normal · **Média** = quebra em volume maior ou em caso de borda ·
 
 ---
 
-## A. O dia vira às 21h de Brasília — Alta
+## A. O dia vira às 21h de Brasília — Alta ✅ CORRIGIDO (PR do fuso, migration 0022)
 
 O sistema calcula as bordas do dia no **fuso do servidor**, que na Vercel é
 **UTC**. Para um lojista brasileiro, o dia começa às 21h do dia anterior:
@@ -43,7 +43,7 @@ O sistema calcula as bordas do dia no **fuso do servidor**, que na Vercel é
 todo mundo, em vez de configurável por conta. O dia passa a virar à
 meia-noite de Brasília.
 
-**Como corrigir:** trocar `periodTimeZone()` por uma constante
+**Como foi corrigido:** trocar `periodTimeZone()` por uma constante
 `America/Sao_Paulo`, passar esse fuso às funções do banco (elas já recebem
 `p_tz`) e substituir os `current_date` por `(now() at time zone
 'America/Sao_Paulo')::date` nas funções e nos defaults. **Atenção:** o

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { hojeNaLoja } from "@/lib/dashboard/dates";
+
 /**
  * Entrada por nota (plano 08, fase G2a). Este schema é a validação do
  * SERVIDOR: o formulário já ajuda o usuário, mas nada entra no banco sem
@@ -139,10 +141,7 @@ const accessKey = z
 const issuedOn = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data da compra.")
-  .refine((v) => {
-    const hoje = new Date().toISOString().slice(0, 10);
-    return v <= hoje;
-  }, "A data da compra não pode ser no futuro.");
+  .refine((v) => v <= hojeNaLoja(), "A data da compra não pode ser no futuro.");
 
 export const purchaseSchema = z.object({
   supplierName: z
