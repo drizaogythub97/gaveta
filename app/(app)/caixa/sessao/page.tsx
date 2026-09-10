@@ -1,6 +1,7 @@
 import { ArrowLeft, Calculator } from "lucide-react";
 import Link from "next/link";
 
+import { todasAsLinhas } from "@/lib/db/paginado";
 import { createClient } from "@/lib/supabase/server";
 import type { CashMovement, CashSession } from "@/lib/types/cash";
 
@@ -28,21 +29,27 @@ export default async function CashSessionPage() {
   let cashSalesCount = 0;
 
   if (session) {
-    const [{ data: movs }, { data: sales }] = await Promise.all([
+    const [{ data: movs }, sales] = await Promise.all([
       supabase
         .from("cash_movements")
         .select("id, session_id, type, amount, note, created_at")
         .eq("session_id", session.id)
         .order("created_at", { ascending: false }),
-      supabase
-        .from("sales")
-        .select("total")
-        .eq("cash_session_id", session.id)
-        .eq("payment_method", "dinheiro")
-        .eq("status", "completed"),
+      todasAsLinhas<{ total: number }>((de, ate) =>
+        supabase
+          .from("sales")
+          .select("total")
+          .eq("cash_session_id", session.id)
+          .eq("payment_method", "dinheiro")
+          .eq("status", "completed")
+          .range(de, ate),
+      ),
     ]);
     movements = (movs ?? []) as CashMovement[];
-    const salesRows = (sales ?? []) as { total: number }[];
+    // A conferência do caixa é conta de dinheiro: não pode somar só o que
+    // coube numa página. O PostgREST corta em 1000 linhas sem avisar, e o
+    // valor esperado na gaveta sairia MENOR que o real.
+    const salesRows = sales.linhas;
     cashSalesCount = salesRows.length;
     cashSalesTotal =
       Math.round(salesRows.reduce((s, r) => s + Number(r.total), 0) * 100) /

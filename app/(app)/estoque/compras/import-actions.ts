@@ -20,6 +20,7 @@ import {
   type NotaExtraida,
 } from "@/lib/compras/tipos";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { todasAsLinhas } from "@/lib/db/paginado";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -36,7 +37,7 @@ import { createClient } from "@/lib/supabase/server";
  * Nada é gravado aqui — quem confirma é sempre a pessoa.
  */
 
-/** Teto do catálogo lido de uma vez para casar os nomes. */
+/** Teto de segurança do catálogo carregado para casar os itens da nota. */
 const LIMITE_CATALOGO = 5000;
 
 export type ImportarNotaResult =
@@ -129,15 +130,24 @@ async function casarComCatalogo(
     }
   }
 
-  const { data: catalogoData } = await supabase
-    .from("products")
-    .select("id, name, track_stock")
-    .order("name", { ascending: true })
-    .limit(LIMITE_CATALOGO);
+  // O catálogo inteiro vem em páginas: pedir `.limit(5000)` não trazia 5000
+  // — o PostgREST corta em 1000 e não avisa, então produto do fim do
+  // alfabeto simplesmente não era reconhecido na nota.
+  const { linhas: catalogoData } = await todasAsLinhas<{
+    id: string;
+    name: string;
+    track_stock: boolean;
+  }>(
+    (de, ate) =>
+      supabase
+        .from("products")
+        .select("id, name, track_stock")
+        .order("name", { ascending: true })
+        .range(de, ate),
+    { maximo: LIMITE_CATALOGO },
+  );
 
-  const catalogo: ProdutoCatalogo[] = (
-    (catalogoData ?? []) as { id: string; name: string; track_stock: boolean }[]
-  ).map((produto) => ({
+  const catalogo: ProdutoCatalogo[] = catalogoData.map((produto) => ({
     id: produto.id,
     name: produto.name,
     trackStock: produto.track_stock,
