@@ -122,12 +122,18 @@ describe("RPC lucro_custo_summary (fechamento do dia)", () => {
       const app = userClient(user.accessToken);
       const feijao = await criarProduto(app, user, "Feijão", 20, 7);
 
+      // A taxa nasce no BANCO desde a migration 0023 (achado C): quem manda é
+      // o cadastro de Preferências, não o valor que a tela envia. O teste
+      // passa a cadastrar a taxa que ele afere, em vez de injetá-la.
+      await app
+        .from("preferences_fees")
+        .upsert({ user_id: user.id, credito_avista_pct: 10 }); // 10% de 20 = 2
+
       const { error } = await app.rpc("register_sale", {
         items: [
           { product_id: feijao, name: "Feijão", unit_price: 20, quantity: 1 },
         ],
         payment_method: "credito_avista",
-        fee_amount: 2,
       });
       expect(error).toBeNull();
 

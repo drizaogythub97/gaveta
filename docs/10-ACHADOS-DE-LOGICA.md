@@ -18,6 +18,14 @@ normal · **Média** = quebra em volume maior ou em caso de borda ·
 
 ---
 
+> ⚠️ **Ordem de deploy do PR "o que o banco garante" (C, D, F).** A
+> **migration 0023 precisa estar aplicada ANTES** de a `main` subir com esse
+> código. A Server Action deixou de mandar `fee_amount`; com a 0023 no lugar,
+> quem calcula a taxa é o banco — **sem** ela, a venda seria gravada com taxa
+> **zero**, e o Fechamento passaria a mostrar lucro a mais.
+
+---
+
 ## A. O dia vira às 21h de Brasília — Alta ✅ CORRIGIDO (PR do fuso, migration 0022)
 
 O sistema calcula as bordas do dia no **fuso do servidor**, que na Vercel é
@@ -106,7 +114,7 @@ chamou decidir o que dizer na tela. O corte deixa de ser mudo.
 
 ---
 
-## C. A taxa da venda vem do cliente e é gravada como veio — Média
+## C. A taxa da venda vem do cliente e é gravada como veio — Média ✅ CORRIGIDO (migration 0023)
 
 `app/(app)/caixa/actions.ts:139` recebe `feeAmount` já calculado no navegador
 e o repassa; a função `register_sale` só garante que não é negativo
@@ -118,14 +126,14 @@ navegador divergir do cadastro — versão antiga da tela aberta, preferência
 alterada no meio do expediente, requisição forjada — o lucro sai errado e nada
 denuncia.
 
-**Como corrigir:** calcular a taxa dentro da `register_sale`, lendo
+**Como foi corrigido:** calcular a taxa dentro da `register_sale`, lendo
 `preferences_fees` do próprio usuário. O cliente continua mostrando a
 estimativa; quem grava é o banco. (A RLS não protege contra isso: o dado é do
 próprio usuário.)
 
 ---
 
-## D. Estoque cortado em zero, mas o movimento grava a quantidade cheia — Média
+## D. Estoque cortado em zero, mas o movimento grava a quantidade cheia — Média ✅ CORRIGIDO (migration 0023)
 
 Na `register_sale`:
 
@@ -139,15 +147,25 @@ Vender 5 unidades com 3 em estoque deixa o saldo em **0** e grava um movimento
 de **-5**. A razão deixa de reconstruir o saldo: somar os movimentos passa a
 dar um número diferente do `stock_quantity`, e a diferença é silenciosa.
 
-**Como corrigir:** decidir a regra primeiro — ou recusar a venda acima do
-estoque (com aviso claro no caixa), ou permitir saldo negativo, ou gravar no
-movimento **o que realmente saiu**. Recusar é o mais honesto para o
-inventário; permitir negativo é o mais honesto para o caixa. O que não pode é
-a razão e o saldo discordarem.
+**Decisão do dono (2026-09-10): PERMITIR SALDO NEGATIVO.** É o mais honesto
+para o caixa, e ele nunca trava — travar o caixa com o cliente esperando é o
+que faz alguém desistir do sistema.
+
+**Como foi corrigido:** o check `products_stock_quantity_check` foi removido
+e a `register_sale` deixou de usar `greatest(..., 0)`. Vender 5 com 3 em
+estoque deixa o saldo em **−2** e o movimento em **−5**: somar a razão volta
+a dar exatamente o saldo, e o número negativo denuncia o inventário furado.
+A regra `products_stock_qty_when_tracked` (quem controla estoque tem
+quantidade) continua valendo.
+
+⚠️ **Fora de escopo, de propósito:** `estornar_compra` e `editar_compra`
+seguem **cortando em zero** e sinalizando `estoque_parcial`. Ali o corte é
+decisão tomada e **avisada ao usuário na tela** — não é silencioso, que era o
+defeito deste achado. Revê-lo é outra decisão de produto.
 
 ---
 
-## E. A busca do caixa não escapa curinga — Baixa
+## E. A busca do caixa não escapa curinga — Baixa ✅ CORRIGIDO
 
 `app/(app)/caixa/actions.ts:19` e `:52`, e `app/(app)/caixa/fiado-actions.ts:35`,
 montam o `ilike` **sem `escaparLike`** — diferente de Produtos
@@ -158,12 +176,14 @@ Consequência: digitar `%` ou `_` casa com qualquer coisa. Buscar `50%` na
 frente de caixa devolve o catálogo inteiro. Não é falha de segurança (o
 PostgREST parametriza o valor), é resultado errado na tela mais usada.
 
-**Como corrigir:** passar pelo `escaparLike` de `lib/db/like.ts`, como as
-outras telas.
+**Como foi corrigido:** os três pontos passam pelo `escaparLike` de
+`lib/db/like.ts`, como as outras telas — os dois de
+`app/(app)/caixa/actions.ts` e a busca de cliente de
+`app/(app)/caixa/fiado-actions.ts`. Coberto por `tests/like-curinga.test.ts`.
 
 ---
 
-## F. O número de parcelas tem três limites diferentes — Baixa
+## F. O número de parcelas tem três limites diferentes — Baixa ✅ CORRIGIDO
 
 - Tela: **2 a 12** (`app/(app)/caixa/pos-client.tsx`, `INSTALLMENT_OPTIONS`);
 - Server Action: **2 a 24** (`app/(app)/caixa/actions.ts`);
@@ -173,7 +193,11 @@ Ninguém tropeça hoje, porque a tela é a única porta. Mas são três verdades
 para a mesma regra, e a próxima porta (integração, importação) vai escolher a
 errada.
 
-**Como corrigir:** uma constante só, validada no servidor e refletida na tela.
+**Como foi corrigido:** `lib/caixa/parcelas.ts` passa a ser a única verdade
+em TypeScript (**2 a 12**, o que o produto realmente oferece) e alimenta tanto
+a tela quanto a Server Action. O banco valida o mesmo intervalo na migration
+0023 e aponta para esse arquivo — são dois lugares só porque o banco não lê
+TypeScript. Coberto por `tests/parcelas.test.ts`.
 
 ---
 

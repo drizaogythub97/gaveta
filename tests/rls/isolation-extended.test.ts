@@ -644,10 +644,14 @@ describe("Hardening 0010 — propriedade do produto e agregações", () => {
   it("sales_summary agrega só as vendas do próprio usuário", async () => {
     const bobApp = userClient(bob.accessToken);
 
+    // A taxa nasce no BANCO desde a migration 0023 (achado C).
+    await bobApp
+      .from("preferences_fees")
+      .upsert({ user_id: bob.id, pix_pct: 10 }); // 10% de 10 = 1
+
     const { data: saleA } = await bobApp.rpc("register_sale", {
       items: [{ product_id: null, name: "Bob A", unit_price: 10, quantity: 1 }],
       payment_method: "pix",
-      fee_amount: 1,
     });
     const { data: saleB } = await bobApp.rpc("register_sale", {
       items: [{ product_id: null, name: "Bob B", unit_price: 15, quantity: 1 }],

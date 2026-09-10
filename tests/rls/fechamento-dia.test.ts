@@ -112,13 +112,18 @@ beforeAll(async () => {
   });
   expect(venda1.error).toBeNull();
 
+  // A taxa nasce no BANCO desde a migration 0023 (achado C): quem manda é o
+  // cadastro de Preferências, não o valor que a tela envia.
+  await app
+    .from("preferences_fees")
+    .upsert({ user_id: dono.id, credito_avista_pct: 4 }); // 4% de 50 = 2
+
   const venda2 = await app.rpc("register_sale", {
     items: [
       { product_id: feijao, name: "Feijão", unit_price: 20, quantity: 1 },
       { product_id: bolo, name: "Bolo", unit_price: 30, quantity: 1 },
     ],
     payment_method: "credito_avista",
-    fee_amount: 2,
   });
   expect(venda2.error).toBeNull();
 }, 60_000);

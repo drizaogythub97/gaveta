@@ -746,12 +746,20 @@ Apareceram porque um arquivo novo (`caixa-cadastro.spec.ts`) passou a rodar
   helper `enviarNota` (`tests/e2e/helpers.ts`) espera a hidratação nos 11
   pontos que enviam nota.
 
-## Achados de lógica — varredura de 2026-09-10 (A TRATAR)
+## Achados de lógica — varredura de 2026-09-10 ✅ TODOS TRATADOS
 
 Varredura do sistema em produção (caminho do dinheiro, lógica de datas,
 limites de consulta), lendo o código **e as funções vivas do banco**. Seis
-achados, nenhum corrigido ainda; a ordem de ataque é decisão do dono.
-**Lista completa, com arquivo e linha, em `docs/10-ACHADOS-DE-LOGICA.md`.**
+achados. **Lista completa, com arquivo e linha, em
+`docs/10-ACHADOS-DE-LOGICA.md`.**
+
+Atacados em **três PRs**, na ordem do que produzia número errado:
+
+| PR | Achados | Merge | Migration |
+|---|---|---|---|
+| **#45 — o relógio do lojista** | A | `23612a2` | **0022** (aplicada) |
+| **#46 — nada some da tela** | B | `b0b227e` | — |
+| **o que o banco garante** | C, D, E, F | (esta sprint) | **0023** (aplicada) |
 
 | # | Achado | Gravidade |
 |---|---|---|
@@ -762,10 +770,40 @@ achados, nenhum corrigido ainda; a ordem de ataque é decisão do dono.
 | E | **A busca do caixa não escapa curinga** (`%`, `_`), diferente de Produtos e Estoque | Baixa |
 | F | **Três limites diferentes para o número de parcelas** (tela 2–12, ação 2–24, banco 1–24) | Baixa |
 
-**Decisão já tomada (2026-09-10):** ao corrigir o achado A, o fuso fica
-**fixo em `America/Sao_Paulo`** para todos, e não configurável por conta.
-Corrigir muda uma vez os números de dias passados — as vendas da noite migram
-para o dia certo. É esperado.
+### As decisões do dono, para não serem refeitas
+
+1. **Achado A — fuso fixo em `America/Sao_Paulo`** para todos, e não
+   configurável por conta. Corrigir mudou uma vez os números de dias
+   passados: as vendas da noite migraram para o dia certo. Era esperado.
+2. **Achado D — saldo de estoque PODE ficar negativo.** Vender 5 com 3 deixa
+   o saldo em −2 e o movimento em −5, então somar a razão volta a dar o
+   saldo, e o negativo denuncia o inventário furado. O caixa nunca trava —
+   travar o caixa com o cliente esperando é o que faz alguém desistir do
+   sistema. O check `products_stock_quantity_check` saiu;
+   `products_stock_qty_when_tracked` ficou.
+3. **Achado F — o limite das parcelas é 2 a 12**, o que a tela realmente
+   oferece (e não 24). A verdade vive em `lib/caixa/parcelas.ts`.
+
+### O que ficou de fora, de propósito
+
+- **`estornar_compra` e `editar_compra` continuam cortando o estoque em
+  zero** e sinalizando `estoque_parcial`. Ali o corte é decisão tomada e
+  **avisada ao usuário na tela** — não é silencioso, que era o defeito do
+  achado D. Revê-lo é outra decisão de produto.
+- **A busca por código de barras do Estoque continua com teto** (200). Não é
+  desleixo: os ids precisam ir na URL, porque a busca é "nome **OU** código"
+  e o `or` do PostgREST não aceita filtro de tabela aninhada. Medição contra
+  o gateway em 10/09: 200 ids = 7,5 KB e HTTP 200; 1000 = HTTP 400; 2000 =
+  **HTTP 414**. Paginar sem teto trocaria corte silencioso por página
+  quebrada. Agora o teto **avisa na tela**.
+
+### Gotcha de teste: o limite de auth do Supabase é janela deslizante
+
+A suíte de RLS cria ~35 usuários descartáveis. Isso **passa** numa execução,
+mas duas execuções seguidas em poucos minutos estouram
+`Request rate limit reached` — o limite conta por janela de tempo, não por
+execução. Ao investigar falha, **espaçar as rodadas** (~5 min) antes de
+concluir que o código quebrou.
 
 ## Evoluções pós-MVP (fora do escopo das 9 fases)
 

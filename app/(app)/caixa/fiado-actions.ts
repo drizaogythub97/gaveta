@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 
+import { escaparLike } from "@/lib/db/like";
 import { createClient } from "@/lib/supabase/server";
 import type { SaleItemInput } from "@/lib/types/db";
 
@@ -32,7 +33,7 @@ export async function searchFiadoClientes(
     .select(COLS)
     .order("nome", { ascending: true })
     .limit(SEARCH_LIMIT);
-  if (term.length > 0) q = q.ilike("nome", `%${term}%`);
+  if (term.length > 0) q = q.ilike("nome", `%${escaparLike(term)}%`);
   const { data } = await q;
   return (data ?? []) as FiadoCliente[];
 }
