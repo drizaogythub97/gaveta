@@ -193,6 +193,61 @@ test("3. produto sem custo avisa que o lucro está por cima e oferece o atalho",
   await expect(page.locator("#costPrice")).toBeVisible();
 });
 
+test("3b. informar o custo corrige o fechamento e devolve para ele", async ({
+  page,
+}) => {
+  // A queixa do dono (2026-09-10): ele cadastrava o custo e o aviso não
+  // saía, porque o relatório lê o RETRATO gravado na venda, não o custo do
+  // produto. Agora cadastrar o custo preenche os retratos em branco daquele
+  // produto (migration 0021) e a tela volta para o fechamento.
+  await page.goto("/financeiro?tab=fechamento&period=today");
+  const linha = page
+    .getByRole("listitem")
+    .filter({ hasText: PRODUTO_SEM_CUSTO });
+  await expect(linha).toBeVisible();
+
+  const antes = await lerFechamento(page);
+
+  await linha.getByRole("link", { name: "Informar custo" }).click();
+  // O endereço de volta viaja na URL — é o que traz a pessoa de volta ao
+  // recorte que ela estava conferindo.
+  await expect(page).toHaveURL(/voltar=/);
+
+  await page.locator("#costPrice").fill("1200");
+  await page.getByRole("button", { name: "Salvar alterações" }).click();
+
+  // Voltou para o fechamento, no mesmo recorte, com a confirmação.
+  await expect(page).toHaveURL(/\/financeiro\?tab=fechamento/);
+  await expect(
+    page.getByText(`Custo de “${PRODUTO_SEM_CUSTO}” cadastrado`),
+  ).toBeVisible();
+
+  // O produto sai da lista de "sem custo" e o custo do dia sobe.
+  await expect(
+    page.getByRole("listitem").filter({ hasText: PRODUTO_SEM_CUSTO }),
+  ).toHaveCount(0);
+
+  const depois = await lerFechamento(page);
+  // Uma unidade vendida no teste 3, a R$ 12,00 de custo.
+  expect(depois.custo - antes.custo).toBeCloseTo(12, 2);
+  expect(depois.lucro - antes.lucro).toBeCloseTo(-12, 2);
+  expect(depois.entrou).toBeCloseTo(antes.entrou, 2);
+
+  // E o retrato da venda passada foi preenchido no banco.
+  const { data: produto } = await app
+    .from("products")
+    .select("id")
+    .eq("name", PRODUTO_SEM_CUSTO)
+    .single();
+  const { data: itens } = await app
+    .from("sale_items")
+    .select("unit_cost")
+    .eq("product_id", (produto as { id: string }).id);
+  for (const item of (itens ?? []) as { unit_cost: number | null }[]) {
+    expect(Number(item.unit_cost)).toBe(12);
+  }
+});
+
 test("4. venda a prazo NÃO entra no dia da venda — só na quitação", async ({
   page,
 }) => {

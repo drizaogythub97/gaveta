@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { caminhoDeVoltaSeguro } from "@/lib/nav/voltar";
 import { listarTags } from "@/lib/products/tags";
 import { createClient } from "@/lib/supabase/server";
 import type { Product } from "@/lib/types/db";
@@ -13,10 +14,16 @@ export const metadata = {
 
 export default async function EditProductPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
+  // Quem chegou aqui pelo aviso do Fechamento volta para lá depois de
+  // salvar, em vez de cair na lista de Produtos. O destino vem da URL, então
+  // passa pelo filtro de alvo conhecido.
+  const voltarPara = caminhoDeVoltaSeguro((await searchParams).voltar);
   const supabase = await createClient();
   const [{ data }, tags] = await Promise.all([
     supabase
@@ -49,13 +56,15 @@ export default async function EditProductPage({
     formData: FormData,
   ): Promise<ProductFormState> => {
     "use server";
-    return updateProduct(id, state, formData);
+    return updateProduct(id, state, formData, voltarPara);
   };
 
   return (
     <section className="mx-auto flex w-full max-w-xl flex-col gap-6">
       <header>
-        <h1 className="text-3xl font-semibold tracking-tight">Editar produto</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Editar produto
+        </h1>
         <p className="text-muted-foreground mt-2 text-lg">
           Altere os campos e salve.
         </p>
@@ -63,6 +72,7 @@ export default async function EditProductPage({
       <ProductForm
         action={boundAction}
         tags={tags}
+        cancelarHref={voltarPara ?? "/produtos"}
         initialValues={{
           name: product.name,
           barcodes: product.barcodes,

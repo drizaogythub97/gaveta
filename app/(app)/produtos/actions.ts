@@ -63,7 +63,9 @@ function rawValues(raw: ReturnType<typeof readForm>) {
   };
 }
 
-function collectFieldErrors(issues: ZodIssue[]): ProductFormState["fieldErrors"] {
+function collectFieldErrors(
+  issues: ZodIssue[],
+): ProductFormState["fieldErrors"] {
   const fieldErrors: ProductFormState["fieldErrors"] = {};
   for (const issue of issues) {
     const key = issue.path[0];
@@ -221,15 +223,19 @@ export async function createProduct(
   // A confirmação viaja na URL e quem a mostra é a tela de DESTINO. Um aviso
   // montado aqui morreria junto com o formulário que está saindo — era por
   // isso que salvar um produto devolvia a lista em silêncio.
-  redirect(
-    `/produtos?salvo=novo&nome=${encodeURIComponent(parsed.data.name)}`,
-  );
+  redirect(`/produtos?salvo=novo&nome=${encodeURIComponent(parsed.data.name)}`);
 }
 
 export async function updateProduct(
   id: string,
   _prev: ProductFormState,
   formData: FormData,
+  /**
+   * Para onde devolver depois de salvar, quando a pessoa veio de outra tela
+   * (o Fechamento manda quem clica em "Informar custo"). Já vem validado
+   * pela página — nunca sai daqui para fora do sistema.
+   */
+  voltarPara?: string | null,
 ): Promise<ProductFormState> {
   const raw = readForm(formData);
   const parsed = productSchema.safeParse(raw);
@@ -274,17 +280,28 @@ export async function updateProduct(
     return { error: syncResult.error, values: rawValues(raw) };
   }
 
-  const tagResult = await syncTags(
-    id,
-    parsed.data.tagIds,
-    parsed.data.newTags,
-  );
+  const tagResult = await syncTags(id, parsed.data.tagIds, parsed.data.newTags);
   if (tagResult.error) {
     return { error: tagResult.error, values: rawValues(raw) };
   }
 
+  // Mexer no custo de um produto muda o Fechamento (o trigger da migration
+  // 0021 preenche as vendas passadas que estavam sem custo), e mexer na
+  // quantidade muda o Estoque e o Painel. Sem estas linhas, a correção
+  // acontecia no banco e a tela continuava mostrando o aviso antigo.
   revalidatePath("/produtos");
   revalidatePath(`/produtos/${id}/editar`);
+  revalidatePath("/estoque");
+  revalidatePath("/financeiro");
+  revalidatePath("/dashboard");
+
+  if (voltarPara) {
+    const separador = voltarPara.includes("?") ? "&" : "?";
+    redirect(
+      `${voltarPara}${separador}custo=${encodeURIComponent(parsed.data.name)}`,
+    );
+  }
+
   redirect(
     `/produtos?salvo=editado&nome=${encodeURIComponent(parsed.data.name)}`,
   );
@@ -303,7 +320,12 @@ export async function deleteProduct(formData: FormData): Promise<void> {
   }
 
   await supabase.from("products").delete().eq("id", id).eq("user_id", user.id);
+
+  // Apagar produto mexe no Estoque e nas contagens do Painel — as duas
+  // telas mostravam o produto apagado até alguém recarregar.
   revalidatePath("/produtos");
+  revalidatePath("/estoque");
+  revalidatePath("/dashboard");
 }
 
 /**
