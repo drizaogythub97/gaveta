@@ -746,6 +746,27 @@ Apareceram porque um arquivo novo (`caixa-cadastro.spec.ts`) passou a rodar
   helper `enviarNota` (`tests/e2e/helpers.ts`) espera a hidratação nos 11
   pontos que enviam nota.
 
+## Achados de lógica — varredura de 2026-09-10 (A TRATAR)
+
+Varredura do sistema em produção (caminho do dinheiro, lógica de datas,
+limites de consulta), lendo o código **e as funções vivas do banco**. Seis
+achados, nenhum corrigido ainda; a ordem de ataque é decisão do dono.
+**Lista completa, com arquivo e linha, em `docs/10-ACHADOS-DE-LOGICA.md`.**
+
+| # | Achado | Gravidade |
+|---|---|---|
+| A | **O dia vira às 21h de Brasília** — as bordas do dia saem no fuso do servidor (UTC na Vercel). Venda da noite cai no relatório do dia seguinte, em todo o Financeiro, Painel, Fechamento e nos filtros do Estoque; no banco, o `current_date` também data despesa, nota e **vencimento do fiado** | Alta |
+| B | **Limites silenciosos de consulta** — razão do estoque e histórico de notas mostram só as 100 últimas sem paginação; busca por código no Estoque corta em 200; filtro por categoria despeja ids na URL; catálogo da nota pede 5000 acima do teto do PostgREST; conferência do caixa soma linha por linha no cliente | Alta/Média |
+| C | **A taxa da venda vem do cliente** e é gravada como veio, sem conferência contra Preferências — e ela desconta do lucro | Média |
+| D | **Estoque cortado em zero, movimento com a quantidade cheia** — a razão deixa de reconstruir o saldo | Média |
+| E | **A busca do caixa não escapa curinga** (`%`, `_`), diferente de Produtos e Estoque | Baixa |
+| F | **Três limites diferentes para o número de parcelas** (tela 2–12, ação 2–24, banco 1–24) | Baixa |
+
+**Decisão já tomada (2026-09-10):** ao corrigir o achado A, o fuso fica
+**fixo em `America/Sao_Paulo`** para todos, e não configurável por conta.
+Corrigir muda uma vez os números de dias passados — as vendas da noite migram
+para o dia certo. É esperado.
+
 ## Evoluções pós-MVP (fora do escopo das 9 fases)
 
 - ~~**Preferências do usuário — taxas por forma de pagamento.**~~ ✅ **JÁ

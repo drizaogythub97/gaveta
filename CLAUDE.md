@@ -95,4 +95,5 @@ automático a cada push na `main`). Por isso:
 - Design/UX: `docs/02-DESIGN-SYSTEM-IDOSOS.md`
 - Segurança/dados: `docs/03-SEGURANCA-E-DADOS.md`
 - Privacidade/LGPD: `docs/04-POLITICA-PRIVACIDADE.md`
+- Achados de lógica a tratar: `docs/10-ACHADOS-DE-LOGICA.md`
 - SQL inicial: `supabase/migrations/0001_init.sql`
