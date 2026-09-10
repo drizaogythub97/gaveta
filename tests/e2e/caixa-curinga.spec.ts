@@ -53,10 +53,16 @@ test.afterAll(async () => {
   if (criados.length > 0) await app.from("products").delete().in("id", criados);
 });
 
+/**
+ * Digita e espera a lista de sugestões.
+ *
+ * Sem `Enter` de propósito: o Enter é outro caminho — `findProductByCode`,
+ * que tenta casar EXATO e, falhando, limpa as sugestões. Quem alimenta a
+ * lista é o que se digita, com debounce, por `searchProductsByName`.
+ */
 async function buscar(page: import("@playwright/test").Page, termo: string) {
   await page.goto("/caixa");
   await page.locator("#pos-query").fill(termo);
-  await page.locator("#pos-query").press("Enter");
   return page.getByRole("listbox", { name: "Sugestões de produtos" });
 }
 
@@ -97,4 +103,16 @@ test("busca normal continua achando pelo pedaço do nome", async ({ page }) => {
 
   // O escape não pode ter quebrado a busca comum: os quatro estão aí.
   await expect(lista.getByRole("button")).toHaveCount(4);
+});
+
+test("o Enter casa o nome EXATO, mesmo com % nele", async ({ page }) => {
+  await page.goto("/caixa");
+  await page.locator("#pos-query").fill(COM_CURINGA);
+  await page.locator("#pos-query").press("Enter");
+
+  // Enter vai por `findProductByCode`, que também escapa agora: o nome com
+  // % é casado literalmente e o produto entra no carrinho.
+  await expect(
+    page.getByRole("button", { name: `Remover ${COM_CURINGA}` }),
+  ).toBeVisible();
 });
