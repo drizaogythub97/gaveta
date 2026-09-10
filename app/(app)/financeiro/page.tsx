@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { BotaoComprovanteVenda } from "@/components/app/botao-comprovante-venda";
+import { SuccessAlert } from "@/components/auth/form-feedback";
 import { Paginacao } from "@/components/app/paginacao";
 
 import { createClient } from "@/lib/supabase/server";
@@ -135,6 +136,17 @@ export default async function FinancialPage({
 
   const { from, to } = rangeForPeriod(period, fromParam, toParam);
 
+  // O endereço desta própria aba, para quem sai daqui cadastrar um custo
+  // voltar ao mesmo recorte em vez de cair na lista de Produtos.
+  const urlDoFechamento =
+    `/financeiro?tab=fechamento&period=${period}` +
+    (period === "custom"
+      ? `&from=${toDateInputValue(from)}&to=${toDateInputValue(to)}`
+      : "");
+
+  // Confirmação de quem acabou de cadastrar o custo e foi trazido de volta.
+  const custoSalvo = pickString(params.custo)?.slice(0, 60);
+
   return (
     <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
       <header>
@@ -147,6 +159,12 @@ export default async function FinancialPage({
       </header>
 
       <TabNav current={tab} />
+
+      {custoSalvo ? (
+        <SuccessAlert
+          message={`Custo de “${custoSalvo}” cadastrado. As vendas anteriores desse produto que estavam sem custo já entraram na conta.`}
+        />
+      ) : null}
 
       <FinancialClient
         period={period}
@@ -179,7 +197,12 @@ export default async function FinancialPage({
         ) : tab === "despesas" ? (
           <DespesasTab from={from} to={to} />
         ) : tab === "fechamento" ? (
-          <FechamentoTab from={from} to={to} period={period} />
+          <FechamentoTab
+            from={from}
+            to={to}
+            period={period}
+            voltarUrl={urlDoFechamento}
+          />
         ) : (
           <ResumoTab from={from} to={to} period={period} />
         )}
@@ -399,10 +422,13 @@ async function FechamentoTab({
   from,
   to,
   period,
+  voltarUrl,
 }: {
   from: string;
   to: string;
   period: Period;
+  /** Endereço desta própria aba: quem sai para cadastrar um custo volta. */
+  voltarUrl: string;
 }) {
   const supabase = await createClient();
   const fromDate = toDateInputValue(from);
@@ -442,6 +468,7 @@ async function FechamentoTab({
       dias={dias}
       from={from}
       to={to}
+      voltarUrl={voltarUrl}
     />
   );
 }

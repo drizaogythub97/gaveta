@@ -25,6 +25,7 @@ export function FechamentoView({
   dias,
   from,
   to,
+  voltarUrl,
 }: {
   fechamento: Fechamento;
   semCusto: ProdutoSemCusto[];
@@ -35,6 +36,8 @@ export function FechamentoView({
   dias: FechamentoDia[];
   from: string;
   to: string;
+  /** Endereço desta aba: quem sai para informar um custo volta para cá. */
+  voltarUrl: string;
 }) {
   const { recebido, recebidoVista, recebidoFiado, taxas, custo, lucro } =
     fechamento;
@@ -149,7 +152,11 @@ export function FechamentoView({
             Só <strong>{coberturaPercentual}%</strong> do que você vendeu tem o
             custo cadastrado. Faltam {formatBRL(fechamento.valorSemCusto)} em
             produtos sem custo — enquanto isso, parte do que aparece como lucro
-            ainda é dinheiro de recompra.
+            ainda é dinheiro de recompra. Ao informar o custo,{" "}
+            <strong className="font-medium">
+              as vendas passadas desse produto entram na conta
+            </strong>{" "}
+            e este aviso diminui.
           </p>
           <ul className="flex flex-col gap-2">
             {semCusto.map((item) => (
@@ -165,7 +172,7 @@ export function FechamentoView({
                 </span>
                 {item.productId ? (
                   <Link
-                    href={`/produtos/${item.productId}/editar`}
+                    href={`/produtos/${item.productId}/editar?voltar=${encodeURIComponent(voltarUrl)}`}
                     className="border-border text-foreground hover:bg-muted flex h-11 items-center justify-center rounded-lg border px-4 text-base font-medium"
                   >
                     Informar custo

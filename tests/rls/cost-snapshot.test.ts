@@ -169,6 +169,167 @@ describe("snapshot de custo em sale_items.unit_cost", () => {
     });
     expect(error).not.toBeNull();
   });
+
+  // ------------------------------------------------------------------
+  // Cadastrar o custo DEPOIS (migration 0021). O relatório lê o retrato,
+  // não o custo do produto — então cadastrar o custo tem de preencher os
+  // retratos que ficaram em branco, senão o aviso "faltam produtos sem
+  // custo" nunca sai (era a queixa do dono em 2026-09-10).
+  // ------------------------------------------------------------------
+
+  it("cadastrar o custo depois preenche o retrato em branco daquela venda", async () => {
+    const app = userClient(user.accessToken);
+    const produto = await novoProduto(app, "Bolo sem custo", 30, null);
+
+    const { data: saleId, error } = await app.rpc("register_sale", {
+      items: [
+        {
+          product_id: produto,
+          name: "Bolo sem custo",
+          unit_price: 30,
+          quantity: 2,
+        },
+      ],
+      payment_method: "dinheiro",
+    });
+    expect(error).toBeNull();
+
+    const antes = await itensDaVenda(app, saleId as string);
+    expect(antes[0]?.unit_cost).toBeNull();
+
+    // A lista do fechamento acusa o produto...
+    const { data: listaAntes } = await app.rpc("produtos_sem_custo", {
+      p_from: "2000-01-01T00:00:00Z",
+      p_to: "2999-01-01T00:00:00Z",
+      p_methods: null,
+    });
+    expect(
+      ((listaAntes ?? []) as { product_id: string | null }[]).some(
+        (l) => l.product_id === produto,
+      ),
+    ).toBe(true);
+
+    const { error: erroCusto } = await app
+      .from("products")
+      .update({ cost_price: 12 })
+      .eq("id", produto);
+    expect(erroCusto).toBeNull();
+
+    const depois = await itensDaVenda(app, saleId as string);
+    expect(Number(depois[0]?.unit_cost)).toBe(12);
+
+    // ...e para de acusar depois do cadastro.
+    const { data: listaDepois } = await app.rpc("produtos_sem_custo", {
+      p_from: "2000-01-01T00:00:00Z",
+      p_to: "2999-01-01T00:00:00Z",
+      p_methods: null,
+    });
+    expect(
+      ((listaDepois ?? []) as { product_id: string | null }[]).some(
+        (l) => l.product_id === produto,
+      ),
+    ).toBe(false);
+  });
+
+  it("preencher não reescreve o retrato de uma venda que já tinha custo", async () => {
+    const app = userClient(user.accessToken);
+    const produto = await novoProduto(app, "Pao com custo antigo", 10, 4);
+
+    const { data: saleId } = await app.rpc("register_sale", {
+      items: [
+        {
+          product_id: produto,
+          name: "Pao com custo antigo",
+          unit_price: 10,
+          quantity: 1,
+        },
+      ],
+      payment_method: "dinheiro",
+    });
+    expect(
+      Number((await itensDaVenda(app, saleId as string))[0]?.unit_cost),
+    ).toBe(4);
+
+    // Zera e cadastra de novo: a transição "sem custo → com custo" acontece,
+    // mas a venda antiga NÃO pode ser reescrita — ela já tem o seu retrato.
+    await app.from("products").update({ cost_price: null }).eq("id", produto);
+    await app.from("products").update({ cost_price: 9 }).eq("id", produto);
+
+    expect(
+      Number((await itensDaVenda(app, saleId as string))[0]?.unit_cost),
+    ).toBe(4);
+  });
+
+  it("item avulso continua sem custo: não há produto de onde tirar", async () => {
+    const app = userClient(user.accessToken);
+    const { data: saleId } = await app.rpc("register_sale", {
+      items: [
+        {
+          product_id: null,
+          name: "Avulso sem dono",
+          unit_price: 7,
+          quantity: 1,
+        },
+      ],
+      payment_method: "dinheiro",
+    });
+
+    const itens = await itensDaVenda(app, saleId as string);
+    expect(itens[0]?.unit_cost).toBeNull();
+  });
+
+  it("o item de venda continua histórico: PATCH direto é barrado", async () => {
+    const app = userClient(user.accessToken);
+    const produto = await novoProduto(app, "Queijo do guard", 20, null);
+    const { data: saleId } = await app.rpc("register_sale", {
+      items: [
+        {
+          product_id: produto,
+          name: "Queijo do guard",
+          unit_price: 20,
+          quantity: 1,
+        },
+      ],
+      payment_method: "dinheiro",
+    });
+
+    const { data: itemData } = await app
+      .from("sale_items")
+      .select("id")
+      .eq("sale_id", saleId as string)
+      .single();
+    const itemId = (itemData as { id: string }).id;
+
+    // Custo inventado (o produto está sem custo): recusado.
+    const { error: erroInventado } = await app
+      .from("sale_items")
+      .update({ unit_cost: 1 })
+      .eq("id", itemId);
+    expect(erroInventado).not.toBeNull();
+
+    // Mudar o valor da venda: recusado.
+    const { error: erroValor } = await app
+      .from("sale_items")
+      .update({ unit_price: 999 })
+      .eq("id", itemId);
+    expect(erroValor).not.toBeNull();
+
+    // Com o custo cadastrado, o retrato já foi preenchido pelo trigger —
+    // e reescrevê-lo com outro valor continua barrado.
+    await app.from("products").update({ cost_price: 6 }).eq("id", produto);
+    const { data: depois } = await app
+      .from("sale_items")
+      .select("unit_cost")
+      .eq("id", itemId)
+      .single();
+    expect(Number((depois as { unit_cost: number }).unit_cost)).toBe(6);
+
+    const { error: erroReescrita } = await app
+      .from("sale_items")
+      .update({ unit_cost: 2 })
+      .eq("id", itemId);
+    expect(erroReescrita).not.toBeNull();
+  });
 });
 
 /**

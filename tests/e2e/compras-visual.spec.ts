@@ -153,7 +153,11 @@ test("conferência da nota importada: layout, alvos e regressão visual", async 
   });
 
   const itens = page.locator('section[aria-labelledby="nota-itens"] li');
-  await expect(itens).toHaveCount(3);
+  // Folga maior só nesta espera: a leitura do arquivo vai ao servidor, e na
+  // suíte inteira (com o servidor compilando outras rotas em paralelo) ela
+  // já passou dos 10 s padrão duas vezes — sozinha, passa sempre. É
+  // contenção de máquina, não regressão.
+  await expect(itens).toHaveCount(3, { timeout: 30_000 });
   // Os três estados aparecem, cada um com o seu selo.
   await expect(itens.filter({ hasText: "Já cadastrado" })).toHaveCount(1);
   await expect(itens.filter({ hasText: "Parecido — confira" })).toHaveCount(1);

@@ -35,6 +35,8 @@ type Props = {
   tags: ProductTag[];
   submitLabel: string;
   submitPendingLabel: string;
+  /** Para onde o "Cancelar" leva. Padrão: a lista de Produtos. */
+  cancelarHref?: string;
 };
 
 const initialState: ProductFormState = {};
@@ -45,6 +47,7 @@ export function ProductForm({
   tags,
   submitLabel,
   submitPendingLabel,
+  cancelarHref = "/produtos",
 }: Props) {
   const [state, formAction] = useActionState(action, initialState);
 
@@ -150,10 +153,7 @@ export function ProductForm({
           Códigos de barras{" "}
           <span className="text-muted-foreground font-normal">(opcional)</span>
         </legend>
-        <p
-          id="barcodes-hint"
-          className="text-muted-foreground text-sm"
-        >
+        <p id="barcodes-hint" className="text-muted-foreground text-sm">
           Você pode cadastrar mais de um código para o mesmo produto — útil
           quando a embalagem muda ou o item é vendido em formatos diferentes.
         </p>
@@ -236,7 +236,9 @@ export function ProductForm({
           required
           initialValue={initialValues?.price ?? null}
           aria-invalid={Boolean(state.fieldErrors?.price)}
-          aria-describedby={state.fieldErrors?.price ? "price-error" : undefined}
+          aria-describedby={
+            state.fieldErrors?.price ? "price-error" : undefined
+          }
           className="minimal:max-sm:h-11 minimal:max-sm:text-sm h-14 text-lg"
         />
         {state.fieldErrors?.price ? (
@@ -252,8 +254,8 @@ export function ProductForm({
           <span className="text-muted-foreground font-normal">(opcional)</span>
         </Label>
         <p id="costPrice-hint" className="text-muted-foreground text-sm">
-          Quanto você paga por este produto. Serve para saber, depois, quanto
-          da venda é lucro. Pode deixar em branco.
+          Quanto você paga por este produto. Serve para saber, depois, quanto da
+          venda é lucro. Pode deixar em branco.
         </p>
         <CurrencyInput
           id="costPrice"
@@ -359,7 +361,7 @@ export function ProductForm({
           desktop) — os h-14 text-lg esticados destoavam das outras telas. */}
       <div className="mt-2 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <LinkAcao
-          href="/produtos"
+          href={cancelarHref}
           className={cn(
             buttonVariants({ variant: "outline" }),
             "minimal:max-sm:h-11 minimal:max-sm:text-sm h-12 px-6 text-base",
