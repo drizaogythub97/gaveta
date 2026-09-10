@@ -29,14 +29,14 @@ import {
 } from "@/lib/products/format";
 import type { NotaConferencia, StatusItem } from "@/lib/compras/tipos";
 import type { Product, ProductTag } from "@/lib/types/db";
-import type { PurchaseSource } from "@/lib/types/purchases";
+import type { PurchaseEdit, PurchaseSource } from "@/lib/types/purchases";
 
 // A busca de produto é a MESMA da frente de caixa (por nome ou por código
 // de barras) — sem duplicar lógica de busca.
 import { findProductByCode, searchProductsByName } from "../../caixa/actions";
 import { criarTag } from "../../produtos/actions";
 
-import { registrarCompra } from "./actions";
+import { editarCompra, registrarCompra } from "./actions";
 import { ImportarNota } from "./importar-nota";
 
 type NotaItem = {
@@ -117,21 +117,30 @@ function lineTotal(item: NotaItem): number {
 export function NotaForm({
   iaLiberada,
   tags,
+  edicao,
 }: {
   iaLiberada: boolean;
   /** Categorias já criadas pelo dono — o produto novo pode nascer com elas. */
   tags: ProductTag[];
+  /**
+   * Quando vem preenchido, a tela CORRIGE uma nota já lançada (roadmap H1)
+   * em vez de lançar uma nova: os campos nascem com o que está gravado e o
+   * botão chama editar_compra. A leitura de arquivo fica de fora — a nota
+   * já existe, e reimportar seria trocar tudo às cegas.
+   */
+  edicao?: PurchaseEdit;
 }) {
   const router = useRouter();
+  const editando = edicao !== undefined;
 
   // As categorias que a tela oferece. Começa com as do servidor e CRESCE:
   // categoria criada num item da nota vira opção para os itens seguintes,
   // sem recarregar a página.
   const [tagsDisponiveis, setTagsDisponiveis] = useState<ProductTag[]>(tags);
 
-  const [supplier, setSupplier] = useState("");
-  const [issuedOn, setIssuedOn] = useState(hoje);
-  const [accessKey, setAccessKey] = useState("");
+  const [supplier, setSupplier] = useState(edicao?.supplier ?? "");
+  const [issuedOn, setIssuedOn] = useState(edicao?.issuedOn ?? hoje);
+  const [accessKey, setAccessKey] = useState(edicao?.accessKey ?? "");
 
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Product[]>([]);
@@ -149,7 +158,23 @@ export function NotaForm({
   // categorias do item anterior.
   const [novoTagsKey, setNovoTagsKey] = useState(0);
 
-  const [items, setItems] = useState<NotaItem[]>([]);
+  const [items, setItems] = useState<NotaItem[]>(() =>
+    (edicao?.itens ?? []).map((item) => ({
+      key: makeKey(),
+      productId: item.productId,
+      isNew: false,
+      name: item.name,
+      barcode: item.barcode,
+      quantity: quantidadeParaTexto(item.quantity),
+      costDigits: numberToDigits(item.unitCost),
+      salePriceDigits: "",
+      trackStock: item.trackStock,
+      tagIds: [],
+      newTags: [],
+      status: "reconhecido" as StatusItem,
+      descricaoNota: item.descricaoNota,
+    })),
+  );
   const [erro, setErro] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isSaving, startSaving] = useTransition();
@@ -187,6 +212,13 @@ export function NotaForm({
   }, []);
 
   const total = items.reduce((soma, item) => soma + lineTotal(item), 0);
+  // Quanto a nota valia antes da correção: é a comparação que deixa claro o
+  // que vai mudar no Financeiro.
+  const totalOriginal = (edicao?.itens ?? []).reduce(
+    (soma, item) =>
+      soma + Math.round(item.quantity * item.unitCost * 100) / 100,
+    0,
+  );
   const novos = items.filter((i) => i.isNew).length;
   const existentes = items.length - novos;
 
@@ -468,6 +500,42 @@ export function NotaForm({
     setConfirmOpen(true);
   }
 
+  /** Os itens no formato que as duas RPCs esperam. */
+  function itensParaEnvio() {
+    return items.map((item) => ({
+      productId: item.productId,
+      isNew: item.isNew,
+      description: item.name,
+      barcode: item.barcode,
+      quantity: parseDecimalPtBR(item.quantity),
+      unitCost: digitsToNumber(item.costDigits),
+      salePrice: item.isNew ? digitsToNumber(item.salePriceDigits) : null,
+      trackStock: item.trackStock,
+      tagIds: item.tagIds,
+      newTags: item.newTags,
+    }));
+  }
+
+  function salvarCorrecao() {
+    if (!edicao) return;
+    startSaving(async () => {
+      const resultado = await editarCompra({
+        purchaseId: edicao.purchaseId,
+        supplierName: supplier,
+        accessKey,
+        issuedOn,
+        items: itensParaEnvio(),
+      });
+
+      setConfirmOpen(false);
+      if (!resultado.ok) {
+        setErro(resultado.error);
+        return;
+      }
+      router.push(`/estoque/compras/${resultado.purchaseId}?corrigida=1`);
+    });
+  }
+
   function lancarNota() {
     startSaving(async () => {
       const resultado = await registrarCompra({
@@ -475,18 +543,7 @@ export function NotaForm({
         accessKey,
         issuedOn,
         source: origem,
-        items: items.map((item) => ({
-          productId: item.productId,
-          isNew: item.isNew,
-          description: item.name,
-          barcode: item.barcode,
-          quantity: parseDecimalPtBR(item.quantity),
-          unitCost: digitsToNumber(item.costDigits),
-          salePrice: item.isNew ? digitsToNumber(item.salePriceDigits) : null,
-          trackStock: item.trackStock,
-          tagIds: item.tagIds,
-          newTags: item.newTags,
-        })),
+        items: itensParaEnvio(),
       });
 
       setConfirmOpen(false);
@@ -503,11 +560,15 @@ export function NotaForm({
       {erro ? <ErrorAlert message={erro} /> : null}
 
       {/* ---------- Importar de PDF/XML (G2b) ---------- */}
-      <ImportarNota
-        onImportar={receberImportacao}
-        desabilitado={isSaving}
-        iaLiberada={iaLiberada}
-      />
+      {/* Na correção não entra: a nota já está lançada, e reler o arquivo
+          trocaria a lista inteira sem a pessoa comparar com o que gravou. */}
+      {editando ? null : (
+        <ImportarNota
+          onImportar={receberImportacao}
+          desabilitado={isSaving}
+          iaLiberada={iaLiberada}
+        />
+      )}
 
       {somaNaoFecha ? (
         <div
@@ -902,7 +963,17 @@ export function NotaForm({
                         {item.name}
                       </span>
                     )}
-                    <StatusDoItem status={item.status} />
+                    {!item.isNew && item.productId === null ? (
+                      // Só acontece em nota antiga cujo produto foi apagado
+                      // (purchase_items.product_id vira null). A linha fica,
+                      // como histórico, sem mexer em estoque nem em custo.
+                      <span className="bg-muted text-muted-foreground inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-sm font-medium">
+                        <Package aria-hidden="true" className="size-4" />
+                        Sem produto vinculado
+                      </span>
+                    ) : (
+                      <StatusDoItem status={item.status} />
+                    )}
                     {item.descricaoNota && item.descricaoNota !== item.name ? (
                       <span className="text-muted-foreground text-sm">
                         Na nota está:{" "}
@@ -1035,25 +1106,69 @@ export function NotaForm({
             {formatBRL(total)}
           </span>
         </div>
-        <p className="text-muted-foreground text-sm">
-          Este valor também entra como gasto de{" "}
-          <strong className="text-foreground font-medium">
-            insumos / mercadorias
-          </strong>{" "}
-          no Financeiro, na data da compra.
-        </p>
+        {editando ? (
+          <p className="text-muted-foreground text-sm">
+            O gasto desta nota no Financeiro passa a ser este valor, na data
+            informada acima. O estoque anda só a{" "}
+            <strong className="text-foreground font-medium">diferença</strong> —
+            o que você já vendeu continua vendido.
+          </p>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            Este valor também entra como gasto de{" "}
+            <strong className="text-foreground font-medium">
+              insumos / mercadorias
+            </strong>{" "}
+            no Financeiro, na data da compra.
+          </p>
+        )}
         <Button
           type="button"
           onClick={abrirConfirmacao}
           disabled={isSaving || items.length === 0}
           className="minimal:max-sm:h-12 minimal:max-sm:text-base h-14 text-lg font-semibold"
         >
-          Conferir e lançar nota
+          {editando ? "Conferir e salvar correção" : "Conferir e lançar nota"}
         </Button>
       </div>
 
       <ConfirmDialog
-        open={confirmOpen}
+        open={confirmOpen && editando}
+        onClose={() => setConfirmOpen(false)}
+        title="Conferir a correção antes de salvar"
+        confirmLabel="Salvar correção"
+        confirmPendingLabel="Salvando a correção…"
+        cancelLabel="Voltar e revisar"
+        pending={isSaving}
+        onConfirm={salvarCorrecao}
+        description={
+          <span className="flex flex-col gap-2 text-base">
+            <span>
+              A nota passa a ter {items.length}{" "}
+              {items.length === 1 ? "item" : "itens"}
+              {novos > 0
+                ? `, ${novos} ${novos === 1 ? "produto novo será criado" : "produtos novos serão criados"}`
+                : ""}
+              .
+            </span>
+            <span>
+              O estoque anda só a diferença e o custo dos produtos passa a ser o
+              desta correção.
+            </span>
+            <span>
+              O gasto no Financeiro vai de{" "}
+              <strong className="font-semibold">
+                {formatBRL(totalOriginal)}
+              </strong>{" "}
+              para <strong className="font-semibold">{formatBRL(total)}</strong>
+              .
+            </span>
+          </span>
+        }
+      />
+
+      <ConfirmDialog
+        open={confirmOpen && !editando}
         onClose={() => setConfirmOpen(false)}
         title="Conferir a nota antes de lançar"
         confirmLabel="Lançar nota"
@@ -1105,7 +1220,6 @@ export function NotaForm({
           setSubstituirOpen(false);
         }}
       />
-
     </div>
   );
 }

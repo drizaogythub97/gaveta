@@ -61,42 +61,63 @@ const newTags = z
   .max(MAX_TAGS_POR_ITEM, "Escolha no máximo 12 categorias.")
   .default([]);
 
-export const purchaseItemSchema = z
-  .object({
-    productId: z.uuid("Produto inválido.").nullable(),
-    isNew: z.boolean(),
-    description,
-    barcode,
-    quantity,
-    unitCost,
-    salePrice,
-    trackStock: z.boolean(),
-    tagIds,
-    newTags,
-  })
-  .superRefine((item, ctx) => {
-    if (item.isNew && item.productId !== null) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Item novo não pode apontar para um produto já cadastrado.",
-      });
-      return;
-    }
-    if (item.isNew && (item.salePrice === null || item.salePrice <= 0)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["salePrice"],
-        message: `Informe o preço de venda de "${item.description}".`,
-      });
-    }
-    if (!item.isNew && item.productId === null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["productId"],
-        message: `Escolha o produto de "${item.description}" ou marque como novo.`,
-      });
-    }
-  });
+const purchaseItemBase = z.object({
+  productId: z.uuid("Produto inválido.").nullable(),
+  isNew: z.boolean(),
+  description,
+  barcode,
+  quantity,
+  unitCost,
+  salePrice,
+  trackStock: z.boolean(),
+  tagIds,
+  newTags,
+});
+
+type PurchaseItemBase = z.output<typeof purchaseItemBase>;
+
+/** Regras comuns ao lançamento e à correção da nota. */
+function checarItem(item: PurchaseItemBase, ctx: z.RefinementCtx): boolean {
+  if (item.isNew && item.productId !== null) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Item novo não pode apontar para um produto já cadastrado.",
+    });
+    return false;
+  }
+  if (item.isNew && (item.salePrice === null || item.salePrice <= 0)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["salePrice"],
+      message: `Informe o preço de venda de "${item.description}".`,
+    });
+  }
+  return true;
+}
+
+export const purchaseItemSchema = purchaseItemBase.superRefine((item, ctx) => {
+  if (!checarItem(item, ctx)) return;
+  if (!item.isNew && item.productId === null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["productId"],
+      message: `Escolha o produto de "${item.description}" ou marque como novo.`,
+    });
+  }
+});
+
+/**
+ * Item de uma nota que está sendo CORRIGIDA. Difere do lançamento num
+ * ponto: aceita a linha sem produto vinculado. Ela existe de verdade nas
+ * notas antigas — quando o produto é apagado, purchase_items.product_id
+ * vira null (on delete set null) — e a correção não pode ser o momento em
+ * que essa linha desaparece do histórico sem o dono mandar.
+ */
+export const editPurchaseItemSchema = purchaseItemBase.superRefine(
+  (item, ctx) => {
+    checarItem(item, ctx);
+  },
+);
 
 /** Aceita a chave copiada com espaços/pontos; exige 44 dígitos no fim. */
 const accessKey = z
@@ -149,3 +170,21 @@ export type PurchaseParsed = z.output<typeof purchaseSchema>;
 export const voidPurchaseSchema = z.object({
   purchaseId: z.uuid("Nota inválida."),
 });
+
+/**
+ * Correção de uma nota já lançada (roadmap H1). O cabeçalho é o mesmo do
+ * lançamento MENOS a origem: como a nota entrou (digitada, PDF, XML, foto,
+ * IA) é histórico e não se reescreve — o banco também barra.
+ */
+export const editPurchaseSchema = z.object({
+  purchaseId: z.uuid("Nota inválida."),
+  supplierName: purchaseSchema.shape.supplierName,
+  accessKey,
+  issuedOn,
+  items: z
+    .array(editPurchaseItemSchema)
+    .min(1, "A nota precisa ter ao menos um item.")
+    .max(200, "Nota com itens demais (máx. 200)."),
+});
+
+export type EditPurchaseInput = z.input<typeof editPurchaseSchema>;

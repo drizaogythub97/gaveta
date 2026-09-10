@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { purchaseSchema } from "@/lib/validations/purchases";
+import {
+  editPurchaseSchema,
+  purchaseSchema,
+} from "@/lib/validations/purchases";
 
 /**
  * Entrada por nota (plano 08, fase G2a): validação de servidor. O formulário
@@ -144,5 +147,76 @@ describe("purchaseSchema — nota de compra", () => {
   it("recusa origem fora da lista", () => {
     const parsed = purchaseSchema.safeParse(nota({ source: "email" }));
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("editPurchaseSchema — correção de nota lançada (H1)", () => {
+  const NOTA = "22222222-2222-4222-8222-222222222222";
+
+  function correcao(over: Record<string, unknown> = {}) {
+    return {
+      purchaseId: NOTA,
+      supplierName: "Atacadão do Bairro",
+      accessKey: null,
+      issuedOn: "2026-08-20",
+      items: [itemExistente()],
+      ...over,
+    };
+  }
+
+  it("aceita a correção de uma nota com item existente e item novo", () => {
+    const parsed = editPurchaseSchema.safeParse(
+      correcao({ items: [itemExistente(), itemNovo()] }),
+    );
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.items).toHaveLength(2);
+  });
+
+  it("aceita a linha SEM produto vinculado (produto apagado depois)", () => {
+    // No lançamento isso é erro — ali a pessoa tem de escolher o produto ou
+    // marcar como novo. Numa nota já gravada a linha existe de verdade.
+    const semVinculo = itemExistente({ productId: null });
+    expect(
+      purchaseSchema.safeParse(nota({ items: [semVinculo] })).success,
+    ).toBe(false);
+    expect(
+      editPurchaseSchema.safeParse(correcao({ items: [semVinculo] })).success,
+    ).toBe(true);
+  });
+
+  it("recusa nota sem itens: corrigir não é esvaziar", () => {
+    const parsed = editPurchaseSchema.safeParse(correcao({ items: [] }));
+    expect(parsed.success).toBe(false);
+  });
+
+  it("recusa identificador de nota que não é uuid", () => {
+    const parsed = editPurchaseSchema.safeParse(correcao({ purchaseId: "42" }));
+    expect(parsed.success).toBe(false);
+  });
+
+  it("continua exigindo preço de venda no item novo", () => {
+    const parsed = editPurchaseSchema.safeParse(
+      correcao({ items: [itemNovo({ salePrice: null })] }),
+    );
+    expect(parsed.success).toBe(false);
+  });
+
+  it("não aceita a origem da nota: ela é histórico", () => {
+    const parsed = editPurchaseSchema.safeParse(correcao({ source: "xml" }));
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && "source" in parsed.data).toBe(false);
+  });
+
+  it("recusa data no futuro e chave de acesso malformada", () => {
+    expect(
+      editPurchaseSchema.safeParse(correcao({ issuedOn: "2099-01-01" }))
+        .success,
+    ).toBe(false);
+    expect(
+      editPurchaseSchema.safeParse(correcao({ accessKey: "123" })).success,
+    ).toBe(false);
+    expect(
+      editPurchaseSchema.safeParse(correcao({ accessKey: CHAVE })).success,
+    ).toBe(true);
   });
 });

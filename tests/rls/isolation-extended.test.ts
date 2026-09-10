@@ -95,9 +95,7 @@ describe("RLS — product_barcodes", () => {
 
   it("Bob nao enxerga os codigos de barras de Alice", async () => {
     const bobApp = userClient(bob.accessToken);
-    const { data, error } = await bobApp
-      .from("product_barcodes")
-      .select("id");
+    const { data, error } = await bobApp.from("product_barcodes").select("id");
     expect(error).toBeNull();
     expect(data).toHaveLength(0);
   });
@@ -303,9 +301,7 @@ describe("RLS + funcional — stock_movements e RPCs da Fase D", () => {
   it("desconto maior que o subtotal e rejeitado", async () => {
     const aliceApp = userClient(alice.accessToken);
     const { error } = await aliceApp.rpc("register_sale", {
-      items: [
-        { product_id: null, name: "Avulso", unit_price: 5, quantity: 1 },
-      ],
+      items: [{ product_id: null, name: "Avulso", unit_price: 5, quantity: 1 }],
       discount_amount: 999,
     });
     expect(error).not.toBeNull();
@@ -380,9 +376,7 @@ describe("RLS + funcional — stock_movements e RPCs da Fase D", () => {
 
   it("Bob nao enxerga as movimentacoes de Alice", async () => {
     const bobApp = userClient(bob.accessToken);
-    const { data, error } = await bobApp
-      .from("stock_movements")
-      .select("id");
+    const { data, error } = await bobApp.from("stock_movements").select("id");
     expect(error).toBeNull();
     expect(data).toHaveLength(0);
   });
@@ -428,7 +422,12 @@ describe("RLS + funcional — sessão de caixa (Fase E)", () => {
 
     const { data: cashSale } = await aliceApp.rpc("register_sale", {
       items: [
-        { product_id: null, name: "Avulso dinheiro", unit_price: 30, quantity: 1 },
+        {
+          product_id: null,
+          name: "Avulso dinheiro",
+          unit_price: 30,
+          quantity: 1,
+        },
       ],
       payment_method: "dinheiro",
     });
@@ -469,7 +468,9 @@ describe("RLS + funcional — sessão de caixa (Fase E)", () => {
     });
     expect(sangErr).toBeNull();
 
-    const { data: bobSessions } = await bobApp.from("cash_sessions").select("id");
+    const { data: bobSessions } = await bobApp
+      .from("cash_sessions")
+      .select("id");
     expect(bobSessions).toHaveLength(0);
     const { data: bobMoves } = await bobApp.from("cash_movements").select("id");
     expect(bobMoves).toHaveLength(0);
@@ -863,5 +864,97 @@ describe("RLS — fechamento dia a dia (0018)", () => {
     const somaDoDetalhe =
       Math.round(doBob.reduce((s, i) => s + Number(i.valor), 0) * 100) / 100;
     expect(recebidoDoBob).toBe(somaDoDetalhe);
+  });
+});
+
+describe("RLS — correção de nota de compra (editar_compra, H1)", () => {
+  it("Bob não corrige a nota de Alice nem apaga os itens dela", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const bobApp = userClient(bob.accessToken);
+
+    const { data: produtoData, error: erroProduto } = await aliceApp
+      .from("products")
+      .insert({
+        user_id: alice.id,
+        name: "Produto da nota de Alice",
+        price: 15,
+        cost_price: 6,
+        track_stock: true,
+        stock_quantity: 0,
+      })
+      .select("id")
+      .single();
+    expect(erroProduto).toBeNull();
+    const produto = (produtoData as { id: string }).id;
+
+    const { data: notaData, error: erroNota } = await aliceApp.rpc(
+      "registrar_compra",
+      {
+        p_purchase: {
+          supplier_name: "Fornecedor de Alice",
+          issued_on: "2026-08-20",
+          source: "manual",
+        },
+        p_itens: [
+          {
+            product_id: produto,
+            description: "Produto da nota de Alice",
+            quantity: 4,
+            unit_cost: 6,
+          },
+        ],
+      },
+    );
+    expect(erroNota).toBeNull();
+    const nota = notaData as { purchase_id: string; total: number };
+
+    // A RPC roda sob a RLS de quem chama: para Bob a nota não existe.
+    const { error: erroEdicao } = await bobApp.rpc("editar_compra", {
+      p_purchase_id: nota.purchase_id,
+      p_purchase: {
+        supplier_name: "Fornecedor do Bob",
+        issued_on: "2026-08-20",
+      },
+      p_itens: [
+        {
+          product_id: produto,
+          description: "Produto da nota de Alice",
+          quantity: 99,
+          unit_cost: 1,
+        },
+      ],
+    });
+    expect(erroEdicao).not.toBeNull();
+    expect(erroEdicao?.message.toLowerCase()).toContain("não encontrada");
+
+    // E o DELETE cruzado nos itens é filtrado pelo USING (0 linhas, sem erro).
+    const { error: erroDelete, data: apagados } = await bobApp
+      .from("purchase_items")
+      .delete()
+      .eq("purchase_id", nota.purchase_id)
+      .select("id");
+    expect(erroDelete).toBeNull();
+    expect(apagados ?? []).toHaveLength(0);
+
+    // Nada mudou do lado de Alice.
+    const { data: depoisData } = await aliceApp
+      .from("purchases")
+      .select("supplier_name, total, edited_at")
+      .eq("id", nota.purchase_id)
+      .single();
+    const depois = depoisData as {
+      supplier_name: string;
+      total: number;
+      edited_at: string | null;
+    };
+    expect(depois.supplier_name).toBe("Fornecedor de Alice");
+    expect(Number(depois.total)).toBe(24);
+    expect(depois.edited_at).toBeNull();
+
+    const { data: itensDaAlice } = await aliceApp
+      .from("purchase_items")
+      .select("id")
+      .eq("purchase_id", nota.purchase_id);
+    expect((itensDaAlice ?? []).length).toBe(1);
   });
 });
