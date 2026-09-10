@@ -80,7 +80,22 @@ const VALID_METHODS: ReadonlySet<PaymentMethod> = new Set([
 ]);
 
 export type RegisterSaleResult =
-  | { ok: true; saleId: string }
+  | {
+      ok: true;
+      saleId: string;
+      /**
+       * A taxa REALMENTE gravada, lida de volta do banco.
+       *
+       * A tela calcula uma estimativa para mostrar antes de fechar a venda,
+       * mas quem grava é a `register_sale` (achado C). Se o cadastro de
+       * Preferências mudou depois que a tela carregou, os dois números
+       * discordam — e o que o comprovante mostra tem de ser o que ficou
+       * gravado, não o palpite da tela.
+       */
+      feeAmount: number;
+      /** Total gravado, pelo mesmo motivo. */
+      total: number;
+    }
   | { ok: false; error: string };
 
 export async function loadPaymentFees() {
@@ -172,5 +187,21 @@ export async function registerSale(
     };
   }
 
-  return { ok: true, saleId: data as string };
+  const saleId = data as string;
+
+  // Lê de volta o que ficou gravado: é barato (busca pela chave primária) e
+  // é o que permite a tela dizer a verdade sobre a taxa.
+  const { data: gravada } = await supabase
+    .from("sales")
+    .select("total, fee_amount")
+    .eq("id", saleId)
+    .maybeSingle();
+  const venda = gravada as { total: number; fee_amount: number } | null;
+
+  return {
+    ok: true,
+    saleId,
+    feeAmount: Number(venda?.fee_amount ?? 0),
+    total: Number(venda?.total ?? 0),
+  };
 }

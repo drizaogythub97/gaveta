@@ -481,13 +481,18 @@ export function PosClient({
       );
       if (result.ok) {
         resetVenda();
+        // A confirmação usa o que o BANCO gravou, não a estimativa da tela:
+        // se o cadastro de taxas mudou depois que esta tela carregou, os
+        // dois números discordam, e quem manda é o que ficou gravado.
+        const taxaGravada = result.feeAmount;
+        const liquido = Math.round((result.total - taxaGravada) * 100) / 100;
         const feeMessage =
-          feeAmount > 0
-            ? ` Taxa: ${formatBRL(feeAmount)}. Líquido: ${formatBRL(netAmount)}.`
+          taxaGravada > 0
+            ? ` Taxa: ${formatBRL(taxaGravada)}. Líquido: ${formatBRL(liquido)}.`
             : "";
         setFeedback({
           kind: "success",
-          message: `Venda registrada! Total ${formatBRL(total)}.${changeMessage}${feeMessage}`,
+          message: `Venda registrada! Total ${formatBRL(result.total)}.${changeMessage}${feeMessage}`,
         });
         // Oferece a impressão do comprovante da venda recém-registrada.
         setPrintSaleId(result.saleId);
