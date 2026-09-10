@@ -91,8 +91,9 @@ export default async function InventoryPage({
     query = query.or(alternativas);
   }
 
-  // As bordas do dia saem no fuso do servidor (UTC na Vercel) — mesma
-  // ressalva do Financeiro, documentada em `lib/dashboard/dates.ts`.
+  // As bordas do dia saem no fuso da LOJA (America/Sao_Paulo), não no do
+  // servidor — ver `FUSO_LOJA` em `lib/dashboard/dates.ts`. Era daqui que o
+  // filtro de data do Estoque herdava o dia virando às 21h de Brasília.
   const inicio = filtros.de === "" ? null : dayStartISO(filtros.de);
   const fim = filtros.ate === "" ? null : dayEndISO(filtros.ate);
   if (inicio) query = query.gte("created_at", inicio);
