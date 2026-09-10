@@ -1,5 +1,11 @@
 "use server";
 
+import {
+  PARCELAS_MAX,
+  PARCELAS_MIN,
+  parcelasValidas,
+} from "@/lib/caixa/parcelas";
+import { escaparLike } from "@/lib/db/like";
 import { createClient } from "@/lib/supabase/server";
 import type { Product, SaleItemInput } from "@/lib/types/db";
 
@@ -16,7 +22,7 @@ export async function searchProductsByName(query: string): Promise<Product[]> {
   const { data } = await supabase
     .from("products")
     .select(PRODUCT_COLUMNS)
-    .ilike("name", `%${term}%`)
+    .ilike("name", `%${escaparLike(term)}%`)
     .order("name", { ascending: true })
     .limit(SEARCH_LIMIT);
 
@@ -49,7 +55,7 @@ export async function findProductByCode(
   const { data: byName } = await supabase
     .from("products")
     .select(PRODUCT_COLUMNS)
-    .ilike("name", term)
+    .ilike("name", escaparLike(term))
     .limit(1)
     .maybeSingle();
 
@@ -93,11 +99,21 @@ export async function loadPaymentFees() {
   return data;
 }
 
+/**
+ * Registra a venda.
+ *
+ * NÃO recebe mais a taxa: ela era calculada no navegador e gravada como
+ * veio, e o Fechamento desconta essa taxa do LUCRO — bastava a tela estar
+ * desatualizada para o lucro sair errado sem nada denunciar. Agora quem
+ * calcula é a `register_sale`, lendo `preferences_fees` do próprio usuário
+ * (migration 0023). A tela segue mostrando a estimativa; ela só não manda
+ * mais no que fica gravado. Ver o achado C de
+ * `docs/10-ACHADOS-DE-LOGICA.md`.
+ */
 export async function registerSale(
   items: SaleItemInput[],
   paymentMethod: PaymentMethod,
   installments: number | null,
-  feeAmount: number,
   discountAmount: number,
 ): Promise<RegisterSaleResult> {
   if (items.length === 0) {
@@ -116,9 +132,12 @@ export async function registerSale(
   }
   if (
     paymentMethod === "credito_parcelado" &&
-    (!installments || installments < 2 || installments > 24)
+    !parcelasValidas(installments)
   ) {
-    return { ok: false, error: "Número de parcelas inválido (2 a 24)." };
+    return {
+      ok: false,
+      error: `Número de parcelas inválido (${PARCELAS_MIN} a ${PARCELAS_MAX}).`,
+    };
   }
 
   const discount = Math.max(0, Math.round((discountAmount || 0) * 100) / 100);
@@ -139,7 +158,6 @@ export async function registerSale(
     payment_method: paymentMethod,
     installments:
       paymentMethod === "credito_parcelado" ? installments : null,
-    fee_amount: Math.max(0, Math.round(feeAmount * 100) / 100),
     discount_amount: discount,
   });
 

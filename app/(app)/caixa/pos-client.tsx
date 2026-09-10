@@ -21,6 +21,7 @@ import {
 } from "react";
 
 import { Button } from "@/components/ui/button";
+import { PARCELAS_OPCOES } from "@/lib/caixa/parcelas";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -81,7 +82,9 @@ const PAYMENT_METHODS: ReadonlyArray<{ value: PaymentMethod; label: string }> =
     { value: "vale", label: "Vale alimentação / refeição" },
   ];
 
-const INSTALLMENT_OPTIONS = Array.from({ length: 11 }, (_, i) => i + 2); // 2x..12x
+// As opções vêm de `lib/caixa/parcelas.ts`: a tela não pode oferecer o que o
+// servidor recusa (achado F).
+const INSTALLMENT_OPTIONS = PARCELAS_OPCOES;
 
 function makeKey() {
   return Math.random().toString(36).slice(2, 10);
@@ -468,11 +471,12 @@ export function PosClient({
     const changeMessage =
       isCash && changeAmount > 0 ? ` Troco: ${formatBRL(changeAmount)}.` : "";
     startRegister(async () => {
+      // `feeAmount` fica só na tela, como estimativa: quem calcula e grava a
+      // taxa é o banco (achado C).
       const result = await registerSale(
         items,
         paymentMethod as PaymentMethod,
         effectiveInstallments,
-        feeAmount,
         discount,
       );
       if (result.ok) {
