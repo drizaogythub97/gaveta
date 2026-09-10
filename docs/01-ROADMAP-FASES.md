@@ -759,7 +759,7 @@ Atacados em **três PRs**, na ordem do que produzia número errado:
 |---|---|---|---|
 | **#45 — o relógio do lojista** | A | `23612a2` | **0022** (aplicada) |
 | **#46 — nada some da tela** | B | `b0b227e` | — |
-| **o que o banco garante** | C, D, E, F | (esta sprint) | **0023** (aplicada) |
+| **#47 — o que o banco garante** | C, D, E, F | `ea989ab` | **0023** (aplicada) |
 
 | # | Achado | Gravidade |
 |---|---|---|

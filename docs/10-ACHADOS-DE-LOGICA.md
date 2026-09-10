@@ -18,15 +18,18 @@ normal · **Média** = quebra em volume maior ou em caso de borda ·
 
 ---
 
-> ⚠️ **Ordem de deploy do PR "o que o banco garante" (C, D, F).** A
-> **migration 0023 precisa estar aplicada ANTES** de a `main` subir com esse
-> código. A Server Action deixou de mandar `fee_amount`; com a 0023 no lugar,
-> quem calcula a taxa é o banco — **sem** ela, a venda seria gravada com taxa
-> **zero**, e o Fechamento passaria a mostrar lucro a mais.
+> ✅ **Os seis achados estão corrigidos e em produção** (`main` = `ea989ab`).
+> Migrations **0022** e **0023** aplicadas e conferidas no catálogo.
+>
+> A lição de ordem que valeu aqui, para a próxima migration deste tipo: a
+> Server Action deixou de mandar `fee_amount`, então a **0023 tinha de estar
+> aplicada ANTES** de a `main` subir — sem ela, a venda seria gravada com
+> taxa **zero** e o Fechamento mostraria lucro a mais. Migration primeiro,
+> código depois.
 
 ---
 
-## A. O dia vira às 21h de Brasília — Alta ✅ CORRIGIDO (PR do fuso, migration 0022)
+## A. O dia vira às 21h de Brasília — Alta ✅ CORRIGIDO (PR #45, merge `23612a2`, migration 0022)
 
 O sistema calcula as bordas do dia no **fuso do servidor**, que na Vercel é
 **UTC**. Para um lojista brasileiro, o dia começa às 21h do dia anterior:
@@ -60,7 +63,7 @@ dia certo. É esperado, e é a correção.
 
 ---
 
-## B. Limites silenciosos de consulta — Alta e Média ✅ CORRIGIDO (PR "nada some da tela")
+## B. Limites silenciosos de consulta — Alta e Média ✅ CORRIGIDO (PR #46, merge `b0b227e`)
 
 Consultas que cortam resultado **sem avisar ninguém**. Nenhuma delas dá erro:
 elas devolvem menos do que existe, e a tela apresenta o pedaço como se fosse o
@@ -114,7 +117,7 @@ chamou decidir o que dizer na tela. O corte deixa de ser mudo.
 
 ---
 
-## C. A taxa da venda vem do cliente e é gravada como veio — Média ✅ CORRIGIDO (migration 0023)
+## C. A taxa da venda vem do cliente e é gravada como veio — Média ✅ CORRIGIDO (PR #47, migration 0023)
 
 `app/(app)/caixa/actions.ts:139` recebe `feeAmount` já calculado no navegador
 e o repassa; a função `register_sale` só garante que não é negativo
@@ -133,7 +136,7 @@ próprio usuário.)
 
 ---
 
-## D. Estoque cortado em zero, mas o movimento grava a quantidade cheia — Média ✅ CORRIGIDO (migration 0023)
+## D. Estoque cortado em zero, mas o movimento grava a quantidade cheia — Média ✅ CORRIGIDO (PR #47, migration 0023)
 
 Na `register_sale`:
 
@@ -165,7 +168,7 @@ defeito deste achado. Revê-lo é outra decisão de produto.
 
 ---
 
-## E. A busca do caixa não escapa curinga — Baixa ✅ CORRIGIDO
+## E. A busca do caixa não escapa curinga — Baixa ✅ CORRIGIDO (PR #47)
 
 `app/(app)/caixa/actions.ts:19` e `:52`, e `app/(app)/caixa/fiado-actions.ts:35`,
 montam o `ilike` **sem `escaparLike`** — diferente de Produtos
@@ -183,7 +186,7 @@ PostgREST parametriza o valor), é resultado errado na tela mais usada.
 
 ---
 
-## F. O número de parcelas tem três limites diferentes — Baixa ✅ CORRIGIDO
+## F. O número de parcelas tem três limites diferentes — Baixa ✅ CORRIGIDO (PR #47)
 
 - Tela: **2 a 12** (`app/(app)/caixa/pos-client.tsx`, `INSTALLMENT_OPTIONS`);
 - Server Action: **2 a 24** (`app/(app)/caixa/actions.ts`);
