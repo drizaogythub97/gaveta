@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { LinkAcao } from "@/components/app/link-acao";
 
 import { FiltroChips } from "@/components/app/filtro-chips";
+import { Paginacao } from "@/components/app/paginacao";
 import { RegiaoEmEspera } from "@/components/app/regiao-em-espera";
 import { createClient } from "@/lib/supabase/server";
 import { formatQuantity } from "@/lib/products/format";
@@ -16,9 +17,18 @@ export const metadata = {
   title: "Movimentação de estoque",
 };
 
-const MOVEMENT_LIMIT = 100;
+// A razão do estoque é o histórico que existe para auditar: ela não pode
+// esconder linha nenhuma. Antes mostrava as 100 últimas e parava por aí — e
+// CADA item vendido gera um movimento, então o corte chegava em poucos dias
+// de uso (medido em 10/09: 97 movimentos de 100). Agora a lista pagina no
+// banco, como Produtos e o Financeiro. Ver o achado B de
+// `docs/10-ACHADOS-DE-LOGICA.md`.
+const PAGE_SIZE = 15;
 
-const FILTERS: ReadonlyArray<{ value: "todos" | StockMovementType; label: string }> = [
+const FILTERS: ReadonlyArray<{
+  value: "todos" | StockMovementType;
+  label: string;
+}> = [
   { value: "todos", label: "Todos" },
   { value: "sale", label: "Vendas" },
   { value: "void", label: "Estornos" },
@@ -29,6 +39,11 @@ const FILTERS: ReadonlyArray<{ value: "todos" | StockMovementType; label: string
 
 function pickString(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function parsePage(value: string | string[] | undefined): number {
+  const n = Number.parseInt(pickString(value) ?? "1", 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
 export default async function StockMovementsPage({
@@ -50,17 +65,46 @@ export default async function StockMovementsPage({
       ? (typeParam as StockMovementType)
       : "todos";
 
+  const paginaPedida = parsePage(params.page);
+
   const supabase = await createClient();
   let query = supabase
     .from("stock_movements")
-    .select("id, type, quantity, sale_id, note, created_at, products(name)")
-    .order("created_at", { ascending: false })
-    .limit(MOVEMENT_LIMIT);
+    .select("id, type, quantity, sale_id, note, created_at, products(name)", {
+      count: "exact",
+    })
+    .order("created_at", { ascending: false });
   if (activeType !== "todos") {
     query = query.eq("type", activeType);
   }
-  const { data, error } = await query;
-  const movements = (data ?? []) as unknown as StockMovementRow[];
+
+  // O `count: "exact"` vem junto da própria página, então o total sai sem
+  // uma consulta a mais. Se a página pedida não existir mais (trocou de
+  // filtro estando na 5, ou a lista encolheu), a busca é refeita na última
+  // página válida logo abaixo — em vez de deixar a tela vazia sem explicação.
+  const offset = (paginaPedida - 1) * PAGE_SIZE;
+  const { data, error, count } = await query.range(
+    offset,
+    offset + PAGE_SIZE - 1,
+  );
+  const total = count ?? 0;
+  const totalPaginas = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const paginaAtual = Math.min(paginaPedida, totalPaginas);
+
+  let movements = (data ?? []) as unknown as StockMovementRow[];
+  if (movements.length === 0 && total > 0 && paginaAtual !== paginaPedida) {
+    const inicio = (paginaAtual - 1) * PAGE_SIZE;
+    let recorte = supabase
+      .from("stock_movements")
+      .select("id, type, quantity, sale_id, note, created_at, products(name)")
+      .order("created_at", { ascending: false });
+    if (activeType !== "todos") recorte = recorte.eq("type", activeType);
+    const { data: pagina } = await recorte.range(
+      inicio,
+      inicio + PAGE_SIZE - 1,
+    );
+    movements = (pagina ?? []) as unknown as StockMovementRow[];
+  }
 
   return (
     <section className="minimal:max-sm:gap-4 flex flex-col gap-6">
@@ -77,8 +121,8 @@ export default async function StockMovementsPage({
         </h1>
         <p className="minimal:max-sm:text-sm text-muted-foreground text-lg">
           Entradas e saídas dos seus produtos: vendas, estornos, reposições,
-          entradas por nota e ajustes. Mostrando os {MOVEMENT_LIMIT} mais
-          recentes.
+          entradas por nota e ajustes. Tudo fica aqui, do mais recente ao mais
+          antigo.
         </p>
       </header>
 
@@ -108,6 +152,14 @@ export default async function StockMovementsPage({
               <MovementRow key={m.id} movement={m} />
             ))}
           </ul>
+          <Paginacao
+            paginaAtual={paginaAtual}
+            totalPaginas={totalPaginas}
+            total={total}
+            singular="movimentação"
+            plural="movimentações"
+            rotulo="Páginas da movimentação de estoque"
+          />
         </RegiaoEmEspera>
       )}
     </section>
@@ -118,7 +170,7 @@ function MovementRow({ movement }: { movement: StockMovementRow }) {
   const incoming = movement.quantity >= 0;
   const sign = incoming ? "+" : "−";
   return (
-    <li className="ring-foreground/10 bg-card flex items-center justify-between gap-3 minimal:max-sm:p-3.5 rounded-xl p-4 ring-1">
+    <li className="ring-foreground/10 bg-card minimal:max-sm:p-3.5 flex items-center justify-between gap-3 rounded-xl p-4 ring-1">
       <div className="flex flex-col gap-1">
         <span className="text-foreground text-lg font-medium">
           {movement.products?.name ?? "Produto removido"}

@@ -15,6 +15,7 @@ import {
   lerFiltrosEstoque,
   temFiltroEstoque,
 } from "@/lib/estoque/filtros";
+import { todasAsLinhas } from "@/lib/db/paginado";
 import { createClient } from "@/lib/supabase/server";
 import type { Product } from "@/lib/types/db";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,13 @@ export const metadata = {
 const COLUNAS =
   "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at";
 
+/**
+ * Quantos ids de código de barras cabem na URL da consulta seguinte.
+ *
+ * Não é gosto: é o que o gateway aceita. Ver a medição no comentário do uso.
+ */
+const TETO_CODIGOS = 200;
+
 export default async function InventoryPage({
   searchParams,
 }: {
@@ -42,17 +50,30 @@ export default async function InventoryPage({
   // produto bipando com a câmera. Os códigos moram noutra tabela, então os
   // ids saem primeiro e entram na consulta como alternativa ao nome.
   let idsPorCodigo: string[] = [];
+  let codigosTruncados = false;
   if (filtros.termo !== "") {
-    const { data } = await supabase
-      .from("product_barcodes")
-      .select("product_id")
-      .ilike("barcode", `%${escaparLike(filtros.termo)}%`)
-      .limit(200);
-    idsPorCodigo = [
-      ...new Set(
-        ((data ?? []) as { product_id: string }[]).map((l) => l.product_id),
-      ),
-    ];
+    // Aqui os ids TÊM de passar pela URL: a busca do estoque é "nome OU
+    // código de barras", e o `or` do PostgREST não aceita filtro de tabela
+    // aninhada — diferente do filtro por categoria em Produtos, que virou
+    // subconsulta com `!inner`.
+    //
+    // Por isso o teto continua, mas agora medido e declarado. Medição de
+    // 10/09 contra o gateway do Supabase: 200 ids = URL de 7,5 KB e HTTP
+    // 200; 1000 ids = HTTP 400; 2000 ids = HTTP 414 (URI Too Long). Ou
+    // seja, buscar os ids "em páginas" sem teto não removeria o corte —
+    // trocaria um corte silencioso por uma página quebrada.
+    const { linhas, truncou } = await todasAsLinhas<{ product_id: string }>(
+      (de, ate) =>
+        supabase
+          .from("product_barcodes")
+          .select("product_id")
+          .ilike("barcode", `%${escaparLike(filtros.termo)}%`)
+          .range(de, ate),
+      { maximo: TETO_CODIGOS },
+    );
+    idsPorCodigo = [...new Set(linhas.map((l) => l.product_id))];
+    // O corte deixa de ser mudo: se bateu no teto, a tela diz.
+    codigosTruncados = truncou;
   }
 
   let query = supabase
@@ -160,6 +181,16 @@ export default async function InventoryPage({
               e dois números iguais lado a lado só confundem. Com uma página
               só, a barra não é renderizada e a contagem faz falta — foi ela
               que a tela sempre mostrou. */}
+          {codigosTruncados ? (
+            <p
+              className="ring-foreground/10 bg-card text-foreground rounded-xl p-4 text-base ring-1"
+              role="status"
+            >
+              Muitos códigos de barras combinam com “{filtros.termo}”. A busca
+              por código considerou os {TETO_CODIGOS} primeiros — digite mais
+              números para encontrar o produto certo.
+            </p>
+          ) : null}
           {totalPaginas === 1 ? (
             <p className="text-muted-foreground text-base" aria-live="polite">
               {total} {total === 1 ? "produto" : "produtos"} no recorte atual.

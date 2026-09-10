@@ -52,7 +52,7 @@ dia certo. É esperado, e é a correção.
 
 ---
 
-## B. Limites silenciosos de consulta — Alta e Média
+## B. Limites silenciosos de consulta — Alta e Média ✅ CORRIGIDO (PR "nada some da tela")
 
 Consultas que cortam resultado **sem avisar ninguém**. Nenhuma delas dá erro:
 elas devolvem menos do que existe, e a tela apresenta o pedaço como se fosse o
@@ -71,10 +71,38 @@ O item 1 é o mais urgente na prática: **cada item vendido gera um movimento**,
 então 100 linhas somem em poucos dias de uso, e a razão do estoque é
 justamente o histórico que existe para auditar.
 
-**Como corrigir:** paginação no banco (`range` + `count: "exact"`) nos itens 1
-e 2, como já é feito em Produtos e no Financeiro; nos itens 3 e 4, casar por
-subconsulta em vez de despejar ids na URL; no 5, paginar o catálogo ou casar
-no banco; no 6, somar com agregação no banco, nunca trazendo linha por linha.
+**Como foi corrigido:**
+
+- **1 e 2** — paginação no banco (`range` + `count: "exact"`, 15 por página),
+  reusando `Paginacao`, como já era feito em Produtos e no Financeiro. Página
+  pedida além do fim cai na última que existe, em vez de tela vazia.
+- **4** — virou **subconsulta**, como previsto: `filtro:product_tag_links!inner(tag_id)`
+  filtra o produto dentro do banco e **nenhum id viaja na URL**. O vínculo sem
+  apelido continua no `select`, senão as tarjas da lista passariam a mostrar
+  só a categoria filtrada. O `count` segue exato (conferido: 42).
+- **3** — **não** virou subconsulta, e a razão está no código: a busca do
+  estoque é "nome **OU** código de barras", e o `or` do PostgREST não aceita
+  filtro de tabela aninhada. O teto continua, mas agora é **medido, declarado
+  e visível**: acima dele a tela avisa para refinar a busca.
+- **5** — catálogo lido em páginas por `lib/db/paginado.ts`; `.limit(5000)`
+  nunca trouxe mais que 1000.
+- **6** — a conferência do caixa soma **todas** as vendas em dinheiro da
+  sessão, em páginas.
+
+### Medições que sustentam as decisões (10/09, banco de produção)
+
+| Medida | Valor | Por quê importa |
+|---|---|---|
+| Movimentos de estoque do maior usuário | 87, no teto de 100 | o item 1 estava a poucas vendas de esconder histórico |
+| Maior categoria | 42 vínculos | itens 3 e 4 ainda não mordiam: a correção é preventiva |
+| Códigos de barras (base inteira) | 114 | idem |
+| `id.in.(…)` com 200 ids | URL de 7,5 KB → **HTTP 200** | é o teto que o gateway aguenta |
+| `id.in.(…)` com 1000 ids | **HTTP 400** | |
+| `id.in.(…)` com 2000 ids | **HTTP 414 (URI Too Long)** | por isso o item 3 **não** podia simplesmente "paginar sem teto": trocaria corte silencioso por página quebrada |
+
+**Ferramenta nova:** `lib/db/paginado.ts` (`todasAsLinhas`) — pede as páginas
+até acabar e devolve `truncou: true` ao bater no teto de segurança, para quem
+chamou decidir o que dizer na tela. O corte deixa de ser mudo.
 
 ---
 

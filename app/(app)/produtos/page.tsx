@@ -43,11 +43,19 @@ function parsePage(value: string | string[] | undefined): number {
   return Number.isFinite(n) && n >= 1 ? n : 1;
 }
 
-
 type ProductRow = Product & {
   product_barcodes: { barcode: string }[] | null;
   product_tag_links: { tag_id: string }[] | null;
 };
+
+// As duas variantes são escritas por extenso, e não montadas com template: o
+// parser de tipos do supabase-js só lê o `select` como literal e desiste de um
+// pedaço interpolado, derrubando o `tsc`.
+const COLUNAS =
+  "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode), product_tag_links(tag_id)";
+
+const COLUNAS_FILTRADAS =
+  "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode), product_tag_links(tag_id), filtro:product_tag_links!inner(tag_id)";
 
 export default async function ProductsPage({
   searchParams,
@@ -65,39 +73,29 @@ export default async function ProductsPage({
   );
   const termo = (pickString(params.q) ?? "").trim();
 
-  // Quando há filtro de categoria, a página vem dos vínculos: o PostgREST não
-  // pagina direito por tabela aninhada, então os ids saem primeiro. Várias
-  // categorias marcadas somam (OU): o produto entra se tiver QUALQUER uma
-  // delas — decisão do dono do produto.
-  let idsDaTag: string[] | null = null;
-  if (tagsAtuais.length > 0) {
-    const { data } = await supabase
-      .from("product_tag_links")
-      .select("product_id")
-      .in("tag_id", tagsAtuais);
-    idsDaTag = [
-      ...new Set(
-        ((data ?? []) as { product_id: string }[]).map((l) => l.product_id),
-      ),
-    ];
-  }
-
   const paginaPedida = parsePage(params.page);
   const offset = (paginaPedida - 1) * PAGE_SIZE;
 
-  // Categoria sem nenhum produto: não vale ir ao banco só para receber uma
-  // lista vazia (e `in.()` com lista vazia não é consulta válida).
-  const semResultado = idsDaTag !== null && idsDaTag.length === 0;
-
+  // O filtro por categoria é uma SUBCONSULTA, não uma lista de ids.
+  //
+  // Antes os vínculos eram lidos primeiro e os ids despejados na query string
+  // (~37 bytes cada): a lista parava no teto calado do PostgREST e a
+  // categoria escondia produtos. Trazer os ids em páginas resolveria o corte
+  // mas pioraria a URL. O `!inner` com apelido filtra o produto no próprio
+  // banco — nenhum id viaja, e o `count` continua exato.
+  //
+  // O apelido importa: `filtro:` é o vínculo que FILTRA (só a categoria
+  // pedida), enquanto `product_tag_links` segue trazendo TODAS as etiquetas
+  // do produto, que é o que as tarjas da lista mostram. Várias categorias
+  // marcadas somam (OU): o produto entra se tiver QUALQUER uma delas.
   let query = supabase
     .from("products")
-    .select(
-      "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at, product_barcodes(barcode), product_tag_links(tag_id)",
-      { count: "exact" },
-    )
+    .select(tagsAtuais.length > 0 ? COLUNAS_FILTRADAS : COLUNAS, {
+      count: "exact",
+    })
     .order("created_at", { ascending: false });
-  if (idsDaTag !== null && idsDaTag.length > 0) {
-    query = query.in("id", idsDaTag);
+  if (tagsAtuais.length > 0) {
+    query = query.in("filtro.tag_id", tagsAtuais);
   }
   if (termo !== "") {
     // A busca corta no banco, não no cliente: só assim a contagem e a
@@ -105,9 +103,10 @@ export default async function ProductsPage({
     query = query.ilike("name", `%${escaparLike(termo)}%`);
   }
 
-  const { data, error, count } = semResultado
-    ? { data: [], error: null, count: 0 }
-    : await query.range(offset, offset + PAGE_SIZE - 1);
+  const { data, error, count } = await query.range(
+    offset,
+    offset + PAGE_SIZE - 1,
+  );
 
   // O total vem do `count` da própria consulta (exato, com o filtro
   // aplicado); a página é limitada depois, para "?page=99" mostrar a última
@@ -117,15 +116,19 @@ export default async function ProductsPage({
   const paginaAtual = Math.min(paginaPedida, totalPaginas);
 
   const porId = new Map(tags.map((t) => [t.id, t]));
-  const products: ProductWithTags[] = ((data ?? []) as ProductRow[]).map(
-    (p) => ({
-      ...p,
-      barcodes: (p.product_barcodes ?? []).map((b) => b.barcode),
-      tags: (p.product_tag_links ?? [])
-        .map((l) => porId.get(l.tag_id))
-        .filter((t): t is ProductTag => Boolean(t)),
-    }),
-  );
+  // `as unknown as`, como em Compras e Movimentações: o parser de tipos do
+  // supabase-js não conhece o embed com apelido (`filtro:…!inner`) e devolve
+  // um ParserError no lugar da linha. O formato real é o de sempre — o
+  // apelido só filtra, não muda as colunas.
+  const products: ProductWithTags[] = (
+    (data ?? []) as unknown as ProductRow[]
+  ).map((p) => ({
+    ...p,
+    barcodes: (p.product_barcodes ?? []).map((b) => b.barcode),
+    tags: (p.product_tag_links ?? [])
+      .map((l) => porId.get(l.tag_id))
+      .filter((t): t is ProductTag => Boolean(t)),
+  }));
 
   const temFiltro = tagsAtuais.length > 0 || termo !== "";
   const semNenhumProduto = totalProdutos === 0 && !temFiltro;
