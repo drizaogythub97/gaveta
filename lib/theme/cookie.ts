@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuario } from "@/lib/supabase/server";
 import { THEME_COOKIE, parseTheme, type Theme } from "@/lib/theme/theme";
 
 export {
@@ -42,9 +42,7 @@ export async function resolveTheme(): Promise<{
 /** Tema gravado no perfil do usuário logado. `null` sem sessão ou sem perfil. */
 export async function readThemeFromProfile(): Promise<Theme | null> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuario();
   if (!user) return null;
 
   const { data } = await supabase

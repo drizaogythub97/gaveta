@@ -37,29 +37,35 @@ export async function findProductByCode(
 
   const supabase = await createClient();
 
-  const { data: barcodeMatch } = await supabase
-    .from("product_barcodes")
-    .select("product_id")
-    .eq("barcode", term)
-    .maybeSingle();
-
-  if (barcodeMatch?.product_id) {
-    const { data: product } = await supabase
+  // Eram três consultas em série (código → produto → nome). Agora são duas,
+  // disparadas JUNTAS: o produto pelo código vem numa consulta só, com o
+  // `!inner` filtrando pela tabela de códigos, e a busca pelo nome exato
+  // corre em paralelo. A preferência continua a mesma: o código manda.
+  const [{ data: porCodigo }, { data: porNome }] = await Promise.all([
+    supabase
+      .from("products")
+      .select(`${PRODUCT_COLUMNS}, product_barcodes!inner(barcode)`)
+      .eq("product_barcodes.barcode", term)
+      .limit(1)
+      .maybeSingle(),
+    supabase
       .from("products")
       .select(PRODUCT_COLUMNS)
-      .eq("id", barcodeMatch.product_id)
-      .maybeSingle();
-    if (product) return product as Product;
+      .ilike("name", escaparLike(term))
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (porCodigo) {
+    // O embed só serviu para filtrar; o que sai daqui é o produto de sempre.
+    const { product_barcodes: _codigos, ...product } = porCodigo as Product & {
+      product_barcodes: unknown;
+    };
+    void _codigos;
+    return product as Product;
   }
 
-  const { data: byName } = await supabase
-    .from("products")
-    .select(PRODUCT_COLUMNS)
-    .ilike("name", escaparLike(term))
-    .limit(1)
-    .maybeSingle();
-
-  return (byName ?? null) as Product | null;
+  return (porNome ?? null) as Product | null;
 }
 
 export type PaymentMethod =
@@ -98,18 +104,22 @@ export type RegisterSaleResult =
     }
   | { ok: false; error: string };
 
+/**
+ * Taxas cadastradas em Preferências.
+ *
+ * Não pede o usuário ao Auth: a RLS de `preferences_fees` já devolve só a
+ * linha do dono da sessão (`auth.uid() = user_id`), então o `getUser()` que
+ * havia aqui era uma viagem de rede a mais só para repetir um filtro que o
+ * banco impõe de qualquer jeito. Sem sessão, a consulta devolve nada e o
+ * caixa cai nas taxas padrão — o proxy já barrou a página antes disso.
+ */
 export async function loadPaymentFees() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
   const { data } = await supabase
     .from("preferences_fees")
     .select(
       "pix_pct, debito_pct, credito_avista_pct, credito_parcelado_base_pct, credito_parcelado_por_parcela_pct, vale_pct",
     )
-    .eq("user_id", user.id)
     .maybeSingle();
   return data;
 }
@@ -145,10 +155,7 @@ export async function registerSale(
   if (!VALID_METHODS.has(paymentMethod)) {
     return { ok: false, error: "Forma de pagamento inválida." };
   }
-  if (
-    paymentMethod === "credito_parcelado" &&
-    !parcelasValidas(installments)
-  ) {
+  if (paymentMethod === "credito_parcelado" && !parcelasValidas(installments)) {
     return {
       ok: false,
       error: `Número de parcelas inválido (${PARCELAS_MIN} a ${PARCELAS_MAX}).`,
@@ -171,8 +178,7 @@ export async function registerSale(
   const { data, error } = await supabase.rpc("register_sale", {
     items: payload,
     payment_method: paymentMethod,
-    installments:
-      paymentMethod === "credito_parcelado" ? installments : null,
+    installments: paymentMethod === "credito_parcelado" ? installments : null,
     discount_amount: discount,
   });
 

@@ -18,7 +18,7 @@ import {
   monthStartISO,
   todayStartISO,
 } from "@/lib/dashboard/dates";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuario } from "@/lib/supabase/server";
 import { CAIXA_PAYMENT_METHODS } from "@/lib/types/sales";
 import { cn } from "@/lib/utils";
 
@@ -39,9 +39,8 @@ export default async function DashboardPage() {
   // dispensado (cookie), então não há flash no carregamento.
   const mostrarAnuncio = !(await cookies()).get("gaveta_ecossistema_anuncio");
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // A mesma validação que o layout já fez nesta requisição.
+  const user = await obterUsuario();
 
   const greeting =
     (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "";
@@ -149,10 +148,7 @@ export default async function DashboardPage() {
         </p>
       </header>
 
-      <section
-        aria-labelledby="kpis-heading"
-        className="flex flex-col gap-4"
-      >
+      <section aria-labelledby="kpis-heading" className="flex flex-col gap-4">
         <h2 id="kpis-heading" className="sr-only">
           Indicadores
         </h2>
@@ -164,9 +160,7 @@ export default async function DashboardPage() {
               key={label}
               className={cn(
                 "minimal:max-sm:p-3.5 minimal:max-sm:gap-1 ring-foreground/10 bg-card flex flex-col gap-2 rounded-xl p-5 ring-1",
-                tone === "warning"
-                  ? "ring-warning/30 bg-warning/5"
-                  : undefined,
+                tone === "warning" ? "ring-warning/30 bg-warning/5" : undefined,
               )}
             >
               <div className="flex items-center justify-between">
@@ -201,8 +195,14 @@ export default async function DashboardPage() {
         </ul>
       </section>
 
-      <section aria-labelledby="shortcuts-heading" className="minimal:max-sm:gap-3 flex flex-col gap-4">
-        <h2 id="shortcuts-heading" className="minimal:max-sm:text-lg text-xl font-semibold">
+      <section
+        aria-labelledby="shortcuts-heading"
+        className="minimal:max-sm:gap-3 flex flex-col gap-4"
+      >
+        <h2
+          id="shortcuts-heading"
+          className="minimal:max-sm:text-lg text-xl font-semibold"
+        >
           Atalhos rápidos
         </h2>
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
