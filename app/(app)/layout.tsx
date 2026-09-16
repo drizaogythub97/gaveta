@@ -10,7 +10,7 @@ import { ModoChooser } from "@/components/app/modo-chooser";
 import { PersonalizationTip } from "@/components/app/personalization-tip";
 import { ThemeSync } from "@/components/app/theme-sync";
 import { Toaster } from "@/components/ui/sonner";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuario } from "@/lib/supabase/server";
 import { parseTheme } from "@/lib/theme/theme";
 import { getUiModeFromCookie } from "@/lib/ui-mode/cookie";
 
@@ -20,19 +20,28 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await obterUsuario();
 
   if (!user) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("brand_name, brand_logo_path, theme")
-    .eq("id", user.id)
-    .maybeSingle();
+  // As duas consultas não dependem uma da outra: vão juntas. Cada viagem ao
+  // banco em série é tempo que a pessoa espera com a tela em branco.
+  const [{ data: profile }, { data: ecoPrefs }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("brand_name, brand_logo_path, theme")
+      .eq("id", user.id)
+      .maybeSingle(),
+    // Atalho do ecossistema (opt-in, estágio 1): só aparece se o usuário
+    // ligou o toggle em /ecossistema. A pref vale a conta (os dois apps).
+    supabase
+      .from("ecossistema_prefs")
+      .select("switcher_ativo")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
 
   // O tema vem junto do perfil que o cabeçalho já buscava — nenhuma consulta
   // a mais só para isso.
@@ -53,13 +62,6 @@ export default async function AppLayout({
 
   const uiMode = await getUiModeFromCookie();
 
-  // Atalho do ecossistema (opt-in, estágio 1): só aparece se o usuário
-  // ligou o toggle em /ecossistema. A pref vale a conta (os dois apps).
-  const { data: ecoPrefs } = await supabase
-    .from("ecossistema_prefs")
-    .select("switcher_ativo")
-    .eq("user_id", user.id)
-    .maybeSingle();
   const mostrarSwitcher = Boolean(ecoPrefs?.switcher_ativo);
 
   return (

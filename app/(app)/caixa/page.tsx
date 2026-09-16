@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { CaixaFullscreenTip } from "@/components/app/caixa-fullscreen-tip";
 import { listarTags } from "@/lib/products/tags";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, obterUsuario } from "@/lib/supabase/server";
 import { DEFAULT_FEES, type PaymentFees } from "@/lib/preferences/types";
 
 import { loadPaymentFees } from "./actions";
@@ -14,29 +14,31 @@ export const metadata = {
 };
 
 export default async function CaixaPage() {
-  const dbFees = await loadPaymentFees();
-  const fees: PaymentFees = dbFees ?? DEFAULT_FEES;
-
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const [{ data: openSession }, { data: prefs }] = await Promise.all([
-    supabase
-      .from("cash_sessions")
-      .select("id, opened_at")
-      .eq("status", "open")
-      .maybeSingle(),
-    supabase
-      .from("ecossistema_prefs")
-      .select("fiado_pdv_ativo")
-      .eq("user_id", user?.id ?? "")
-      .maybeSingle(),
-  ]);
-  const fiadoPdvAtivo = Boolean(prefs?.fiado_pdv_ativo);
+  // Mesma validação que o layout já fez nesta requisição — reaproveitada,
+  // não repetida.
+  const user = await obterUsuario();
 
-  // O produto cadastrado no caixa pode nascer já categorizado.
-  const tags = await listarTags(supabase);
+  // Nenhuma destas quatro consultas depende da outra. Em série, cada uma
+  // era uma viagem ao banco que a pessoa esperava antes de ver o caixa.
+  const [dbFees, { data: openSession }, { data: prefs }, tags] =
+    await Promise.all([
+      loadPaymentFees(),
+      supabase
+        .from("cash_sessions")
+        .select("id, opened_at")
+        .eq("status", "open")
+        .maybeSingle(),
+      supabase
+        .from("ecossistema_prefs")
+        .select("fiado_pdv_ativo")
+        .eq("user_id", user?.id ?? "")
+        .maybeSingle(),
+      // O produto cadastrado no caixa pode nascer já categorizado.
+      listarTags(supabase),
+    ]);
+  const fees: PaymentFees = dbFees ?? DEFAULT_FEES;
+  const fiadoPdvAtivo = Boolean(prefs?.fiado_pdv_ativo);
 
   return (
     // O caixa é a tela mais densa do sistema (duas colunas com números

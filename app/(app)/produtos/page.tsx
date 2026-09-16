@@ -65,12 +65,18 @@ export default async function ProductsPage({
   const params = await searchParams;
   const supabase = await createClient();
 
-  const tags = await listarTags(supabase);
+  // As categorias começam a vir já; só se espera por elas quando a URL
+  // filtra por categoria, porque aí a lista depende de saber quais existem.
+  const tagsPedidas = pickAll(params.tag);
+  const carregandoTags = listarTags(supabase);
   // Só vale filtro por categoria que existe: parâmetro inventado na URL é
   // descartado em vez de devolver uma lista vazia sem explicação.
-  const tagsAtuais = pickAll(params.tag).filter((id) =>
-    tags.some((t) => t.id === id),
-  );
+  const tagsAtuais =
+    tagsPedidas.length === 0
+      ? []
+      : await carregandoTags.then((tags) =>
+          tagsPedidas.filter((id) => tags.some((t) => t.id === id)),
+        );
   const termo = (pickString(params.q) ?? "").trim();
 
   const paginaPedida = parsePage(params.page);
@@ -103,10 +109,12 @@ export default async function ProductsPage({
     query = query.ilike("name", `%${escaparLike(termo)}%`);
   }
 
-  const { data, error, count } = await query.range(
-    offset,
-    offset + PAGE_SIZE - 1,
-  );
+  // Sem filtro de categoria, a lista e as categorias viajam juntas: era uma
+  // consulta em série a mais em toda abertura da tela.
+  const [{ data, error, count }, tags] = await Promise.all([
+    query.range(offset, offset + PAGE_SIZE - 1),
+    carregandoTags,
+  ]);
 
   // O total vem do `count` da própria consulta (exato, com o filtro
   // aplicado); a página é limitada depois, para "?page=99" mostrar a última
