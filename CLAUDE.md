@@ -29,7 +29,12 @@ npm run test:e2e   # Playwright
 
 1. **RLS sempre ativo** em todas as tabelas; políticas por `user_id`. Nunca desabilitar RLS.
 2. A **`service_role` / secret key NUNCA** vai ao cliente. Sem prefixo `NEXT_PUBLIC_`, sem uso em Client Components. Só em Server Components, Route Handlers, Server Actions ou Edge Functions.
-3. No servidor, proteger rotas com `supabase.auth.getUser()` — **nunca** confiar em `getSession()`.
+3. No servidor, a sessão é sempre **verificada**, nunca só lida: no `proxy.ts`
+   usa-se `getClaims()` (assinatura conferida localmente com a chave pública
+   ES256 do projeto — zero chamadas de rede por requisição); nos layouts e
+   páginas, `obterUsuario()` (`getUser()` em cache, uma vez por requisição),
+   que consulta o Auth e pega sessão revogada. **Nunca** confiar em
+   `getSession()`.
 4. **Validar toda entrada com Zod no servidor**, não só no cliente.
 5. Nunca commitar `.env*`. Segredos só em `.env.local` (dev) e no painel da Vercel (prod).
 6. Mensagens de erro ao usuário são genéricas; não vazar SQL/stack/segredos.

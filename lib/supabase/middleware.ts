@@ -46,7 +46,9 @@ export async function updateSession(
           // Reflete os cookies refrescados nos headers encaminhados ao render,
           // para que os Server Components vejam a sessao atualizada.
           requestHeaders.set("cookie", request.cookies.toString());
-          response = NextResponse.next({ request: { headers: requestHeaders } });
+          response = NextResponse.next({
+            request: { headers: requestHeaders },
+          });
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
           }
@@ -55,11 +57,25 @@ export async function updateSession(
     },
   );
 
-  // IMPORTANTE: usar getUser() (valida o token via servidor).
-  // Nunca confiar em getSession() no servidor.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // A sessão é VERIFICADA aqui, não apenas lida: `getClaims()` confere a
+  // assinatura do token com a chave pública do projeto (ES256, publicada em
+  // /auth/v1/.well-known/jwks.json e guardada em cache). É o que a própria
+  // Supabase recomenda para o middleware desde as chaves assimétricas.
+  //
+  // Por que não `getUser()` aqui: ele é uma chamada HTTP ao Auth em TODA
+  // requisição — cada página, cada navegação interna, cada busca do caixa.
+  // A conferência com estado (sessão apagada, usuário removido) continua
+  // acontecendo uma vez por página no layout autenticado, via
+  // `obterUsuario()`; e o banco valida a assinatura em toda consulta pela
+  // RLS. O que este arquivo decide é só "pode entrar ou vai para o login".
+  //
+  // Nunca `getSession()`: ele devolve o que está no cookie sem conferir nada.
+  //
+  // Token vencido: `getClaims()` renova a sessão pelo refresh token antes de
+  // verificar, e o `setAll` acima devolve os cookies novos ao navegador — o
+  // refresh silencioso continua sendo papel do proxy.
+  const { data, error } = await supabase.auth.getClaims();
+  const user = !error && data?.claims?.sub ? { id: data.claims.sub } : null;
 
   const { pathname, search } = request.nextUrl;
 
