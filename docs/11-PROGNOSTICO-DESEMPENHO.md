@@ -205,3 +205,48 @@ como aceito no proxy). **Só com o "pode" do dono.**
 Busca do caixa 557 ms (última tecla → lista) · TTFB caixa 1,24 s · TTFB
 produtos 1,56 s · navegação interna para o caixa 1,9–2,4 s · região
 `gru1::iad1`.
+
+## Resultado (mesmo dia, 16/09/2026) — os três itens entregues
+
+| PR  | Item                                                                                   | Merge     |
+| --- | -------------------------------------------------------------------------------------- | --------- |
+| #48 | A — função em `gru1` (`vercel.json`)                                                   | `e39bd56` |
+| #49 | B — uma validação por requisição (`React.cache`) e consultas em paralelo               | `307338d` |
+| #50 | C — `getClaims()` no proxy; `getUser()` no layout e, com estado, em `/login`/`/signup` | `75869fc` |
+
+Medido em produção com o mesmo script, mesma máquina, função quente
+(mediana de 3 cargas por tela e de 10 buscas):
+
+| Medida                               | Antes        | Só #48       | #48 + #49 + #50 |
+| ------------------------------------ | ------------ | ------------ | --------------- |
+| Busca do caixa, última tecla → lista | 557 ms       | 281 ms       | **BUSCA**       |
+| TTFB do caixa                        | 1,24 s       | 0,26 s       | **CAIXA**       |
+| TTFB de produtos                     | 1,56 s       | 0,26 s       | **PRODUTOS**    |
+| TTFB do painel                       | 1,16 s       | 0,23 s       | **PAINEL**      |
+| TTFB do estoque                      | 1,00 s       | 0,28 s       | **ESTOQUE**     |
+| TTFB do financeiro                   | 0,93 s       | 0,26 s       | **FINANCEIRO**  |
+| Navegação interna para o caixa       | 1,9–2,4 s    | 0,85 s       | **NAV**         |
+| Login → painel                       | 7,9 s        | 2,5 s        | **LOGIN**       |
+| Região (`x-vercel-id`)               | `gru1::iad1` | `gru1::gru1` | `gru1::gru1`    |
+
+Dos ~260 ms da busca, 220 ms são o `debounce` proposital: a viagem ao
+servidor ficou em ~40 ms. O que resta é a partida a frio do plano Hobby
+(1–2 s depois de alguns minutos sem uso), que nenhuma das três mudanças
+toca — mas o que vem depois dela caiu de ~1,2 s para ~0,2 s.
+
+A navegação interna (clique no menu) ainda alterna entre ~0,35 s e ~0,85 s
+com o mesmo servidor respondendo em ~0,15 s. **Hipótese, não medida:** a
+coreografia do cliente — o loader que espera 400 ms para aparecer e o
+ com fade de 300 ms — e não o servidor. Se incomodar, é o
+próximo lugar para medir.
+
+### O que a entrega do item C ensinou
+
+A prova da garantia de segurança (apagar as sessões no Auth com o cookie
+intacto) revelou um laço: o layout mandava para `/login`, o proxy via
+assinatura válida e devolvia para `/dashboard`, e o navegador parava em
+`ERR_TOO_MANY_REDIRECTS`. Ninguém entrava, mas a tela de entrar não
+aparecia. Corrigido no próprio PR: em `/login` e `/signup` o proxy confere
+com estado e limpa os cookies mortos. **A suíte e2e não pegou isso** — só a
+prova dedicada pegou. Fica a lição: mudança em autenticação pede prova do
+cenário de revogação, não só dos cenários felizes.

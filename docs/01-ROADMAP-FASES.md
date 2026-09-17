@@ -805,6 +805,48 @@ mas duas execuções seguidas em poucos minutos estouram
 execução. Ao investigar falha, **espaçar as rodadas** (~5 min) antes de
 concluir que o código quebrou.
 
+## Desempenho — varredura de 2026-09-16 ✅ ENTREGUE (PRs #48, #49, #50)
+
+O dono sentia "alguns segundos" na busca de produto do caixa. Prognóstico
+completo, com as medições, em **`docs/11-PROGNOSTICO-DESEMPENHO.md`**;
+script que mede em produção com usuário descartável em
+**`scripts/desempenho/`**. A varredura de segurança pedida na sequência
+está em **`docs/12-VARREDURA-DE-SEGURANCA-2026-09.md`**.
+
+**A causa, medida:** a função da Vercel rodava em `iad1` (Virgínia) e o
+Supabase fica em `sa-east-1` (São Paulo) — cada consulta cruzava o
+continente, e o caixa fazia seis em série ao abrir (quatro delas o mesmo
+`getUser()`). Banco (0,4 ms) e bundle (75 KB gzip na rota) inocentes.
+
+| PR | O que muda | Merge |
+|---|---|---|
+| **#48 — região** | `vercel.json` com `regions: ["gru1"]` (Hobby permite uma). Só config. | `e39bd56` |
+| **#49 — cascata** | `createClient` e `obterUsuario()` em `React.cache()` (uma validação por requisição); `Promise.all` no caixa, layout e produtos; `findProductByCode` em paralelo com `product_barcodes!inner` | `307338d` |
+| **#50 — proxy** | `getClaims()` no proxy (assinatura ES256 verificada localmente, sem rede); `getUser()` continua no layout e, com estado, em `/login`/`/signup` para fechar o laço da sessão revogada | `75869fc` |
+
+| Medida (produção, função quente) | Antes | Depois |
+|---|---|---|
+| Busca do caixa, última tecla → lista | 557 ms | **265 ms** (220 ms são o debounce) |
+| TTFB do caixa | 1,24 s | **0,15 s** |
+| TTFB de produtos | 1,56 s | **0,22 s** |
+| Navegação interna para o caixa | 1,9–2,4 s | **0,35–0,89 s** |
+| Região (`x-vercel-id`) | `gru1::iad1` | `gru1::gru1` |
+
+### Decisões e lições que a próxima sessão não deve refazer
+
+1. **A região é a alavanca.** Antes de qualquer otimização de código, conferir
+   `x-vercel-id`: se a função não está onde o banco está, nada mais importa.
+2. **`getClaims()` só no proxy; `getUser()` no layout.** A conferência
+   com estado (sessão apagada, conta removida) tem de existir em algum
+   lugar por página, e o layout é esse lugar. Em `/login` e `/signup` o
+   proxy também confere com estado e limpa os cookies mortos — sem isso a
+   sessão revogada virava `ERR_TOO_MANY_REDIRECTS` (provado antes de
+   corrigir). O `CLAUDE.md` (regra 3) e o `docs/05` foram alinhados.
+3. **Não baixar o catálogo para o navegador.** Faria a busca instantânea,
+   mas muda a dinâmica (preço alterado em outro aparelho demora a aparecer).
+   Só se, depois disto, ainda incomodar.
+4. **Medir com o mesmo script antes e depois**, uma mudança por vez.
+
 ## Evoluções pós-MVP (fora do escopo das 9 fases)
 
 - ~~**Preferências do usuário — taxas por forma de pagamento.**~~ ✅ **JÁ
