@@ -80,6 +80,23 @@ Este documento é a prova desse esforço.
   padrão é 1 h). Isso já valia para o banco, que sempre verificou só a
   assinatura; o proxy passou a ter a mesma janela, o layout não.
 
+### 1.1. Privilégio de execução das funções (desde 2026-09-17, migration 0024)
+- As **25 funções do Gaveta** no schema `public` perderam `EXECUTE` para
+  `PUBLIC` e para o papel `anon`. Quem não tem sessão recebe
+  `42501 permission denied for function` antes de qualquer lógica rodar.
+  Conferido no ambiente real: `sales_summary`, `data_loja`,
+  `produtos_sem_custo` e `rls_auto_enable` respondem HTTP 401 ao anônimo.
+- `authenticated` e `service_role` mantêm `EXECUTE`: é por ali que o app
+  funciona. Conferido no catálogo: 25 de 25.
+- **Revogar só de `anon` não teria efeito**: o catálogo mostrava o privilégio
+  concedido a `PUBLIC` **e** a `anon` ao mesmo tempo.
+- As 4 funções `fiado_*` não foram tocadas: o projeto Supabase é
+  compartilhado com o FiadoApp.
+- O **privilégio padrão do schema não foi alterado** de propósito, pelo mesmo
+  motivo: ele vale para o papel `postgres` inteiro e afetaria as funções
+  futuras do outro app. A regra para as próximas RPCs do Gaveta está na
+  regra 5.1 do `CLAUDE.md`.
+
 ### 2. Autorização no banco — Row Level Security (RLS)
 - **RLS habilitado em todas as tabelas** (`profiles`, `products`, `sales`,
   `sale_items`, `product_barcodes`, …).
@@ -207,6 +224,9 @@ Segurança sem verificação é torcida. Cada controle foi exercitado:
 | Política de senha (força mínima, feedback acessível) | ✅ Concluído e verificado |
 | `/security-review` (varredura) + correção de achados | ✅ Concluído (sem achados) |
 | Backup do banco e plano de recuperação | ⏳ Planejado (Fase 8) |
+| Sessão verificada em duas camadas (`getClaims` no proxy, `getUser` no layout) | ✅ Concluído e verificado (PR #50) |
+| Funções do Gaveta sem `EXECUTE` para o anônimo | ✅ Concluído e verificado (migration 0024) |
+| Contas descartáveis de teste fora do banco, com trava automática | ✅ Concluído (200 removidas em 17/09) |
 
 ---
 
