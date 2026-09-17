@@ -236,8 +236,7 @@ toca — mas o que vem depois dela caiu de ~1,2 s para ~0,2 s.
 
 A navegação interna (clique no menu) ainda alterna entre ~0,35 s e ~0,85 s
 com o mesmo servidor respondendo em ~0,15 s. **Hipótese, não medida:** a
-coreografia do cliente — o loader que espera 400 ms para aparecer e o
- com fade de 300 ms — e não o servidor. Se incomodar, é o
+coreografia do cliente — o loader que espera 400 ms para aparecer e o `template.tsx` com fade de 300 ms — e não o servidor. Se incomodar, é o
 próximo lugar para medir.
 
 ### O que a entrega do item C ensinou
