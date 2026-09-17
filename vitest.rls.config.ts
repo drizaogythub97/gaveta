@@ -10,6 +10,7 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
+    globalSetup: ["./tests/rls/global-setup.ts"],
     setupFiles: ["./tests/rls/setup.ts"],
     include: ["tests/rls/**/*.test.ts"],
     testTimeout: 30_000,

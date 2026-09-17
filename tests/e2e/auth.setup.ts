@@ -5,6 +5,7 @@ import { STATE_FUNCIONAL, STATE_VISUAL } from "../../playwright.config";
 import {
   createTestUser,
   dispensarAvisos,
+  limparContasDeTesteAntigas,
   loginPelaUI,
   saveUsers,
   userClient,
@@ -15,6 +16,11 @@ import {
  * sessão de cada uma. O projeto `cleanup` apaga as duas no fim.
  */
 setup("cria usuários descartáveis e faz login", async ({ browser }) => {
+  // Varre sobras de execuções interrompidas antes de criar as desta vez.
+  const sobras = await limparContasDeTesteAntigas();
+  if (sobras > 0)
+    console.log(`[limpeza] ${sobras} conta(s) de teste antigas removidas.`);
+
   const funcional = await createTestUser("e2e-func");
   const visual = await createTestUser("e2e-visu");
 

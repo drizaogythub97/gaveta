@@ -37,6 +37,12 @@ npm run test:e2e   # Playwright
    `getSession()`.
 4. **Validar toda entrada com Zod no servidor**, não só no cliente.
 5. Nunca commitar `.env*`. Segredos só em `.env.local` (dev) e no painel da Vercel (prod).
+5.1. **RPC nova nasce sem o papel anônimo.** Toda função criada em migration
+   termina com `revoke execute on function public.<nome>(<args>) from public,
+   anon;`. O privilégio PADRÃO do schema ainda concede a `anon`, e ele não foi
+   alterado de propósito: aquele padrão vale para o papel `postgres` inteiro e
+   afetaria também as funções futuras do **FiadoApp**, que divide este banco.
+   Ver a migration `0024` e o achado 6 de `docs/12`.
 6. Mensagens de erro ao usuário são genéricas; não vazar SQL/stack/segredos.
 
 ## Convenções de código

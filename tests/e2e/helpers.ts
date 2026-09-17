@@ -7,12 +7,19 @@ import { USERS_FILE, AUTH_DIR } from "../../playwright.config";
 import {
   createTestUser,
   deleteTestUser,
+  limparContasDeTesteAntigas,
   userClient,
   adminClient,
   type TestUser,
 } from "../rls/helpers";
 
-export { createTestUser, deleteTestUser, userClient, adminClient };
+export {
+  createTestUser,
+  deleteTestUser,
+  limparContasDeTesteAntigas,
+  userClient,
+  adminClient,
+};
 export type { TestUser };
 
 /**

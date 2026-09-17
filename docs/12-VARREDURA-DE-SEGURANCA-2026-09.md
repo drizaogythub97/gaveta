@@ -30,6 +30,19 @@ verificar está dito como tal. A ordem é por retorno sobre esforço.
   (`getClaims`, ES256) e estado no layout (`getUser`), com o laço de
   sessão revogada provado e fechado.
 
+## Estado em 17/09/2026
+
+| #   | Achado                           | Estado                                                                     |
+| --- | -------------------------------- | -------------------------------------------------------------------------- |
+| 1   | Next 16.3.5                      | validado localmente, aguardando o dono                                     |
+| 2   | Cookie sem `Secure`/`httpOnly`   | validado localmente, aguardando o dono                                     |
+| 3   | Confirmação de e-mail            | **o dono decidiu NÃO ligar por enquanto**                                  |
+| 4   | Validade do token (1 h)          | **o dono decidiu DEIXAR como está**                                        |
+| 5   | Contas de teste no banco         | ✅ **feito**: 200 apagadas, sobraram as 3 reais; trava automática na suíte |
+| 6   | Funções executáveis pelo anônimo | ✅ **feito**: migration `0024` aplicada                                    |
+| 7   | `X-Powered-By`                   | pendente                                                                   |
+| 8   | Zod em quatro ações              | pendente                                                                   |
+
 ## Achados, em ordem de prioridade
 
 ### 1. Next.js 16.2.9 com 11 avisos publicados (2 críticos) — atualizar para 16.3.5
