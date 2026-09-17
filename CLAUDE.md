@@ -71,7 +71,7 @@ app/                # rotas (login, signup, dashboard, caixa, estoque, financeir
 components/
   ui/               # shadcn/ui
 lib/
-  supabase/         # clients (server, client, middleware)
+  supabase/         # clients (server, middleware) — não há cliente de navegador
   validations/      # schemas Zod
 supabase/migrations # SQL (0001_init.sql já existe)
 docs/               # planejamento (esta documentação)
