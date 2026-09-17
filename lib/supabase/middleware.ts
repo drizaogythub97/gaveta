@@ -75,9 +75,30 @@ export async function updateSession(
   // verificar, e o `setAll` acima devolve os cookies novos ao navegador — o
   // refresh silencioso continua sendo papel do proxy.
   const { data, error } = await supabase.auth.getClaims();
-  const user = !error && data?.claims?.sub ? { id: data.claims.sub } : null;
+  let user = !error && data?.claims?.sub ? { id: data.claims.sub } : null;
 
   const { pathname, search } = request.nextUrl;
+
+  // Em /login e /signup — e SÓ aqui — a conferência é com estado, como era.
+  //
+  // É o que fecha o laço da sessão revogada: o layout autenticado, ao ver
+  // que a sessão morreu no Auth (Sair em outro aparelho, conta apagada),
+  // manda para /login; se este proxy olhasse só a assinatura, mandaria de
+  // volta para /dashboard, e o navegador acabaria em "muitos
+  // redirecionamentos" em vez de na tela de entrar. Provado localmente
+  // antes desta conferência existir. Como quem já está logado raramente
+  // pede /login, a viagem ao Auth aqui não pesa em nada; e quando a sessão
+  // de fato morreu, os cookies velhos são limpos para a tela de entrar
+  // nascer limpa.
+  if (user && isAuthOnly(pathname)) {
+    const {
+      data: { user: vivo },
+    } = await supabase.auth.getUser();
+    if (!vivo) {
+      await supabase.auth.signOut({ scope: "local" });
+      user = null;
+    }
+  }
 
   if (!user && !isPublic(pathname) && pathname !== "/") {
     const loginUrl = request.nextUrl.clone();
