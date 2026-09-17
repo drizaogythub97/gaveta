@@ -12,6 +12,83 @@ Feita lendo o código do repositório **e as funções vivas do banco**
 > linha** para conferir, e nada aqui foi corrigido ainda — a ordem de ataque é
 > decisão do dono.
 
+> 🆕 **Dois achados NOVOS, de 17/09/2026, ainda NÃO corrigidos.** Saíram da
+> conferência visual que acompanhou a sprint de desempenho, e estão logo
+> abaixo, antes da varredura de 10/09. Nenhum dos dois foi causado por
+> aquelas mudanças: os dois reproduzem no deploy anterior.
+
+## G — O dia continua errado em seis telas (continuação do achado A)
+
+**Gravidade: Alta.** O PR #45 fixou o fuso da loja em
+`lib/dashboard/dates.ts`, mas **seis lugares constroem o próprio
+`Intl.DateTimeFormat` na linha, sem `timeZone`**. Sem o fuso, o formatador
+usa o relógio de quem renderiza: **UTC no servidor da Vercel**.
+
+Provado na tela, em produção, em 16/09/2026: uma venda registrada às
+**21h17 de Brasília** apareceu na lista do Financeiro como **17/09 às
+00:17**, e ainda assim dentro do filtro "Hoje", que é calculado no fuso da
+loja. A tela mostra uma venda de amanhã dentro do dia de hoje.
+
+Renderizam no **servidor**, então erram para todo mundo depois das 21h:
+
+| Arquivo | O que mostra errado |
+|---|---|
+| `app/(app)/financeiro/page.tsx` | data e hora de cada venda na lista |
+| `app/(app)/estoque/movimentacoes/page.tsx` | data e hora de cada movimento |
+| `components/receipt/receipt.tsx` | **o comprovante impresso do cliente** |
+
+Renderizam no **navegador**, então acertam por acidente em aparelho no fuso
+de Brasília e erram em qualquer outro:
+
+| Arquivo | O que mostra |
+|---|---|
+| `app/(app)/caixa/sessao/session-client.tsx` | abertura e fechamento do caixa |
+| `app/(app)/financeiro/fechamento-dias.tsx` | dia da semana e hora |
+| `app/(app)/minha-conta/account-client.tsx` | data da conta |
+
+**Por que escapou do PR #45**: `tests/fuso-da-loja.test.ts` cobre as funções
+da biblioteca, não os formatadores criados dentro das telas.
+
+**Conserto sugerido**: exportar os formatadores de `lib/dashboard/dates.ts` e
+usá-los nos seis lugares, para não haver mais formatador solto que possa
+nascer sem fuso; mais um teste que cubra as telas, e não só a biblioteca.
+
+## H — O Caixa estoura a tela entre 1280 e 1332 pixels
+
+**Gravidade: Média.** Em janela de **1280px exatos**, o conteúdo do Caixa
+começa em **−26px**: o "F" de "Frente de caixa" fica fora da tela e a página
+ganha rolagem lateral. 1280 é resolução comum de notebook.
+
+Medido em produção, e também no deploy anterior à sprint de desempenho, o
+que descarta relação com ela:
+
+| Largura da janela | Borda esquerda da seção | Rolagem lateral |
+|---|---|---|
+| 1279 px | 82 px | não |
+| 1280 px | −26 px | 26 px |
+| 1300 px | −16 px | 16 px |
+| 1366 px | 17 px | não |
+
+**Causa**: a fonte base do sistema é 18px, por acessibilidade. Então
+`xl:-mx-24` em `app/(app)/caixa/page.tsx` vale **108px**, e não os 96px que
+o desenho supunha. O ponto de quebra `xl` é fixo em 1280px, a margem é
+proporcional à fonte, e as duas se desencontram. O limite seguro nessa
+largura é 82px por lado.
+
+**Conserto sugerido**: `xl:-mx-16`, que dá 72px e deixa 10px de folga a
+1280px. O `2xl:-mx-40` pode ficar: a 1536px sobra margem.
+
+**Por que ninguém viu**: não existe imagem de referência do Caixa. As três
+specs visuais cobrem Compras, Fechamento e Produtos. O projeto `desktop` do
+Playwright roda **exatamente a 1280px**, ou seja, a falha estava debaixo da
+câmera o tempo todo — faltava alguém apontá-la para essa tela. Vale fechar a
+lacuna com imagem e verificação de contraste para Caixa, Painel, Estoque e
+Financeiro.
+
+---
+
+## Varredura de 10/09/2026
+
 Legenda de gravidade: **Alta** = número errado na tela ou dado perdido em uso
 normal · **Média** = quebra em volume maior ou em caso de borda ·
 **Baixa** = inconsistência que ainda não morde.
