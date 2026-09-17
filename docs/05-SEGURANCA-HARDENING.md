@@ -47,7 +47,7 @@ Este documento é a prova desse esforço.
 | Ameaça | Mitigação principal |
 |---|---|
 | Acesso aos dados de outro usuário | **Row Level Security** por `user_id` em todas as tabelas |
-| Sessão forjada / token adulterado | `supabase.auth.getUser()` no servidor (valida o token); nunca `getSession()` |
+| Sessão forjada / token adulterado | Assinatura do token **verificada** no servidor: `getClaims()` no proxy (chave pública ES256, sem rede) e `getUser()` no layout autenticado (consulta o Auth); nunca `getSession()` |
 | Entrada maliciosa / malformada | Validação com **Zod no servidor**, não só no cliente |
 | Vazamento de segredos | `service_role`/secret keys só no servidor; sem `NEXT_PUBLIC_` |
 | Força-bruta / abuso de autenticação | **Rate limiting** por IP em login, cadastro e recuperação |
@@ -62,11 +62,23 @@ Este documento é a prova desse esforço.
 
 ### 1. Autenticação e sessão
 - Autenticação via **Supabase Auth** com `@supabase/ssr`.
-- No servidor, as rotas são protegidas com **`supabase.auth.getUser()`**, que
-  revalida o token junto ao provedor — **nunca** confiamos em `getSession()`
-  (que apenas lê o cookie, sem validar).
-- *Middleware* (`proxy.ts` → `lib/supabase/middleware.ts`) redireciona não
-  autenticados e mantém a sessão atualizada, repassando cookies refrescados.
+- No servidor a sessão é sempre **verificada**, em duas camadas (desde
+  2026-09-16, PR #50):
+  - o *proxy* (`proxy.ts` → `lib/supabase/middleware.ts`) usa
+    **`getClaims()`**, que confere a **assinatura** do token com a chave
+    pública do projeto (ES256, JWKS em cache) — sem chamada de rede por
+    requisição. Decide só "entra ou vai para o login", redireciona não
+    autenticados e mantém a sessão atualizada, repassando cookies refrescados;
+  - o **layout autenticado** usa **`obterUsuario()`** (`getUser()` em cache,
+    uma vez por requisição), que consulta o Auth e por isso pega sessão
+    revogada (Sair em outro aparelho, conta apagada) antes de renderizar
+    qualquer página.
+  - **Nunca** confiamos em `getSession()` (que apenas lê o cookie, sem
+    validar).
+- Janela de exposição de um token copiado do aparelho ANTES do Sair: a
+  validade do access token (ajustável em Supabase → Auth → Sessions; o
+  padrão é 1 h). Isso já valia para o banco, que sempre verificou só a
+  assinatura; o proxy passou a ter a mesma janela, o layout não.
 
 ### 2. Autorização no banco — Row Level Security (RLS)
 - **RLS habilitado em todas as tabelas** (`profiles`, `products`, `sales`,

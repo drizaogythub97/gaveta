@@ -89,7 +89,7 @@ Implementadas principalmente na **Fase 7** do roadmap, mas com sementes desde a 
 - Supabase Auth (hashing de senha gerenciado, tokens rotativos).
 - Política de senha mínima (comprimento, complexidade) na tela de cadastro.
 - Recuperação de senha por e-mail.
-- Sempre `supabase.auth.getUser()` para proteger rotas (nunca confiar em `getSession()` no servidor).
+- Sessão sempre **verificada** no servidor: `getClaims()` no proxy (assinatura, sem rede) e `obterUsuario()`/`getUser()` no layout autenticado (consulta o Auth). Nunca confiar em `getSession()` no servidor.
 
 ### S2 — Isolamento de dados (RLS)
 
