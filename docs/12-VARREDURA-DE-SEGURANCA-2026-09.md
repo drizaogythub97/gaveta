@@ -34,8 +34,8 @@ verificar está dito como tal. A ordem é por retorno sobre esforço.
 
 | #   | Achado                           | Estado                                                                     |
 | --- | -------------------------------- | -------------------------------------------------------------------------- |
-| 1   | Next 16.3.5                      | validado localmente, aguardando o dono                                     |
-| 2   | Cookie sem `Secure`/`httpOnly`   | validado localmente, aguardando o dono                                     |
+| 1   | Next 16.3.5                      | ✅ **feito** (PR #55): 0 vulnerabilidades, 28 imagens idênticas            |
+| 2   | Cookie sem `Secure`/`httpOnly`   | ✅ **feito** (PR #56)                                                      |
 | 3   | Confirmação de e-mail            | **o dono decidiu NÃO ligar por enquanto**                                  |
 | 4   | Validade do token (1 h)          | **o dono decidiu DEIXAR como está**                                        |
 | 5   | Contas de teste no banco         | ✅ **feito**: 200 apagadas, sobraram as 3 reais; trava automática na suíte |

@@ -17,6 +17,27 @@ export const createClient = cache(async () => {
   const cookieStore = await cookies();
 
   return createServerClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
+    /**
+     * O cookie de sessão é escondido do JavaScript da página.
+     *
+     * `httpOnly`: o token deixa de ser legível por `document.cookie`. A CSP
+     * estrita já torna um XSS improvável; esta é a segunda tranca, para o
+     * dia em que a primeira falhar. Nada quebra porque o Gaveta não usa
+     * cliente do Supabase no navegador — quem fala com o banco é sempre o
+     * servidor. Os cookies do PRÓPRIO app (tema, modo de exibição, aviso
+     * do ecossistema) não passam por aqui e continuam legíveis, que é o
+     * que sustenta o script anti-piscada.
+     *
+     * `secure` só em produção: em desenvolvimento o servidor é http, e um
+     * cookie `Secure` seria descartado pelo navegador — a suíte e2e local
+     * não conseguiria entrar.
+     *
+     * Ver o achado 2 de `docs/12-VARREDURA-DE-SEGURANCA-2026-09.md`.
+     */
+    cookieOptions: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    },
     cookies: {
       getAll() {
         return cookieStore.getAll();

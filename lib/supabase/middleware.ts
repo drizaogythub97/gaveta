@@ -35,6 +35,13 @@ export async function updateSession(
     publicEnv.supabaseUrl,
     publicEnv.supabaseAnonKey,
     {
+      // Mesmas opções do cliente de servidor (`lib/supabase/server.ts`): as
+      // duas pontas têm de gravar o cookie igual, senão o refresh do proxy
+      // reescreveria o cookie sem as travas.
+      cookieOptions: {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll();

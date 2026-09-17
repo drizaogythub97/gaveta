@@ -141,7 +141,15 @@ Este documento é a prova desse esforço.
 - **CSRF:** os *Server Actions* do Next só aceitam `POST` e **rejeitam
   requisições cross-origin** (comparação `Origin` × `Host`). Verificado: um POST
   com `Origin` forjado retorna erro e **não executa** a ação.
-- **Cookies de sessão** (`@supabase/ssr`): `SameSite=Lax` e `Secure` em produção.
+- **Cookies de sessão** (`@supabase/ssr`): `SameSite=Lax`, **`HttpOnly`** e
+  **`Secure` em produção**, desde 2026-09-17. Até então a documentação
+  afirmava o `Secure` mas o navegador **não** o recebia — foi o achado 2 da
+  varredura, corrigido passando `cookieOptions` aos dois
+  `createServerClient`. Conferido no navegador depois da correção: o cookie
+  de sessão some de `document.cookie` e os cookies do próprio app (tema,
+  modo de exibição) continuam legíveis, que é o que o script anti-piscada
+  precisa. Não há cliente do Supabase no navegador: `lib/supabase/client.ts`
+  era código morto e foi apagado.
   Por design do Supabase SSR, **não são `httpOnly`** (o client de navegador
   precisa lê-los) — por isso a **CSP estrita sem `unsafe-inline` em scripts** é a
   principal defesa contra roubo de token via XSS.
