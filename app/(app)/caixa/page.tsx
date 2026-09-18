@@ -44,8 +44,15 @@ export default async function CaixaPage() {
     // O caixa é a tela mais densa do sistema (duas colunas com números
     // grandes) e herdava o `max-w-5xl` do layout, apertando o total contra o
     // botão de registrar. A partir de 1280px ele toma a folga que a tela já
-    // tem: o recuo é menor que a margem lateral do layout, então nada estoura.
-    <section className="minimal:max-sm:gap-4 flex flex-col gap-6 xl:-mx-24 2xl:-mx-40">
+    // tem.
+    //
+    // O recuo é CONTADO, não escolhido no olho: a fonte base do sistema é
+    // 18px (acessibilidade), então `-mx-16` vale 72px e não 64px. A 1280px o
+    // `main` tem 1116px de conteúdo, e 1116 + 2×72 = 1260 cabe com 10px de
+    // folga. O `-mx-24` que estava aqui valia 108px por lado: dava 1332px e
+    // jogava 26px para fora da tela, com o título começando fora dela. Ver o
+    // achado H de `docs/10-ACHADOS-DE-LOGICA.md`.
+    <section className="minimal:max-sm:gap-4 flex flex-col gap-6 xl:-mx-16 2xl:-mx-40">
       <header>
         <h1 className="minimal:max-sm:text-xl text-3xl font-semibold tracking-tight">
           Frente de caixa

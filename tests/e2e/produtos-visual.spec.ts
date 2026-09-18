@@ -1,9 +1,16 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { STATE_VISUAL } from "../../playwright.config";
 
 import { esperaContrasteAA } from "./a11y";
+import {
+  alvosGrandes,
+  ehMobile,
+  escondeOverlayDoNext,
+  semRolagemHorizontal,
+  usarModo,
+} from "./visual-helpers";
 import { loadUsers, userClient } from "./helpers";
 
 /**
@@ -62,57 +69,10 @@ test.afterAll(async () => {
   }
 });
 
-function ehMobile(): boolean {
-  return test.info().project.name === "mobile";
-}
-
-async function usarModo(page: Page, modo: "simples" | "minimalista") {
-  await page.goto("/produtos");
-  await page.evaluate((valor) => {
-    document.cookie = `gaveta_ui_mode=${valor}; path=/; max-age=31536000; samesite=lax`;
-  }, modo);
-}
-
-async function escondeOverlayDoNext(page: Page) {
-  await page.addStyleTag({
-    content:
-      "nextjs-portal, #__next-build-watcher { display: none !important; }",
-  });
-}
-
-async function semRolagemHorizontal(page: Page) {
-  const estouro = await page.evaluate(
-    () => document.documentElement.scrollWidth - window.innerWidth,
-  );
-  expect(estouro).toBeLessThanOrEqual(1);
-}
-
-/** Acessibilidade (docs/02): alvos de toque com pelo menos 44px de altura. */
-async function alvosGrandes(page: Page) {
-  const pequenos = await page.evaluate(() => {
-    const main = document.querySelector("main");
-    if (!main) return [];
-    const alvos = Array.from(
-      main.querySelectorAll<HTMLElement>("button, input, select, a[href]"),
-    );
-    return alvos
-      .filter((el) => {
-        const r = el.getBoundingClientRect();
-        if (r.width === 0 || r.height === 0) return false;
-        if (el.className.includes("sr-only")) return false;
-        const ehLinkDeTexto =
-          el.tagName === "A" && !el.className.includes("h-1");
-        return !ehLinkDeTexto && r.height < 44;
-      })
-      .map((el) => `${el.tagName}.${el.className}`.slice(0, 80));
-  });
-  expect(pequenos).toEqual([]);
-}
-
 test("listagem com os filtros novos: layout, alvos e regressão visual", async ({
   page,
 }) => {
-  if (ehMobile()) await usarModo(page, "simples");
+  if (ehMobile()) await usarModo(page, "simples", "/produtos");
 
   await page.goto("/produtos");
   await expect(
@@ -134,7 +94,7 @@ test("listagem com os filtros novos: layout, alvos e regressão visual", async (
 test("lista suspensa de categorias aberta: layout e regressão visual", async ({
   page,
 }) => {
-  if (ehMobile()) await usarModo(page, "simples");
+  if (ehMobile()) await usarModo(page, "simples", "/produtos");
 
   await page.goto("/produtos");
   await page.getByRole("button", { name: /^Filtrar por categoria:/ }).click();
@@ -158,7 +118,7 @@ test("lista suspensa de categorias aberta: layout e regressão visual", async ({
 test("confirmação de produto salvo: layout e regressão visual", async ({
   page,
 }) => {
-  if (ehMobile()) await usarModo(page, "simples");
+  if (ehMobile()) await usarModo(page, "simples", "/produtos");
 
   // O mesmo endereço para o qual o formulário manda depois de salvar.
   await page.goto("/produtos?salvo=novo&nome=Bolo%20caseiro");
@@ -180,7 +140,7 @@ test("celular no modo Minimalista mantém o padrão em Produtos", async ({
 }) => {
   test.skip(!ehMobile(), "O modo Minimalista só muda a escala no celular.");
 
-  await usarModo(page, "minimalista");
+  await usarModo(page, "minimalista", "/produtos");
   await page.goto("/produtos");
   await expect(
     page.getByRole("heading", { name: "Produtos", level: 1 }),
