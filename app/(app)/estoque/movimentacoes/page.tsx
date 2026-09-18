@@ -6,6 +6,7 @@ import { Paginacao } from "@/components/app/paginacao";
 import { RegiaoEmEspera } from "@/components/app/regiao-em-espera";
 import { createClient } from "@/lib/supabase/server";
 import { formatQuantity } from "@/lib/products/format";
+import { formatDateTime } from "@/lib/dashboard/dates";
 import {
   STOCK_MOVEMENT_LABELS,
   type StockMovementRow,
@@ -177,13 +178,7 @@ function MovementRow({ movement }: { movement: StockMovementRow }) {
         </span>
         <span className="text-muted-foreground text-sm">
           {STOCK_MOVEMENT_LABELS[movement.type]} ·{" "}
-          {new Intl.DateTimeFormat("pt-BR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          }).format(new Date(movement.created_at))}
+          {formatDateTime(movement.created_at)}
         </span>
       </div>
       <span
