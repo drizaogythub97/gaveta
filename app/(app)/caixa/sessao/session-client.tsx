@@ -12,6 +12,7 @@ import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatDateTime } from "@/lib/dashboard/dates";
 import { Label } from "@/components/ui/label";
 import {
   digitsToBRL,
@@ -48,16 +49,6 @@ type Props = {
 
 type Feedback = { kind: "success" | "error"; message: string } | null;
 
-function formatDateTime(iso: string) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(iso));
-}
-
 function FeedbackBanner({ feedback }: { feedback: Feedback }) {
   if (!feedback) return null;
   return (
@@ -92,7 +83,11 @@ export function SessionClient(props: Props) {
     <div className="flex flex-col gap-6">
       {closeResult ? <CloseSummary {...closeResult} /> : null}
       {session ? (
-        <OpenSessionPanel {...props} session={session} onClosed={setCloseResult} />
+        <OpenSessionPanel
+          {...props}
+          session={session}
+          onClosed={setCloseResult}
+        />
       ) : (
         <OpenForm onOpened={() => setCloseResult(null)} />
       )}
@@ -115,18 +110,18 @@ function CloseSummary({
   return (
     <section
       aria-live="polite"
-      className="ring-foreground/10 bg-card flex flex-col gap-3 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
+      className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-3 rounded-xl p-5 ring-1"
     >
-      <h2 className="minimal:max-sm:text-lg text-xl font-semibold">Caixa fechado</h2>
+      <h2 className="minimal:max-sm:text-lg text-xl font-semibold">
+        Caixa fechado
+      </h2>
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Esperado" value={formatBRL(expected)} />
         <Stat label="Contado" value={formatBRL(counted)} />
         <div
           className={cn(
             "rounded-lg p-3",
-            exact
-              ? "bg-success/10 text-success"
-              : "bg-warning/10 text-warning",
+            exact ? "bg-success/10 text-success" : "bg-warning/10 text-warning",
           )}
         >
           <p className="text-sm opacity-90">Diferença</p>
@@ -210,7 +205,7 @@ function OpenForm({ onOpened }: { onOpened: () => void }) {
   }
 
   return (
-    <section className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1">
+    <section className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1">
       <h2 className="minimal:max-sm:text-lg flex items-center gap-2 text-xl font-semibold">
         <Unlock aria-hidden="true" className="size-6" />
         Abrir o caixa
@@ -270,19 +265,28 @@ function OpenSessionPanel({
   onClosed,
 }: Props & {
   session: CashSession;
-  onClosed: (r: { expected: number; counted: number; difference: number }) => void;
+  onClosed: (r: {
+    expected: number;
+    counted: number;
+    difference: number;
+  }) => void;
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <section className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1">
+      <section className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="minimal:max-sm:text-lg text-xl font-semibold">Caixa aberto</h2>
+          <h2 className="minimal:max-sm:text-lg text-xl font-semibold">
+            Caixa aberto
+          </h2>
           <span className="bg-success/15 text-success rounded-full px-3 py-1 text-sm font-medium">
             Aberto desde {formatDateTime(session.opened_at)}
           </span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Troco inicial" value={formatBRL(session.opening_amount)} />
+          <Stat
+            label="Troco inicial"
+            value={formatBRL(session.opening_amount)}
+          />
           <Stat
             label={`Vendas em dinheiro (${cashSalesCount})`}
             value={formatBRL(cashSalesTotal)}
@@ -306,8 +310,10 @@ function OpenSessionPanel({
       <MovementForm />
 
       {movements.length > 0 ? (
-        <section className="ring-foreground/10 bg-card flex flex-col gap-3 minimal:max-sm:p-4 rounded-xl p-5 ring-1">
-          <h2 className="minimal:max-sm:text-lg text-xl font-semibold">Movimentos do caixa</h2>
+        <section className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-3 rounded-xl p-5 ring-1">
+          <h2 className="minimal:max-sm:text-lg text-xl font-semibold">
+            Movimentos do caixa
+          </h2>
           <ul className="flex flex-col gap-2">
             {movements.map((m) => (
               <li
@@ -339,7 +345,9 @@ function OpenSessionPanel({
                 <span
                   className={cn(
                     "text-lg font-semibold tabular-nums",
-                    m.type === "suprimento" ? "text-success" : "text-destructive",
+                    m.type === "suprimento"
+                      ? "text-success"
+                      : "text-destructive",
                   )}
                 >
                   {m.type === "suprimento" ? "+" : "−"}
@@ -366,7 +374,10 @@ function MovementForm() {
   function submit() {
     setFeedback(null);
     if (digitsToNumber(amountDigits) <= 0) {
-      setFeedback({ kind: "error", message: "Informe um valor maior que zero." });
+      setFeedback({
+        kind: "error",
+        message: "Informe um valor maior que zero.",
+      });
       return;
     }
     const fd = new FormData();
@@ -392,8 +403,10 @@ function MovementForm() {
   }
 
   return (
-    <section className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1">
-      <h2 className="minimal:max-sm:text-lg text-xl font-semibold">Registrar movimento</h2>
+    <section className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1">
+      <h2 className="minimal:max-sm:text-lg text-xl font-semibold">
+        Registrar movimento
+      </h2>
       <p className="text-muted-foreground text-base">
         <strong className="text-foreground font-medium">Sangria</strong> é uma
         retirada de dinheiro da gaveta;{" "}
@@ -458,7 +471,11 @@ function CloseForm({
   onClosed,
 }: {
   expected: number;
-  onClosed: (r: { expected: number; counted: number; difference: number }) => void;
+  onClosed: (r: {
+    expected: number;
+    counted: number;
+    difference: number;
+  }) => void;
 }) {
   const [countedDigits, setCountedDigits] = useState("");
   const [note, setNote] = useState("");
@@ -491,7 +508,7 @@ function CloseForm({
   }
 
   return (
-    <section className="ring-destructive/20 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1">
+    <section className="ring-destructive/20 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1">
       <h2 className="minimal:max-sm:text-lg flex items-center gap-2 text-xl font-semibold">
         <LockKeyhole aria-hidden="true" className="size-6" />
         Fechar o caixa
@@ -529,9 +546,7 @@ function CloseForm({
           <strong
             className={cn(
               "font-semibold tabular-nums",
-              Math.abs(preview) < 0.005
-                ? "text-success"
-                : "text-warning",
+              Math.abs(preview) < 0.005 ? "text-success" : "text-warning",
             )}
           >
             {Math.abs(preview) < 0.005
@@ -559,7 +574,9 @@ function ClosedHistory({ sessions }: { sessions: CashSession[] }) {
   if (sessions.length === 0) return null;
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="minimal:max-sm:text-lg text-xl font-semibold">Caixas fechados recentes</h2>
+      <h2 className="minimal:max-sm:text-lg text-xl font-semibold">
+        Caixas fechados recentes
+      </h2>
       <ul className="flex flex-col gap-2">
         {sessions.map((s) => {
           const diff = Number(s.difference_amount ?? 0);
@@ -567,7 +584,7 @@ function ClosedHistory({ sessions }: { sessions: CashSession[] }) {
           return (
             <li
               key={s.id}
-              className="ring-foreground/10 bg-card flex flex-col gap-2 minimal:max-sm:p-3.5 rounded-xl p-4 ring-1 sm:flex-row sm:items-center sm:justify-between"
+              className="ring-foreground/10 bg-card minimal:max-sm:p-3.5 flex flex-col gap-2 rounded-xl p-4 ring-1 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex flex-col">
                 <span className="text-foreground text-base font-medium">

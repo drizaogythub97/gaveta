@@ -12,6 +12,13 @@ export default defineConfig({
     },
   },
   test: {
+    // A suíte roda no relógio do SERVIDOR (UTC), não no desta máquina.
+    //
+    // Sem isto, um formatador de data sem fuso fixo passa aqui (a máquina do
+    // dono está em Brasília) e mostra o dia errado em produção — foi assim
+    // que o achado G sobreviveu ao PR #45. Rodar em UTC faz o teste ver o
+    // que a Vercel vê.
+    env: { TZ: "UTC" },
     environment: "jsdom",
     globals: true,
     setupFiles: ["./tests/setup.ts"],

@@ -264,3 +264,32 @@ export function formatDate(iso: string): string {
 export function formatDateTime(iso: string): string {
   return DATETIME_FMT.format(new Date(iso));
 }
+
+const TIME_FMT = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: FUSO_LOJA,
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+/** Só a hora de um instante, no relógio da loja. */
+export function formatTime(iso: string): string {
+  return TIME_FMT.format(new Date(iso));
+}
+
+/**
+ * Dia da semana de uma data PURA ("YYYY-MM-DD").
+ *
+ * Único formatador daqui que NÃO fixa o fuso, e é de propósito: não há
+ * instante, há uma data de calendário. A data é montada com
+ * `new Date(ano, mês, dia)` — meia-noite no relógio de quem roda — e
+ * formatada no mesmo relógio, então os dois se cancelam e o dia sai certo em
+ * qualquer servidor. Fixar o fuso aqui QUEBRARIA: num servidor UTC a
+ * meia-noite local viraria 21h do dia anterior em São Paulo, e o nome do dia
+ * voltaria um. Não "consertar".
+ */
+const WEEKDAY_FMT = new Intl.DateTimeFormat("pt-BR", { weekday: "long" });
+
+export function formatWeekday(dataPura: string): string {
+  const [ano, mes, dia] = dataPura.split("-").map(Number);
+  return WEEKDAY_FMT.format(new Date(ano, mes - 1, dia));
+}

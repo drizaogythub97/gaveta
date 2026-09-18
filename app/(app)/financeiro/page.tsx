@@ -9,6 +9,7 @@ import {
   PERIOD_LABELS,
   type Period,
   hojeNaLoja,
+  formatDateTime,
   monthStartISO,
   periodTimeZone,
   rangeForPeriod,
@@ -628,14 +629,7 @@ function SaleCard({ sale }: { sale: SaleRow }) {
             />
           </div>
           <p className="text-muted-foreground text-sm">
-            {new Intl.DateTimeFormat("pt-BR", {
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            }).format(new Date(sale.created_at))}{" "}
-            · {itemsLabel}
+            {formatDateTime(sale.created_at)} · {itemsLabel}
           </p>
           {Number(sale.discount_amount) > 0 ? (
             <p className="text-muted-foreground text-sm">

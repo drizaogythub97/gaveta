@@ -9,6 +9,7 @@ import { PasswordField } from "@/components/auth/password-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatDate } from "@/lib/dashboard/dates";
 
 import {
   changeEmail,
@@ -23,12 +24,6 @@ type Props = {
   createdAt: string | null;
   privacyAcceptedAt: string | null;
 };
-
-const DATE_FMT = new Intl.DateTimeFormat("pt-BR", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
 
 type Toast = { kind: "success" | "error"; message: string } | null;
 
@@ -292,7 +287,7 @@ export function AccountClient({
               <p>
                 Conta criada em{" "}
                 <strong className="text-foreground font-medium">
-                  {DATE_FMT.format(new Date(createdAt))}
+                  {formatDate(createdAt)}
                 </strong>
                 .
               </p>
@@ -301,7 +296,7 @@ export function AccountClient({
               <p>
                 Política de privacidade aceita em{" "}
                 <strong className="text-foreground font-medium">
-                  {DATE_FMT.format(new Date(privacyAcceptedAt))}
+                  {formatDate(privacyAcceptedAt)}
                 </strong>
                 .
               </p>

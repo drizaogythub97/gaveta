@@ -3,7 +3,12 @@
 import { ChevronDown, Package, TrendingUp } from "lucide-react";
 import { useState } from "react";
 
-import { formatDate, formatDateOnly } from "@/lib/dashboard/dates";
+import {
+  formatDate,
+  formatDateOnly,
+  formatTime,
+  formatWeekday,
+} from "@/lib/dashboard/dates";
 import type { FechamentoDia, VendaDoDia } from "@/lib/financeiro/lucro-custo";
 import { formatBRL } from "@/lib/products/format";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types/sales";
@@ -18,19 +23,6 @@ import { detalheDoDia } from "./fechamento-actions";
  * com as mesmas regras do total do topo, então a soma fecha). As vendas de
  * um dia só são buscadas quando aquele dia é aberto.
  */
-
-const DIA_DA_SEMANA = new Intl.DateTimeFormat("pt-BR", { weekday: "long" });
-
-/** Nome do dia sem passar a data pura por `new Date` (voltaria um dia). */
-function nomeDoDia(dia: string): string {
-  const [ano, mes, d] = dia.split("-").map(Number);
-  return DIA_DA_SEMANA.format(new Date(ano, mes - 1, d));
-}
-
-const HORA = new Intl.DateTimeFormat("pt-BR", {
-  hour: "2-digit",
-  minute: "2-digit",
-});
 
 export function FechamentoDias({
   dias,
@@ -58,8 +50,8 @@ export function FechamentoDias({
         Dia a dia
       </h3>
       <p className="text-muted-foreground text-base">
-        Toque em um dia para ver as vendas daquele dia, uma a uma, com o que
-        foi custo e o que foi lucro.
+        Toque em um dia para ver as vendas daquele dia, uma a uma, com o que foi
+        custo e o que foi lucro.
       </p>
       <ul className="flex flex-col gap-2">
         {dias.map((dia) => (
@@ -129,7 +121,7 @@ function LinhaDoDia({
               <span className="text-muted-foreground text-sm">
                 {/* `capitalize` só no dia da semana: aplicado na frase
                     inteira, viraria "Domingo · 1 Venda". */}
-                <span className="capitalize">{nomeDoDia(dia.dia)}</span> ·{" "}
+                <span className="capitalize">{formatWeekday(dia.dia)}</span> ·{" "}
                 {dia.vendas === 1 ? "1 venda" : `${dia.vendas} vendas`}
                 {dia.recebidoFiado > 0 ? " · recebimento a prazo" : ""}
               </span>
@@ -141,7 +133,7 @@ function LinhaDoDia({
         </div>
 
         {/* O mesmo par de números do topo da aba, na escala do dia. */}
-        <div className="@xs:grid-cols-2 grid grid-cols-1 gap-2">
+        <div className="grid grid-cols-1 gap-2 @xs:grid-cols-2">
           <span className="border-warning/40 bg-warning/10 flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
             <span className="text-warning flex items-center gap-1.5 text-sm font-medium">
               <Package aria-hidden="true" className="size-4 shrink-0" />
@@ -215,7 +207,7 @@ function CartaoDaVenda({ venda }: { venda: VendaDoDia }) {
             <>Recebido de venda a prazo de {formatDate(venda.vendidaEm)}</>
           ) : (
             <>
-              {HORA.format(new Date(venda.vendidaEm))} · {rotuloMetodo}
+              {formatTime(venda.vendidaEm)} · {rotuloMetodo}
             </>
           )}
         </span>

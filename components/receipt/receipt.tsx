@@ -1,4 +1,5 @@
 import { formatBRL } from "@/lib/products/format";
+import { formatDateTime } from "@/lib/dashboard/dates";
 import { PAYMENT_METHOD_LABELS } from "@/lib/types/sales";
 import {
   FISCAL_DISCLAIMER,
@@ -15,16 +16,6 @@ const PAPER_CLASS: Record<ReceiptPaper, string> = {
   "58mm": styles.paper58,
   a4: styles.paperA4,
 };
-
-function formatDateTime(iso: string): string {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(iso));
-}
 
 function formatQty(qty: number): string {
   return qty.toString().replace(".", ",");
@@ -69,7 +60,9 @@ export function Receipt({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={brand.logoUrl!} alt="" className={styles.logo} />
           ) : null}
-          {displayName ? <div className={styles.name}>{displayName}</div> : null}
+          {displayName ? (
+            <div className={styles.name}>{displayName}</div>
+          ) : null}
         </div>
       ) : null}
 
@@ -111,7 +104,9 @@ export function Receipt({
             </div>
             <div className={styles.totalRow}>
               <span>Desconto</span>
-              <span className={styles.tabular}>− {formatBRL(data.discount)}</span>
+              <span className={styles.tabular}>
+                − {formatBRL(data.discount)}
+              </span>
             </div>
           </>
         ) : null}

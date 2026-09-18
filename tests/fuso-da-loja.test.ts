@@ -6,6 +6,8 @@ import {
   dayStartISO,
   formatDate,
   formatDateTime,
+  formatTime,
+  formatWeekday,
   hojeNaLoja,
   monthStartISO,
   periodTimeZone,
@@ -106,5 +108,28 @@ describe("fuso da loja", () => {
     expect(formatDate("2026-09-11T02:30:00.000Z")).toBe("10/09/2026");
     expect(formatDateTime("2026-09-11T02:30:00.000Z")).toContain("10/09/2026");
     expect(formatDateTime("2026-09-11T02:30:00.000Z")).toContain("23:30");
+  });
+  it("a venda das 21h17 NAO aparece como do dia seguinte (achado G)", () => {
+    // O caso exato que apareceu na tela em producao: venda registrada as
+    // 21h17 de 16/09 em Brasilia. O servidor da Vercel roda em UTC, onde o
+    // mesmo instante ja e 00:17 do dia 17 -- e era isso que a lista do
+    // Financeiro mostrava, dentro do filtro "Hoje".
+    const instante = "2026-09-17T00:17:00.000Z";
+    expect(formatDateTime(instante)).toBe("16/09/2026, 21:17");
+    expect(formatDate(instante)).toBe("16/09/2026");
+    expect(formatTime(instante)).toBe("21:17");
+  });
+
+  it("a hora sozinha tambem sai no relogio da loja", () => {
+    expect(formatTime("2026-09-11T02:30:00.000Z")).toBe("23:30");
+    expect(formatTime("2026-09-10T12:00:00.000Z")).toBe("09:00");
+  });
+
+  it("o dia da semana de uma data PURA nao anda com o fuso", () => {
+    // 17/09/2026 e uma quinta. Aqui nao ha instante, ha data de calendario:
+    // o formatador do dia da semana e o unico que NAO fixa o fuso, de
+    // proposito. Fixar quebraria num servidor UTC.
+    expect(formatWeekday("2026-09-17")).toBe("quinta-feira");
+    expect(formatWeekday("2026-09-01")).toBe("terça-feira");
   });
 });
