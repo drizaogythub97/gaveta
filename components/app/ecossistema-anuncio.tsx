@@ -50,7 +50,7 @@ export function EcossistemaAnuncio() {
           setDispensado(true);
         }}
         aria-label="Dispensar anúncio"
-        className="text-muted-foreground hover:text-foreground hover:bg-muted absolute top-2 right-2 flex size-9 items-center justify-center rounded-lg"
+        className="text-muted-foreground hover:text-foreground hover:bg-muted absolute top-1.5 right-1.5 flex size-11 items-center justify-center rounded-lg"
       >
         <X aria-hidden="true" className="size-4" />
       </button>

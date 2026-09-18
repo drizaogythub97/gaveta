@@ -3,6 +3,13 @@ import { expect, test, type Page } from "@playwright/test";
 import { STATE_VISUAL } from "../../playwright.config";
 
 import { esperaContrasteAA } from "./a11y";
+import {
+  alvosGrandes,
+  ehMobile,
+  escondeOverlayDoNext,
+  semRolagemHorizontal,
+  usarModo,
+} from "./visual-helpers";
 
 import { enviarNota, loadUsers } from "./helpers";
 
@@ -26,80 +33,14 @@ test.describe.configure({ mode: "serial" });
 
 const DATA_FIXA = "2026-08-20";
 
-function ehMobile(): boolean {
-  return test.info().project.name === "mobile";
-}
-
-/** Modo de exibição do celular (cookie por aparelho, como o tema). */
-async function usarModo(page: Page, modo: "simples" | "minimalista") {
-  await page.goto("/estoque");
-  await page.evaluate((valor) => {
-    document.cookie = `gaveta_ui_mode=${valor}; path=/; max-age=31536000; samesite=lax`;
-  }, modo);
-}
-
 /** Deixa a tela previsível: data fixa e nada de foco piscando no campo. */
 async function estabilizaFormulario(page: Page) {
   await page.locator("#issuedOn").fill(DATA_FIXA);
   await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
 }
 
-/**
- * O indicador de desenvolvimento do Next (balãozinho "N Issues") flutua sobre
- * a página em `npm run dev` e não existe no build de produção — some da foto
- * para o mesmo baseline valer local e contra o Preview.
- */
-async function escondeOverlayDoNext(page: Page) {
-  await page.addStyleTag({
-    content:
-      "nextjs-portal, #__next-build-watcher { display: none !important; }",
-  });
-}
-
-/**
- * Nenhuma tela pode rolar na horizontal — é o sintoma clássico de layout
- * quebrado no celular.
- */
-async function semRolagemHorizontal(page: Page) {
-  const estouro = await page.evaluate(
-    () => document.documentElement.scrollWidth - window.innerWidth,
-  );
-  expect(estouro).toBeLessThanOrEqual(1);
-}
-
-/**
- * Acessibilidade (docs/02): alvos de toque com pelo menos 44px de altura.
- * Confere só o conteúdo da página (o cabeçalho e a barra inferior são do
- * layout, já validados em fases anteriores).
- */
-async function alvosGrandes(page: Page) {
-  const pequenos = await page.evaluate(() => {
-    const main = document.querySelector("main");
-    if (!main) return [];
-    const alvos = Array.from(
-      main.querySelectorAll<HTMLElement>("button, input, select, a[href]"),
-    );
-    return alvos
-      .filter((el) => {
-        const r = el.getBoundingClientRect();
-        if (r.width === 0 || r.height === 0) return false; // invisível
-        // Elementos só para leitor de tela (ex.: o input[type=file] atrás do
-        // botão "Escolher arquivo da nota") não recebem toque: quem é alvo
-        // de ponteiro é o botão visível, e esse sim é medido aqui.
-        if (el.className.includes("sr-only")) return false;
-        // Links de texto corrido (ex.: "Voltar ao estoque") não são alvos
-        // de bloco; a regra de 44px vale para botões e campos.
-        const ehLinkDeTexto =
-          el.tagName === "A" && !el.className.includes("h-1");
-        return !ehLinkDeTexto && r.height < 44;
-      })
-      .map((el) => `${el.tagName}.${el.className}`.slice(0, 80));
-  });
-  expect(pequenos).toEqual([]);
-}
-
 test("entrada por nota: layout, alvos e regressão visual", async ({ page }) => {
-  if (ehMobile()) await usarModo(page, "simples");
+  if (ehMobile()) await usarModo(page, "simples", "/estoque");
 
   await page.goto("/estoque/compras/nova");
   await expect(
@@ -143,7 +84,7 @@ const XML_FIXO = `<?xml version="1.0" encoding="UTF-8"?>
 test("conferência da nota importada: layout, alvos e regressão visual", async ({
   page,
 }) => {
-  if (ehMobile()) await usarModo(page, "simples");
+  if (ehMobile()) await usarModo(page, "simples", "/estoque");
 
   await page.goto("/estoque/compras/nova");
   await enviarNota(page, {
@@ -178,7 +119,7 @@ test("conferência da nota importada: layout, alvos e regressão visual", async 
 test("histórico de notas: layout, alvos e regressão visual", async ({
   page,
 }) => {
-  if (ehMobile()) await usarModo(page, "simples");
+  if (ehMobile()) await usarModo(page, "simples", "/estoque");
 
   await page.goto("/estoque/compras");
   await expect(
@@ -203,7 +144,7 @@ test("histórico de notas: layout, alvos e regressão visual", async ({
 });
 
 test("detalhe da nota: layout e regressão visual", async ({ page }) => {
-  if (ehMobile()) await usarModo(page, "simples");
+  if (ehMobile()) await usarModo(page, "simples", "/estoque");
 
   const { visualPurchaseId } = loadUsers();
   await page.goto(`/estoque/compras/${visualPurchaseId}`);
@@ -223,7 +164,7 @@ test("detalhe da nota: layout e regressão visual", async ({ page }) => {
 test("correção da nota: layout, alvos e regressão visual (H1)", async ({
   page,
 }) => {
-  if (ehMobile()) await usarModo(page, "simples");
+  if (ehMobile()) await usarModo(page, "simples", "/estoque");
 
   const { visualPurchaseId } = loadUsers();
   await page.goto(`/estoque/compras/${visualPurchaseId}/editar`);
@@ -255,7 +196,7 @@ test("correção da nota: layout, alvos e regressão visual (H1)", async ({
 test("confirmação de cancelamento: layout, alvos e regressão visual", async ({
   page,
 }) => {
-  if (ehMobile()) await usarModo(page, "simples");
+  if (ehMobile()) await usarModo(page, "simples", "/estoque");
 
   const { visualPurchaseId } = loadUsers();
   await page.goto(`/estoque/compras/${visualPurchaseId}`);
@@ -286,7 +227,7 @@ test("confirmação de cancelamento: layout, alvos e regressão visual", async (
 test("detalhe da nota cancelada: layout e regressão visual", async ({
   page,
 }) => {
-  if (ehMobile()) await usarModo(page, "simples");
+  if (ehMobile()) await usarModo(page, "simples", "/estoque");
 
   const { visualVoidedPurchaseId } = loadUsers();
   await page.goto(`/estoque/compras/${visualVoidedPurchaseId}`);
@@ -318,7 +259,7 @@ test("celular no modo Minimalista mantém o padrão", async ({ page }) => {
     "O modo Minimalista só existe em viewport de celular.",
   );
 
-  await usarModo(page, "minimalista");
+  await usarModo(page, "minimalista", "/estoque");
   await page.goto("/estoque/compras/nova");
   await expect(
     page.getByRole("heading", { name: "Entrada por nota" }),

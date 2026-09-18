@@ -99,7 +99,7 @@ export function BottomNav({
                 type="button"
                 onClick={() => setMaisAberto(false)}
                 aria-label="Fechar"
-                className="text-muted-foreground hover:text-foreground hover:bg-muted -mr-2 flex size-9 shrink-0 items-center justify-center rounded-lg"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted -mr-2 flex size-11 shrink-0 items-center justify-center rounded-lg"
               >
                 <X aria-hidden="true" className="size-5" />
               </button>
