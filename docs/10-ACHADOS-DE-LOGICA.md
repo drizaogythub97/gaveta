@@ -12,10 +12,24 @@ Feita lendo o código do repositório **e as funções vivas do banco**
 > linha** para conferir, e nada aqui foi corrigido ainda — a ordem de ataque é
 > decisão do dono.
 
-> 🆕 **Dois achados NOVOS, de 17/09/2026, ainda NÃO corrigidos.** Saíram da
-> conferência visual que acompanhou a sprint de desempenho, e estão logo
-> abaixo, antes da varredura de 10/09. Nenhum dos dois foi causado por
-> aquelas mudanças: os dois reproduzem no deploy anterior.
+> ✅ **Os dois achados de 17/09 estão CORRIGIDOS e em produção**: o G no
+> PR #57 (merge `99d4143`) e o H no PR #58 (merge `77d712f`). Ficam
+> descritos abaixo porque a causa de cada um vale mais que o conserto — e
+> porque os dois sobreviveram tanto tempo por falta de guarda, não por falta
+> de atenção. Nenhum dos dois foi causado pela sprint de desempenho: os dois
+> reproduziam no deploy anterior.
+>
+> O que entrou junto, e é o que impede a volta:
+>
+> - **G**: `lib/dashboard/dates.ts` virou o único lugar do projeto com
+>   formatador de data, uma **regra de ESLint** proíbe
+>   `Intl.DateTimeFormat` e `toLocale(Date|Time)String` fora dela, e a
+>   **suíte unitária passou a rodar em `TZ=UTC`**, como o servidor. Era a
+>   máquina do dono, em Brasília, que fazia o teste concordar com o bug.
+> - **H**: nasceu `tests/e2e/caixa-visual.spec.ts`, com foto do caixa e
+>   verificação de rolagem lateral, alvo de toque e contraste também no
+>   Painel, no Estoque e no Financeiro. Na primeira execução ela já achou
+>   dois botões abaixo dos 44px do `docs/02`.
 
 ## G — O dia continua errado em seis telas (continuação do achado A)
 

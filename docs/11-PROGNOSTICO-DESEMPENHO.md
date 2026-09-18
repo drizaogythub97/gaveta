@@ -249,3 +249,68 @@ aparecia. Corrigido no próprio PR: em `/login` e `/signup` o proxy confere
 com estado e limpa os cookies mortos. **A suíte e2e não pegou isso** — só a
 prova dedicada pegou. Fica a lição: mudança em autenticação pede prova do
 cenário de revogação, não só dos cenários felizes.
+
+## Abertura do app instalado no celular (18/09/2026) — PR #59, `398229d`
+
+O dono relatou o **app instalado demorando para abrir**. Medido num Pixel 7
+emulado, com **CPU 4× mais lenta e 4G a 150 ms de latência**, sessão já
+iniciada e cache quente.
+
+### Onde o tempo estava
+
+| Caminho de abertura    | Mediana |
+| ---------------------- | ------- |
+| `start_url` era a raiz | 874 ms  |
+| direto em `/dashboard` | 596 ms  |
+
+Decomposição de uma abertura:
+
+| Fase                      | Mediana |
+| ------------------------- | ------- |
+| Espera do servidor (TTFB) | 196 ms  |
+| Baixar o HTML (55 KB)     | 3 ms    |
+| Montar o DOM              | 77 ms   |
+| Primeiro desenho          | 268 ms  |
+| Load completo             | 556 ms  |
+
+**A leitura que importa:** a latência emulada é de 150 ms, então o servidor
+responde em **~46 ms**. No celular o que custa caro não é o servidor, é cada
+**ida e volta de rede** — e o `start_url` gastava uma inteira só para ouvir
+"vá para o painel".
+
+### O que mudou
+
+1. **`start_url` passou a ser `/dashboard`**, com `"id": "/"` junto. Sem o
+   `id`, mudar o `start_url` faria o Chrome tratar como um app diferente e
+   o ícone instalado viraria outro app.
+2. **A raiz é resolvida no proxy**, com a sessão que aquela requisição já
+   verificou. Antes ela renderizava uma página que chamava o Auth de novo só
+   para responder um redirecionamento. Isso é o que alcança o **app Android
+   (TWA)**, que tem a URL de abertura gravada dentro dele e continua
+   entrando pela raiz.
+3. **O service worker parou de interceptar tudo.** O handler continua
+   existindo, que é o que mantém o app instalável, mas não chama
+   `respondWith`.
+4. **As logos viraram import estático**, ganhando URL com hash e
+   `max-age=31536000, immutable`. Antes o otimizador respondia
+   `max-age=0` e o navegador perguntava por elas a cada abertura.
+
+### Três coisas medidas e DESCARTADAS
+
+- **O prefetch do menu não é o vilão.** Toda abertura dispara **11
+  prefetches**, um por tela, duas vezes cada. Parecia o culpado óbvio; não
+  é: 603 ms com prefetch contra 622 ms sem, e a troca de tela ficou igual.
+  Fica como está — e ainda ajuda, porque mantém a função quente no Hobby.
+- **Cache dos arquivos de `/public`**: nenhum deles é pedido na abertura.
+  Mexer ali não traria nada.
+- **`images.minimumCacheTTL` e regra de `headers()` para `/_next/image`**:
+  nenhuma das duas muda o `Cache-Control` que chega ao navegador — quem
+  responde aquele cabeçalho é o otimizador. Foram removidas depois de
+  medidas. Quem resolveu foi o import estático.
+
+### O que sobra, e é do plano
+
+A **partida a frio** do plano Hobby continua somando 1 a 2 s quando o app
+fica horas sem uso — é o que aparece como lentidão na primeira abertura do
+dia. Não há saída gratuita: o cron da Vercel no Hobby roda uma vez por dia,
+então não serve para manter a função quente.
