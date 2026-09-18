@@ -86,6 +86,23 @@ export async function updateSession(
 
   const { pathname, search } = request.nextUrl;
 
+  // A raiz não mostra nada: ela existe só para mandar a pessoa ao lugar
+  // certo. Decidir aqui, com a sessão que ESTA requisição já verificou,
+  // evita renderizar uma página e pedir o usuário ao Auth de novo só para
+  // depois responder um redirecionamento.
+  //
+  // Vale principalmente para o app instalado no celular: o atalho da tela
+  // inicial aponta para a raiz, e no celular cada ida e volta custa a
+  // latência inteira da rede. O `start_url` do manifesto já vai direto ao
+  // painel, mas o app Android (TWA) tem a URL de abertura gravada dentro
+  // dele e continua entrando por aqui.
+  if (pathname === "/") {
+    const destino = request.nextUrl.clone();
+    destino.pathname = user ? "/dashboard" : "/login";
+    destino.search = "";
+    return NextResponse.redirect(destino);
+  }
+
   // Em /login e /signup — e SÓ aqui — a conferência é com estado, como era.
   //
   // É o que fecha o laço da sessão revogada: o layout autenticado, ao ver

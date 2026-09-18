@@ -29,6 +29,16 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  images: {
+    // A logo do cabeçalho passa pelo otimizador de imagem e vinha com
+    // "max-age=0, must-revalidate": o navegador perguntava por ela a cada
+    // abertura do app. No celular isso é uma ida e volta inteira (~150 ms
+    // medidos) por uma imagem de 3 KB que não muda. 30 dias de cache tiram
+    // essa pergunta do caminho; quando a logo padrão mudar, o arquivo muda
+    // de nome junto.
+    minimumCacheTTL: 2592000,
+  },
+
   // O tesseract.js (leitura de nota por foto, G2c) resolve o caminho do
   // próprio worker a partir do disco. Empacotado, ele procura num caminho
   // reescrito pelo bundler e não se acha ("Cannot find module
