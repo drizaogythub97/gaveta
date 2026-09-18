@@ -1,4 +1,12 @@
 import Image from "next/image";
+
+// Import ESTÁTICO das logos, não caminho em texto. Com o caminho, o
+// otimizador responde `max-age=0` e o navegador pergunta pela logo a cada
+// abertura do app -- uma ida e volta inteira no celular. Importada, ela
+// ganha URL com hash do conteúdo e cache imutável, e some do caminho
+// crítico da abertura.
+import logoColorida from "@/public/logo-mark.png";
+import logoBranca from "@/public/logo-mono-white.png";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -85,14 +93,14 @@ export default async function AppLayout({
               <>
                 {/* Logo padrão Gaveta: colorida no claro, branca no escuro. */}
                 <Image
-                  src="/logo-mark.png"
+                  src={logoColorida}
                   alt=""
                   width={40}
                   height={40}
                   className="minimal:max-sm:size-8 size-10 object-contain dark:hidden"
                 />
                 <Image
-                  src="/logo-mono-white.png"
+                  src={logoBranca}
                   alt=""
                   width={40}
                   height={40}
