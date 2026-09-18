@@ -30,12 +30,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   images: {
-    // A logo do cabeçalho passa pelo otimizador de imagem e vinha com
-    // "max-age=0, must-revalidate": o navegador perguntava por ela a cada
-    // abertura do app. No celular isso é uma ida e volta inteira (~150 ms
-    // medidos) por uma imagem de 3 KB que não muda. 30 dias de cache tiram
-    // essa pergunta do caminho; quando a logo padrão mudar, o arquivo muda
-    // de nome junto.
+    // Quanto tempo a Vercel guarda a imagem JÁ otimizada, para não refazer o
+    // trabalho. Não é isto que manda no cache do NAVEGADOR: esse cabeçalho é
+    // do otimizador, e está sobrescrito em `headers()` mais abaixo.
     minimumCacheTTL: 2592000,
   },
 
@@ -87,6 +84,27 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      {
+        // A logo do cabeçalho passa pelo otimizador de imagem, que responde
+        // `max-age=0, must-revalidate`: o navegador perguntava por ela a
+        // CADA abertura do app. No celular isso é uma ida e volta inteira
+        // (~150 ms medidos) por uma imagem de 3 KB que quase nunca muda.
+        //
+        // Um dia de cache tira essa pergunta do caminho, e o
+        // `stale-while-revalidate` evita o outro extremo: se a logo mudar,
+        // a pessoa vê a antiga uma vez e o navegador já busca a nova por
+        // baixo, em vez de ficar uma semana com a errada.
+        //
+        // Só imagens de `/public` passam por aqui: a logo personalizada da
+        // loja vem do Storage do Supabase por `<img>`, fora do otimizador.
+        source: "/_next/image",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
       },
     ];
   },
