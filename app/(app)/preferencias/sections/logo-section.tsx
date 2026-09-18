@@ -2,6 +2,11 @@
 
 import { Trash2, Upload } from "lucide-react";
 import Image from "next/image";
+
+// Import estático: a logo ganha URL com hash e cache imutável, em vez de
+// ser perguntada ao servidor a cada abertura. Ver app/(app)/layout.tsx.
+import logoColorida from "@/public/logo-mark.png";
+import logoBranca from "@/public/logo-mono-white.png";
 import { useRef, useState, useTransition } from "react";
 import ReactCrop, {
   centerCrop,
@@ -29,9 +34,10 @@ export function LogoSection({ initialLogoUrl }: Props) {
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [crop, setCrop] = useState<Crop>();
   const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
-  const [feedback, setFeedback] = useState<
-    { kind: "error" | "success"; message: string } | null
-  >(null);
+  const [feedback, setFeedback] = useState<{
+    kind: "error" | "success";
+    message: string;
+  } | null>(null);
   const [pending, startTransition] = useTransition();
   const imgRef = useRef<HTMLImageElement>(null);
 
@@ -148,10 +154,13 @@ export function LogoSection({ initialLogoUrl }: Props) {
   return (
     <section
       aria-labelledby="logo-heading"
-      className="ring-foreground/10 bg-card flex flex-col gap-4 minimal:max-sm:p-4 rounded-xl p-5 ring-1"
+      className="ring-foreground/10 bg-card minimal:max-sm:p-4 flex flex-col gap-4 rounded-xl p-5 ring-1"
     >
       <header>
-        <h2 id="logo-heading" className="minimal:max-sm:text-lg text-xl font-semibold">
+        <h2
+          id="logo-heading"
+          className="minimal:max-sm:text-lg text-xl font-semibold"
+        >
           Logo do estabelecimento
         </h2>
         <p className="text-muted-foreground text-base">
@@ -161,8 +170,12 @@ export function LogoSection({ initialLogoUrl }: Props) {
         </p>
       </header>
 
-      {feedback?.kind === "error" ? <ErrorAlert message={feedback.message} /> : null}
-      {feedback?.kind === "success" ? <SuccessAlert message={feedback.message} /> : null}
+      {feedback?.kind === "error" ? (
+        <ErrorAlert message={feedback.message} />
+      ) : null}
+      {feedback?.kind === "success" ? (
+        <SuccessAlert message={feedback.message} />
+      ) : null}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         <div className="flex flex-col items-center gap-2">
@@ -177,14 +190,14 @@ export function LogoSection({ initialLogoUrl }: Props) {
             ) : (
               <>
                 <Image
-                  src="/logo-mark.png"
+                  src={logoColorida}
                   alt="Marca padrão Gaveta"
                   width={80}
                   height={80}
                   className="size-20 object-contain dark:hidden"
                 />
                 <Image
-                  src="/logo-mono-white.png"
+                  src={logoBranca}
                   alt="Marca padrão Gaveta"
                   width={80}
                   height={80}

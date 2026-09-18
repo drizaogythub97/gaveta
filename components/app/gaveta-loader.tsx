@@ -1,6 +1,11 @@
 "use client";
 
 import Image from "next/image";
+
+// Import estático: mesma razão do layout — URL com hash e cache imutável,
+// em vez de uma pergunta ao servidor a cada abertura.
+import logoColorida from "@/public/logo-mark.png";
+import logoBranca from "@/public/logo-mono-white.png";
 import { useEffect, useState } from "react";
 
 import styles from "./gaveta-loader.module.css";
@@ -27,7 +32,7 @@ function Logo({ size, className }: { size: number; className?: string }) {
   return (
     <>
       <Image
-        src="/logo-mark.png"
+        src={logoColorida}
         alt=""
         width={size}
         height={size}
@@ -36,7 +41,7 @@ function Logo({ size, className }: { size: number; className?: string }) {
         style={{ width: size, height: size }}
       />
       <Image
-        src="/logo-mono-white.png"
+        src={logoBranca}
         alt=""
         width={size}
         height={size}
@@ -82,12 +87,12 @@ function PulseScene() {
       <span className={styles.pulseOpacity}>
         <Logo size={96} className={styles.breathe} />
       </span>
-      <span className="absolute left-10 top-10">
+      <span className="absolute top-10 left-10">
         <span className={`block ${styles.float}`}>
           <Coin />
         </span>
       </span>
-      <span className="absolute right-10 top-12">
+      <span className="absolute top-12 right-10">
         <span className={`block ${styles.float} ${styles.delay05}`}>
           <Coin />
         </span>
@@ -162,7 +167,14 @@ function RingScene() {
           className={`absolute inset-0 size-40 ${styles.spin}`}
           aria-hidden="true"
         >
-          <circle cx="25" cy="25" r="22" fill="none" stroke="#d1d5db" strokeWidth="4" />
+          <circle
+            cx="25"
+            cy="25"
+            r="22"
+            fill="none"
+            stroke="#d1d5db"
+            strokeWidth="4"
+          />
           <circle
             cx="25"
             cy="25"
@@ -178,7 +190,9 @@ function RingScene() {
           <Logo size={80} />
         </span>
       </div>
-      <span className={`text-primary absolute bottom-6 left-[30%] text-xl font-extrabold ${styles.rise}`}>
+      <span
+        className={`text-primary absolute bottom-6 left-[30%] text-xl font-extrabold ${styles.rise}`}
+      >
         $
       </span>
       <span
