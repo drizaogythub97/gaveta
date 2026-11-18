@@ -7,7 +7,7 @@ import { LinkAcao } from "@/components/app/link-acao";
 import { Paginacao } from "@/components/app/paginacao";
 import { RegiaoEmEspera } from "@/components/app/regiao-em-espera";
 import { buttonVariants } from "@/components/ui/button";
-import { escaparLike } from "@/lib/db/like";
+import { padraoSemAcento, termosDaBusca } from "@/lib/db/busca";
 import { formatBRL, formatQuantity } from "@/lib/products/format";
 import { listarTags } from "@/lib/products/tags";
 import { createClient } from "@/lib/supabase/server";
@@ -103,10 +103,11 @@ export default async function ProductsPage({
   if (tagsAtuais.length > 0) {
     query = query.in("filtro.tag_id", tagsAtuais);
   }
-  if (termo !== "") {
-    // A busca corta no banco, não no cliente: só assim a contagem e a
-    // paginação continuam certas com o catálogo inteiro.
-    query = query.ilike("name", `%${escaparLike(termo)}%`);
+  // A busca corta no banco, não no cliente: só assim a contagem e a
+  // paginação continuam certas com o catálogo inteiro. Cada palavra precisa
+  // estar no nome, em qualquer ordem e com ou sem acento (`lib/db/busca.ts`).
+  for (const palavra of termosDaBusca(termo)) {
+    query = query.filter("name", "imatch", padraoSemAcento(palavra));
   }
 
   // Sem filtro de categoria, a lista e as categorias viajam juntas: era uma

@@ -9,6 +9,7 @@ import {
   dayEndISO,
   dayStartISO,
 } from "@/lib/dashboard/dates";
+import { padraoSemAcento, termosDaBusca } from "@/lib/db/busca";
 import { escaparLike, valorParaOr } from "@/lib/db/like";
 import {
   ESTOQUE_PAGE_SIZE,
@@ -83,7 +84,13 @@ export default async function InventoryPage({
     .order("name", { ascending: true });
 
   if (filtros.termo !== "") {
-    const porNome = `name.ilike.${valorParaOr(`%${escaparLike(filtros.termo)}%`)}`;
+    // Pelo nome, cada palavra precisa aparecer — em qualquer ordem, com ou
+    // sem acento (`lib/db/busca.ts`). Pelo código, o termo inteiro.
+    const palavras = termosDaBusca(filtros.termo).map(
+      (palavra) => `name.imatch.${valorParaOr(padraoSemAcento(palavra))}`,
+    );
+    const porNome =
+      palavras.length > 1 ? `and(${palavras.join(",")})` : palavras[0];
     const alternativas =
       idsPorCodigo.length > 0
         ? `${porNome},id.in.(${idsPorCodigo.join(",")})`

@@ -2,7 +2,11 @@
 
 import { z } from "zod";
 
-import { escaparLike } from "@/lib/db/like";
+import {
+  emAlgumaColuna,
+  ordenarPorSemelhanca,
+  termosDaBusca,
+} from "@/lib/db/busca";
 import { createClient } from "@/lib/supabase/server";
 import type { SaleItemInput } from "@/lib/types/db";
 
@@ -16,26 +20,46 @@ export type FiadoCliente = {
 };
 
 const SEARCH_LIMIT = 50;
+/** Com busca, vêm mais nomes do banco para os parecidos irem para cima. */
+const SEARCH_CANDIDATES = 100;
 const COLS = "id, nome, sobrenome, referencia, telefone";
+/** Onde cada palavra da busca pode estar: o apelido mora na referência. */
+const COLUNAS_DA_BUSCA = ["nome", "sobrenome", "referencia"] as const;
+
+function textoDoCliente(c: FiadoCliente): string {
+  return [c.nome, c.sobrenome, c.referencia].filter(Boolean).join(" ");
+}
 
 /**
  * Busca clientes do FiadoApp da PRÓPRIA conta (mesma conta via SSO; RLS por
  * user_id em fiado_clientes). Termo vazio = todos (limitado). Só leitura —
  * o caderno segue nativo do FiadoApp; o caixa apenas o consulta.
+ *
+ * Cada palavra pode estar no nome, no sobrenome OU na referência, com ou
+ * sem acento: "souza" acha pelo sobrenome e "cida" pelo apelido — antes só
+ * o nome entrava na busca. Ver `lib/db/busca.ts`.
  */
 export async function searchFiadoClientes(
   query: string,
 ): Promise<FiadoCliente[]> {
-  const term = query.trim();
+  const termos = termosDaBusca(query);
   const supabase = await createClient();
   let q = supabase
     .from("fiado_clientes")
     .select(COLS)
     .order("nome", { ascending: true })
-    .limit(SEARCH_LIMIT);
-  if (term.length > 0) q = q.ilike("nome", `%${escaparLike(term)}%`);
+    .limit(termos.length > 0 ? SEARCH_CANDIDATES : SEARCH_LIMIT);
+  for (const termo of termos) {
+    q = q.or(emAlgumaColuna(COLUNAS_DA_BUSCA, termo));
+  }
   const { data } = await q;
-  return (data ?? []) as FiadoCliente[];
+  const clientes = (data ?? []) as FiadoCliente[];
+  return termos.length > 0
+    ? ordenarPorSemelhanca(clientes, query, textoDoCliente).slice(
+        0,
+        SEARCH_LIMIT,
+      )
+    : clientes;
 }
 
 const novoClienteSchema = z.object({

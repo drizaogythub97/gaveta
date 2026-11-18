@@ -5,28 +5,39 @@ import {
   PARCELAS_MIN,
   parcelasValidas,
 } from "@/lib/caixa/parcelas";
-import { escaparLike } from "@/lib/db/like";
+import {
+  ordenarPorSemelhanca,
+  padraoNomeExato,
+  padraoSemAcento,
+  termosDaBusca,
+} from "@/lib/db/busca";
 import { createClient } from "@/lib/supabase/server";
 import type { Product, SaleItemInput } from "@/lib/types/db";
 
 const SEARCH_LIMIT = 8;
+/** Quantos nomes vêm do banco para escolher as sugestões mais parecidas. */
+const SEARCH_CANDIDATES = 50;
 
 const PRODUCT_COLUMNS =
   "id, user_id, name, price, cost_price, track_stock, stock_quantity, created_at, updated_at";
 
 export async function searchProductsByName(query: string): Promise<Product[]> {
-  const term = query.trim();
-  if (term.length === 0) return [];
+  const termos = termosDaBusca(query);
+  if (termos.length === 0) return [];
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("products")
-    .select(PRODUCT_COLUMNS)
-    .ilike("name", `%${escaparLike(term)}%`)
+  let consulta = supabase.from("products").select(PRODUCT_COLUMNS);
+  // Cada palavra precisa estar no nome — em qualquer ordem e posição, com
+  // ou sem acento. Ver `lib/db/busca.ts`.
+  for (const termo of termos) {
+    consulta = consulta.filter("name", "imatch", padraoSemAcento(termo));
+  }
+  const { data } = await consulta
     .order("name", { ascending: true })
-    .limit(SEARCH_LIMIT);
+    .limit(SEARCH_CANDIDATES);
 
-  return (data ?? []) as Product[];
+  return ordenarPorSemelhanca((data ?? []) as Product[], query, (p) => p.name)
+    .slice(0, SEARCH_LIMIT);
 }
 
 export async function findProductByCode(
@@ -48,12 +59,14 @@ export async function findProductByCode(
       .eq("product_barcodes.barcode", term)
       .limit(1)
       .maybeSingle(),
+    // Nome inteiro sem diferenciar caixa NEM acento: "racao filhotes" com
+    // Enter acha "Ração Filhotes" em vez de oferecer cadastrar de novo.
     supabase
       .from("products")
       .select(PRODUCT_COLUMNS)
-      .ilike("name", escaparLike(term))
-      .limit(1)
-      .maybeSingle(),
+      .filter("name", "imatch", padraoNomeExato(term))
+      .order("name", { ascending: true })
+      .limit(5),
   ]);
 
   if (porCodigo) {
@@ -65,7 +78,13 @@ export async function findProductByCode(
     return product as Product;
   }
 
-  return (porNome ?? null) as Product | null;
+  // Sem acento, dois cadastros podem casar ("Café" e "Cafe"): o escrito
+  // igualzinho ao que se digitou tem a preferência.
+  const candidatos = (porNome ?? []) as Product[];
+  const identico = candidatos.find(
+    (p) => p.name.trim().toLowerCase() === term.toLowerCase(),
+  );
+  return identico ?? candidatos[0] ?? null;
 }
 
 export type PaymentMethod =
