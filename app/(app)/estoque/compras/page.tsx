@@ -72,7 +72,7 @@ export default async function ComprasPage({
       <header className="flex flex-col gap-3">
         <Link
           href="/estoque"
-          className="text-primary inline-flex w-fit items-center gap-2 text-base font-medium underline-offset-4 hover:underline"
+          className="text-primary -my-2.5 inline-flex w-fit items-center gap-2 py-2.5 text-base font-medium underline-offset-4 hover:underline"
         >
           <ArrowLeft aria-hidden="true" className="size-5" />
           Voltar ao estoque

@@ -90,9 +90,9 @@ export function StockRow({ product }: { product: Product }) {
       )}
     >
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-1 flex-col gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-foreground text-lg font-semibold">
+            <span className="text-foreground min-w-0 text-lg font-semibold wrap-anywhere">
               {product.name}
             </span>
             <StockChip qty={qty} low={low} />
