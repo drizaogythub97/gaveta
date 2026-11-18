@@ -123,7 +123,9 @@ export default async function ProductsPage({
   // porque são poucos e vêm do mais ao menos parecido.
   let linhas = (data ?? []) as unknown as ProductRow[];
   let saoParecidos = false;
-  if (!error && linhas.length === 0 && termo !== "") {
+  // Pela contagem, não pela página: "?page=5" vazia com achados na página 1
+  // não é "nada bate".
+  if (!error && (count ?? 0) === 0 && termo !== "") {
     let aproximada = supabase
       .rpc("produtos_parecidos", { p_busca: termo })
       .select(tagsAtuais.length > 0 ? COLUNAS_FILTRADAS : COLUNAS);
