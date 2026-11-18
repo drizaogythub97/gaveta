@@ -847,6 +847,56 @@ continente, e o caixa fazia seis em série ao abrir (quatro delas o mesmo
    Só se, depois disto, ainda incomodar.
 4. **Medir com o mesmo script antes e depois**, uma mudança por vez.
 
+## Busca sem acento, por pedaço e com erro de digitação (2026-11-16/18) ✅
+
+Pedido do dono, nos dois sistemas: a busca não achava pelo sobrenome, pela
+referência nem sem o acento, e depois — com autorização para instalar o que
+fosse preciso — que achasse "de alguma forma" mesmo com erro de digitação.
+O FiadoApp recebeu a MESMA regra (`lib/busca.ts` de lá, PR #32 do
+`fiadoapp-v2`).
+
+**O que mudou** (regra única em `lib/db/busca.ts`):
+
+| Camada | Como | Onde |
+|---|---|---|
+| Exato | cada palavra contida no nome, em qualquer ordem e posição, sem acento — `imatch` do PostgREST com classes de vogal (`[aáàâãä]`) | caixa, Produtos, Estoque, nota de compra |
+| Parecido | distância de edição com troca de vizinhas (1 erro até 7 letras, 2 depois) e grafias que soam igual (s/z, ph/f, th/t, y/i, k/c, ce/se, letra dobrada); o banco pré-seleciona por trigramas | caixa (completa as 8 sugestões), Produtos e Estoque (só quando nada bate, com aviso) |
+| Cliente do fiado | a lista inteira vem uma vez e filtra na tela, com as duas camadas, por nome, sobrenome **ou referência** | seletor da venda a prazo no caixa |
+
+**Migration 0025** (aplicada e conferida no catálogo em 18/11): extensões
+`unaccent` e `pg_trgm` no schema `extensions`, `texto_de_busca()` imutável,
+índice de trigramas sobre o nome sem acento e a RPC `produtos_parecidos`
+(SECURITY INVOKER, `setof products`, sem o papel anônimo). Provado por HTTP:
+acha com erro de digitação, outra conta não vê nada, sem sessão dá 401 — e
+há teste disso em `tests/rls/isolation-extended.test.ts`.
+
+**Varredura visual** (telas com nome comprido, celular e computador): nome
+sem espaço — comum em nota fiscal — não quebrava a linha e dava rolagem
+lateral em Produtos, Estoque, carrinho e sugestões do caixa e na nota
+(`wrap-anywhere`). Alvos de toque abaixo de 44px (os links "Voltar…", "Ver
+no FiadoApp", a lixeira do a-receber e o logo do topo) cresceram sem mover
+o layout (padding com margem negativa, ou `::after`).
+
+### Decisões que a próxima sessão não deve refazer
+
+1. **A pontuação fica dentro da palavra no filtro exato**: "50%" acha o
+   "50%" do nome, não tudo com "50" (achado E de `docs/10`). Pelo mesmo
+   motivo, no parecido a palavra de até 2 letras só casa inteira e número
+   repetido não encolhe ("500" não vira "50").
+2. **O Enter do caixa continua exato** (nome inteiro, só sem acento e sem
+   caixa): ele põe o produto no carrinho sem confirmar, e parecido ali
+   seria vender a coisa errada.
+3. **Parecido nas listas só quando nada bate**, e a tela diz "escrito
+   assim"; nas sugestões, ele só completa o que faltou.
+4. **Sem coluna nova em `products`**: o índice é de expressão. O exato não
+   depende da 0025 — se ela sumisse, só o parecido pararia.
+
+### Testes
+
+Unitários de busca (`tests/busca-sem-acento.test.ts`, 26), 9 e2e em
+`busca-sem-acento.spec.ts` — todos reprovam no código antigo —, e os de
+RLS da RPC nova.
+
 ## Evoluções pós-MVP (fora do escopo das 9 fases)
 
 - ~~**Preferências do usuário — taxas por forma de pagamento.**~~ ✅ **JÁ
