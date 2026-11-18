@@ -2,11 +2,7 @@
 
 import { z } from "zod";
 
-import {
-  emAlgumaColuna,
-  ordenarPorSemelhanca,
-  termosDaBusca,
-} from "@/lib/db/busca";
+import { todasAsLinhas } from "@/lib/db/paginado";
 import { createClient } from "@/lib/supabase/server";
 import type { SaleItemInput } from "@/lib/types/db";
 
@@ -19,47 +15,31 @@ export type FiadoCliente = {
   telefone: string | null;
 };
 
-const SEARCH_LIMIT = 50;
-/** Com busca, vêm mais nomes do banco para os parecidos irem para cima. */
-const SEARCH_CANDIDATES = 100;
 const COLS = "id, nome, sobrenome, referencia, telefone";
-/** Onde cada palavra da busca pode estar: o apelido mora na referência. */
-const COLUNAS_DA_BUSCA = ["nome", "sobrenome", "referencia"] as const;
-
-function textoDoCliente(c: FiadoCliente): string {
-  return [c.nome, c.sobrenome, c.referencia].filter(Boolean).join(" ");
-}
 
 /**
- * Busca clientes do FiadoApp da PRÓPRIA conta (mesma conta via SSO; RLS por
- * user_id em fiado_clientes). Termo vazio = todos (limitado). Só leitura —
- * o caderno segue nativo do FiadoApp; o caixa apenas o consulta.
+ * TODOS os clientes do FiadoApp da PRÓPRIA conta (mesma conta via SSO; RLS
+ * por user_id em fiado_clientes), em ordem de nome. Só leitura — o caderno
+ * segue nativo do FiadoApp; o caixa apenas o consulta.
  *
- * Cada palavra pode estar no nome, no sobrenome OU na referência, com ou
- * sem acento: "souza" acha pelo sobrenome e "cida" pelo apelido — antes só
- * o nome entrava na busca. Ver `lib/db/busca.ts`.
+ * A busca acontece na tela, sobre esta lista, com a MESMA regra do FiadoApp
+ * (`sugerir`, em `lib/db/busca.ts`): cada palavra no nome, no sobrenome ou
+ * na referência, com ou sem acento, e perdoando erro de digitação. Antes ia
+ * uma consulta por tecla, que só olhava o nome e só achava o texto exato.
+ * Um caderno de fiado cabe folgado em memória, e filtrar ali responde na
+ * hora.
  */
-export async function searchFiadoClientes(
-  query: string,
-): Promise<FiadoCliente[]> {
-  const termos = termosDaBusca(query);
+export async function listarFiadoClientes(): Promise<FiadoCliente[]> {
   const supabase = await createClient();
-  let q = supabase
-    .from("fiado_clientes")
-    .select(COLS)
-    .order("nome", { ascending: true })
-    .limit(termos.length > 0 ? SEARCH_CANDIDATES : SEARCH_LIMIT);
-  for (const termo of termos) {
-    q = q.or(emAlgumaColuna(COLUNAS_DA_BUSCA, termo));
-  }
-  const { data } = await q;
-  const clientes = (data ?? []) as FiadoCliente[];
-  return termos.length > 0
-    ? ordenarPorSemelhanca(clientes, query, textoDoCliente).slice(
-        0,
-        SEARCH_LIMIT,
-      )
-    : clientes;
+  const { linhas } = await todasAsLinhas<FiadoCliente>((de, ate) =>
+    supabase
+      .from("fiado_clientes")
+      .select(COLS)
+      .order("nome", { ascending: true })
+      .order("id", { ascending: true })
+      .range(de, ate),
+  );
+  return linhas;
 }
 
 const novoClienteSchema = z.object({

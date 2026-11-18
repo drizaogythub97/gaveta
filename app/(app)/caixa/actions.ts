@@ -9,6 +9,7 @@ import {
   ordenarPorSemelhanca,
   padraoNomeExato,
   padraoSemAcento,
+  parecidos,
   termosDaBusca,
 } from "@/lib/db/busca";
 import { createClient } from "@/lib/supabase/server";
@@ -36,8 +37,26 @@ export async function searchProductsByName(query: string): Promise<Product[]> {
     .order("name", { ascending: true })
     .limit(SEARCH_CANDIDATES);
 
-  return ordenarPorSemelhanca((data ?? []) as Product[], query, (p) => p.name)
-    .slice(0, SEARCH_LIMIT);
+  const exatos = ordenarPorSemelhanca(
+    (data ?? []) as Product[],
+    query,
+    (p) => p.name,
+  );
+  if (exatos.length >= SEARCH_LIMIT) return exatos.slice(0, SEARCH_LIMIT);
+
+  // Achou pouco: completa com os de nome PARECIDO, para quem errou uma letra
+  // ("aroz", "biscoto"). O banco pré-seleciona por trigramas (migration
+  // 0025) e `parecidos` decide. Só vai ao banco de novo quando falta.
+  const { data: candidatos } = await supabase
+    .rpc("produtos_parecidos", { p_busca: query })
+    .select(PRODUCT_COLUMNS);
+  const jaEstao = new Set(exatos.map((p) => p.id));
+  const extras = parecidos(
+    ((candidatos ?? []) as Product[]).filter((p) => !jaEstao.has(p.id)),
+    query,
+    (p) => p.name,
+  );
+  return [...exatos, ...extras].slice(0, SEARCH_LIMIT);
 }
 
 export async function findProductByCode(

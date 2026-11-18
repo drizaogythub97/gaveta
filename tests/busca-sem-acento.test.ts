@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  emAlgumaColuna,
   normalizarBusca,
   ordenarPorSemelhanca,
   padraoNomeExato,
   padraoSemAcento,
+  parecidos,
+  sugerir,
   termosDaBusca,
 } from "@/lib/db/busca";
 
@@ -111,16 +112,76 @@ describe("padraoNomeExato", () => {
   });
 });
 
-describe("emAlgumaColuna", () => {
-  it("monta um `or` com a palavra em cada coluna, entre aspas", () => {
-    expect(emAlgumaColuna(["nome", "sobrenome"], "ze")).toBe(
-      'nome.imatch."z[eéèêë]",sobrenome.imatch."z[eéèêë]"',
-    );
+describe("parecidos (erro de digitação)", () => {
+  const nome = (s: string) => s;
+  const achar = (itens: string[], busca: string) =>
+    parecidos(itens, busca, nome);
+
+  it("perdoa uma letra trocada, faltando, sobrando ou invertida", () => {
+    expect(achar(["Maria Aparecida", "Mario", "Marta"], "maira")).toEqual([
+      "Maria Aparecida",
+    ]);
+    expect(achar(["Arroz Tio João 5kg", "Feijão"], "aroz")).toEqual([
+      "Arroz Tio João 5kg",
+    ]);
+    expect(achar(["Biscoito Recheado", "Bisnaguinha"], "biscoto")).toEqual([
+      "Biscoito Recheado",
+    ]);
   });
 
-  it("protege a barra do escape dentro das aspas do PostgREST", () => {
-    // `\%` no padrão vira `\\%` dentro das aspas — o PostgREST desfaz.
-    expect(emAlgumaColuna(["nome"], "50%")).toBe('nome.imatch."50\\\\%"');
+  it("junta grafias que soam igual", () => {
+    expect(achar(["Maria Souza"], "sousa")).toEqual(["Maria Souza"]);
+    expect(achar(["Tiago Silva"], "thiago")).toEqual(["Tiago Silva"]);
+    expect(achar(["Rafael Santos"], "raphael")).toEqual(["Rafael Santos"]);
+    expect(achar(["Cátia"], "katia")).toEqual(["Cátia"]);
+    expect(achar(["José da Conceição"], "conseissao")).toEqual([
+      "José da Conceição",
+    ]);
+  });
+
+  it("acha enquanto se digita, mesmo com a letra errada no começo", () => {
+    expect(achar(["Biscoito Recheado"], "bisxoi")).toEqual([
+      "Biscoito Recheado",
+    ]);
+  });
+
+  it("acha a palavra escrita colada", () => {
+    expect(achar(["Coca Cola 2L"], "cocacola")).toEqual(["Coca Cola 2L"]);
+  });
+
+  it("não inventa parentesco", () => {
+    expect(achar(["Ana"], "jo")).toEqual([]);
+    // Duas letras de diferença numa palavra de 6 é outra pessoa.
+    expect(achar(["Marcos"], "carlos")).toEqual([]);
+    expect(achar(["Arroz", "Feijão"], "xyzw")).toEqual([]);
+    // Toda palavra digitada precisa ter par.
+    expect(achar(["Maria Souza"], "maira lima")).toEqual([]);
+    // Palavra curta só casa inteira: "50%" não puxa o "500" (achado E).
+    expect(achar(["Zcuringa cafe_500"], "50%")).toEqual([]);
+  });
+
+  it("o mais parecido vem primeiro", () => {
+    expect(achar(["Mariana", "Maria"], "maria")).toEqual(["Maria", "Mariana"]);
+  });
+});
+
+describe("sugerir", () => {
+  const nome = (s: string) => s;
+
+  it("sem nada exato, traz os parecidos", () => {
+    expect(
+      sugerir(["Biscoito Recheado", "Biscoito de Arroz", "Bisnaguinha"], "biscoto", nome, 8),
+    ).toEqual(["Biscoito de Arroz", "Biscoito Recheado"]);
+  });
+
+  it("o exato vem antes e o parecido completa a lista", () => {
+    expect(sugerir(["Marina", "Maria Souza"], "maria", nome, 8)).toEqual([
+      "Maria Souza",
+      "Marina",
+    ]);
+    expect(sugerir(["Marina", "Maria Souza"], "maria", nome, 1)).toEqual([
+      "Maria Souza",
+    ]);
   });
 });
 

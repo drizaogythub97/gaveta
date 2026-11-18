@@ -163,3 +163,61 @@ test("caixa, venda a prazo: acha o cliente pelo sobrenome, pelo apelido e sem ac
   await busca.fill("josefa");
   await expect(josefa).toBeVisible();
 });
+
+// ── Erro de digitação (migration 0025 + `parecidos`) ────────────────────
+
+test("caixa: com uma letra errada, sugere o produto parecido", async ({
+  page,
+}) => {
+  await page.goto("/caixa");
+  // "rasao" no lugar de "racao": nada bate exato, e o parecido aparece.
+  await page.locator("#pos-query").fill("zumbrava rasao");
+  await expect(sugestoes(page).getByRole("button")).toHaveCount(1);
+  await expect(sugestoes(page)).toContainText(RACAO);
+});
+
+test("Produtos: com erro de digitação, mostra os parecidos e avisa", async ({
+  page,
+}) => {
+  await page.goto("/produtos");
+  await page.getByLabel("Buscar por nome").fill("filhotes zumbraba");
+
+  await expect(
+    page.getByRole("status").filter({ hasText: "escrito assim" }),
+  ).toBeVisible();
+  const cartoes = page.getByRole("link", { name: /^Editar / });
+  await expect(cartoes).toHaveCount(1);
+  await expect(cartoes.first()).toHaveAttribute("aria-label", `Editar ${RACAO}`);
+});
+
+test("Estoque: com erro de digitação, mostra os parecidos e avisa", async ({
+  page,
+}) => {
+  await page.goto("/estoque");
+  await page.getByLabel("Nome ou código").fill("pao zunbrava");
+
+  await expect(
+    page.getByRole("status").filter({ hasText: "escrito assim" }),
+  ).toBeVisible();
+  const linhas = page.getByRole("listitem").filter({ hasText: "ZUMBRAVA" });
+  await expect(linhas).toHaveCount(1);
+  await expect(linhas.first()).toContainText(PAO);
+});
+
+test("caixa, venda a prazo: acha o cliente mesmo com erro de digitação", async ({
+  page,
+}) => {
+  await page.goto("/caixa");
+  await page.locator("#pos-query").fill("zumbrava racao");
+  await sugestoes(page).getByRole("button", { name: new RegExp(RACAO) }).click();
+  await page.locator("#payment-method").selectOption("fiado");
+
+  const busca = page.getByLabel("Buscar cliente do FiadoApp");
+  // "maira" (letras invertidas) acha a Maria; "conseisao" acha a Conceição.
+  await busca.fill("maira zumbrava");
+  await expect(
+    page.getByRole("button", { name: /^Maria Aparecida Zumbrava/ }),
+  ).toBeVisible();
+  await busca.fill("conseisao");
+  await expect(page.getByRole("button", { name: /^Joséfa Zumbrava/ })).toBeVisible();
+});

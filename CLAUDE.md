@@ -61,6 +61,12 @@ npm run test:e2e   # Playwright
   foi assim que o intervalo personalizado do Financeiro derrubava a aba
   aberta — e recarrega o documento inteiro. Componentes prontos:
   `FiltroChips` (chips de um parâmetro) e `Paginacao`.
+- **Busca por nome passa por `lib/db/busca.ts`.** Nunca `ilike '%termo%'`
+  com o texto inteiro: ele não acha sem acento nem com as palavras fora de
+  ordem. No banco, `termosDaBusca` + `padraoSemAcento` (um `imatch` por
+  palavra); para erro de digitação, a RPC `produtos_parecidos` (migration
+  0025) filtrada por `parecidos`; lista em memória, `sugerir`. O FiadoApp
+  segue a mesma regra no `lib/busca.ts` de lá.
 
 ## Estrutura de pastas (alvo)
 

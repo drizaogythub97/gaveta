@@ -7,7 +7,7 @@ import { LinkAcao } from "@/components/app/link-acao";
 import { Paginacao } from "@/components/app/paginacao";
 import { RegiaoEmEspera } from "@/components/app/regiao-em-espera";
 import { buttonVariants } from "@/components/ui/button";
-import { padraoSemAcento, termosDaBusca } from "@/lib/db/busca";
+import { padraoSemAcento, parecidos, termosDaBusca } from "@/lib/db/busca";
 import { formatBRL, formatQuantity } from "@/lib/products/format";
 import { listarTags } from "@/lib/products/tags";
 import { createClient } from "@/lib/supabase/server";
@@ -117,10 +117,32 @@ export default async function ProductsPage({
     carregandoTags,
   ]);
 
+  // Nenhum nome com essas palavras: em vez da lista vazia, os de nome
+  // PARECIDO — quem digitou "biscoto" quer o "Biscoito". O banco pré-seleciona
+  // por trigramas (RPC da migration 0025) e `parecidos` decide; sem paginação,
+  // porque são poucos e vêm do mais ao menos parecido.
+  let linhas = (data ?? []) as unknown as ProductRow[];
+  let saoParecidos = false;
+  if (!error && linhas.length === 0 && termo !== "") {
+    let aproximada = supabase
+      .rpc("produtos_parecidos", { p_busca: termo })
+      .select(tagsAtuais.length > 0 ? COLUNAS_FILTRADAS : COLUNAS);
+    if (tagsAtuais.length > 0) {
+      aproximada = aproximada.in("filtro.tag_id", tagsAtuais);
+    }
+    const { data: candidatos } = await aproximada;
+    linhas = parecidos(
+      (candidatos ?? []) as unknown as ProductRow[],
+      termo,
+      (p) => p.name,
+    ).slice(0, PAGE_SIZE);
+    saoParecidos = linhas.length > 0;
+  }
+
   // O total vem do `count` da própria consulta (exato, com o filtro
   // aplicado); a página é limitada depois, para "?page=99" mostrar a última
   // em vez de uma tela vazia.
-  const totalProdutos = count ?? 0;
+  const totalProdutos = saoParecidos ? linhas.length : (count ?? 0);
   const totalPaginas = Math.max(1, Math.ceil(totalProdutos / PAGE_SIZE));
   const paginaAtual = Math.min(paginaPedida, totalPaginas);
 
@@ -129,9 +151,7 @@ export default async function ProductsPage({
   // supabase-js não conhece o embed com apelido (`filtro:…!inner`) e devolve
   // um ParserError no lugar da linha. O formato real é o de sempre — o
   // apelido só filtra, não muda as colunas.
-  const products: ProductWithTags[] = (
-    (data ?? []) as unknown as ProductRow[]
-  ).map((p) => ({
+  const products: ProductWithTags[] = linhas.map((p) => ({
     ...p,
     barcodes: (p.product_barcodes ?? []).map((b) => b.barcode),
     tags: (p.product_tag_links ?? [])
@@ -235,15 +255,24 @@ export default async function ProductsPage({
         </div>
       ) : (
         <RegiaoEmEspera>
+          {saoParecidos ? (
+            <p
+              role="status"
+              className="bg-muted/40 rounded-xl px-4 py-3 text-base"
+            >
+              Nenhum produto com “{termo}” escrito assim. Estes têm o nome
+              parecido:
+            </p>
+          ) : null}
           <ul className="minimal:max-sm:gap-2 flex flex-col gap-3">
             {products.map((p) => (
               <li
                 key={p.id}
                 className="minimal:max-sm:gap-2 minimal:max-sm:p-3.5 ring-foreground/10 bg-card flex flex-col gap-3 rounded-xl p-4 ring-1 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex flex-col gap-2">
+                <div className="flex min-w-0 flex-col gap-2">
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="minimal:max-sm:text-base text-foreground text-xl font-semibold">
+                    <span className="minimal:max-sm:text-base text-foreground min-w-0 text-xl font-semibold wrap-anywhere">
                       {p.name}
                     </span>
                     <StockBadge product={p} />
