@@ -67,13 +67,20 @@ export async function loginPelaUI(page: Page, user: TestUser): Promise<void> {
 }
 
 /**
- * O aviso de personalização é um toast que fica na tela até o usuário
- * responder — atrapalharia clique e screenshot. Dispensa por armazenamento
- * local (o mesmo que o botão "Não mostrar novamente" faz).
+ * Os avisos que ficam na tela até o usuário responder — o de personalização
+ * e o do modo tela cheia do caixa — atrapalhariam clique e screenshot.
+ * Dispensa por armazenamento local (o mesmo que o botão "Não mostrar
+ * novamente" faz).
+ *
+ * O do caixa entrou aqui em 18/11/2026: no build de PRODUÇÃO ele aparece
+ * na foto do caixa no celular (visto contra o Preview e contra a produção,
+ * com o código da `main`); contra o `next dev` ele não chegava à foto, e
+ * por isso a suíte local nunca reprovou.
  */
 export async function dispensarAvisos(page: Page): Promise<void> {
   await page.evaluate(() => {
     localStorage.setItem("gaveta:personalization-tip:dismissed", "1");
+    localStorage.setItem("gaveta:caixa-fullscreen-tip:dismissed", "1");
   });
 }
 
