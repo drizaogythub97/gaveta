@@ -847,7 +847,7 @@ continente, e o caixa fazia seis em série ao abrir (quatro delas o mesmo
    Só se, depois disto, ainda incomodar.
 4. **Medir com o mesmo script antes e depois**, uma mudança por vez.
 
-## Busca sem acento, por pedaço e com erro de digitação (2026-11-16/18) ✅
+## Busca sem acento, por pedaço e com erro de digitação (2026-11-16/18) ✅ PR #62
 
 Pedido do dono, nos dois sistemas: a busca não achava pelo sobrenome, pela
 referência nem sem o acento, e depois — com autorização para instalar o que
