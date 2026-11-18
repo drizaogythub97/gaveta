@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 
-import { escaparLike } from "@/lib/db/like";
+import { todasAsLinhas } from "@/lib/db/paginado";
 import { createClient } from "@/lib/supabase/server";
 import type { SaleItemInput } from "@/lib/types/db";
 
@@ -15,27 +15,31 @@ export type FiadoCliente = {
   telefone: string | null;
 };
 
-const SEARCH_LIMIT = 50;
 const COLS = "id, nome, sobrenome, referencia, telefone";
 
 /**
- * Busca clientes do FiadoApp da PRÓPRIA conta (mesma conta via SSO; RLS por
- * user_id em fiado_clientes). Termo vazio = todos (limitado). Só leitura —
- * o caderno segue nativo do FiadoApp; o caixa apenas o consulta.
+ * TODOS os clientes do FiadoApp da PRÓPRIA conta (mesma conta via SSO; RLS
+ * por user_id em fiado_clientes), em ordem de nome. Só leitura — o caderno
+ * segue nativo do FiadoApp; o caixa apenas o consulta.
+ *
+ * A busca acontece na tela, sobre esta lista, com a MESMA regra do FiadoApp
+ * (`sugerir`, em `lib/db/busca.ts`): cada palavra no nome, no sobrenome ou
+ * na referência, com ou sem acento, e perdoando erro de digitação. Antes ia
+ * uma consulta por tecla, que só olhava o nome e só achava o texto exato.
+ * Um caderno de fiado cabe folgado em memória, e filtrar ali responde na
+ * hora.
  */
-export async function searchFiadoClientes(
-  query: string,
-): Promise<FiadoCliente[]> {
-  const term = query.trim();
+export async function listarFiadoClientes(): Promise<FiadoCliente[]> {
   const supabase = await createClient();
-  let q = supabase
-    .from("fiado_clientes")
-    .select(COLS)
-    .order("nome", { ascending: true })
-    .limit(SEARCH_LIMIT);
-  if (term.length > 0) q = q.ilike("nome", `%${escaparLike(term)}%`);
-  const { data } = await q;
-  return (data ?? []) as FiadoCliente[];
+  const { linhas } = await todasAsLinhas<FiadoCliente>((de, ate) =>
+    supabase
+      .from("fiado_clientes")
+      .select(COLS)
+      .order("nome", { ascending: true })
+      .order("id", { ascending: true })
+      .range(de, ate),
+  );
+  return linhas;
 }
 
 const novoClienteSchema = z.object({

@@ -9,6 +9,7 @@ import {
   dayEndISO,
   dayStartISO,
 } from "@/lib/dashboard/dates";
+import { padraoSemAcento, parecidos, termosDaBusca } from "@/lib/db/busca";
 import { escaparLike, valorParaOr } from "@/lib/db/like";
 import {
   ESTOQUE_PAGE_SIZE,
@@ -76,40 +77,70 @@ export default async function InventoryPage({
     codigosTruncados = truncou;
   }
 
-  let query = supabase
-    .from("products")
-    .select(COLUNAS, { count: "exact" })
-    .eq("track_stock", true)
-    .order("name", { ascending: true });
-
-  if (filtros.termo !== "") {
-    const porNome = `name.ilike.${valorParaOr(`%${escaparLike(filtros.termo)}%`)}`;
-    const alternativas =
-      idsPorCodigo.length > 0
-        ? `${porNome},id.in.(${idsPorCodigo.join(",")})`
-        : porNome;
-    query = query.or(alternativas);
-  }
-
   // As bordas do dia saem no fuso da LOJA (America/Sao_Paulo), não no do
   // servidor — ver `FUSO_LOJA` em `lib/dashboard/dates.ts`. Era daqui que o
   // filtro de data do Estoque herdava o dia virando às 21h de Brasília.
   const inicio = filtros.de === "" ? null : dayStartISO(filtros.de);
   const fim = filtros.ate === "" ? null : dayEndISO(filtros.ate);
-  if (inicio) query = query.gte("created_at", inicio);
-  if (fim) query = query.lte("created_at", fim);
-
-  if (filtros.min !== null) query = query.gte("stock_quantity", filtros.min);
-  if (filtros.max !== null) query = query.lte("stock_quantity", filtros.max);
-  if (filtros.soBaixo) {
-    query = query.lte("stock_quantity", LOW_STOCK_THRESHOLD);
-  }
-
   const offset = (filtros.pagina - 1) * ESTOQUE_PAGE_SIZE;
-  const { data, error, count } = await query.range(
-    offset,
-    offset + ESTOQUE_PAGE_SIZE - 1,
-  );
+
+  // A mesma consulta serve à busca exata e à dos parecidos: só muda como a
+  // busca entra. Os outros filtros, a ordem e a página valem igual.
+  const consultar = (idsParecidos?: string[]) => {
+    let query = supabase
+      .from("products")
+      .select(COLUNAS, { count: "exact" })
+      .eq("track_stock", true)
+      .order("name", { ascending: true });
+
+    if (idsParecidos) {
+      query = query.in("id", idsParecidos);
+    } else if (filtros.termo !== "") {
+      // Pelo nome, cada palavra precisa aparecer — em qualquer ordem, com ou
+      // sem acento (`lib/db/busca.ts`). Pelo código, o termo inteiro.
+      const palavras = termosDaBusca(filtros.termo).map(
+        (palavra) => `name.imatch.${valorParaOr(padraoSemAcento(palavra))}`,
+      );
+      const porNome =
+        palavras.length > 1 ? `and(${palavras.join(",")})` : palavras[0];
+      const alternativas =
+        idsPorCodigo.length > 0
+          ? `${porNome},id.in.(${idsPorCodigo.join(",")})`
+          : porNome;
+      query = query.or(alternativas);
+    }
+
+    if (inicio) query = query.gte("created_at", inicio);
+    if (fim) query = query.lte("created_at", fim);
+    if (filtros.min !== null) query = query.gte("stock_quantity", filtros.min);
+    if (filtros.max !== null) query = query.lte("stock_quantity", filtros.max);
+    if (filtros.soBaixo) {
+      query = query.lte("stock_quantity", LOW_STOCK_THRESHOLD);
+    }
+    return query.range(offset, offset + ESTOQUE_PAGE_SIZE - 1);
+  };
+
+  let { data, error, count } = await consultar();
+
+  // Nenhum nome com essas palavras: em vez da lista vazia, os de nome
+  // PARECIDO — "aroz" acha o "Arroz". O banco pré-seleciona por trigramas
+  // (RPC da migration 0025), `parecidos` decide, e a consulta de sempre roda
+  // de novo só com eles — no máximo 60 ids, longe do teto da URL.
+  let saoParecidos = false;
+  if (!error && (count ?? 0) === 0 && filtros.termo !== "") {
+    const { data: candidatos } = await supabase
+      .rpc("produtos_parecidos", { p_busca: filtros.termo })
+      .select("id, name");
+    const ids = parecidos(
+      (candidatos ?? []) as { id: string; name: string }[],
+      filtros.termo,
+      (p) => p.name,
+    ).map((p) => p.id);
+    if (ids.length > 0) {
+      ({ data, error, count } = await consultar(ids));
+      saoParecidos = (count ?? 0) > 0;
+    }
+  }
 
   // O total vem do `count` da própria consulta (exato, com o filtro
   // aplicado); a página é limitada depois, para "?page=99" mostrar a última
@@ -190,6 +221,15 @@ export default async function InventoryPage({
               Muitos códigos de barras combinam com “{filtros.termo}”. A busca
               por código considerou os {TETO_CODIGOS} primeiros — digite mais
               números para encontrar o produto certo.
+            </p>
+          ) : null}
+          {saoParecidos ? (
+            <p
+              role="status"
+              className="bg-muted/40 rounded-xl px-4 py-3 text-base"
+            >
+              Nenhum produto com “{filtros.termo}” escrito assim. Estes têm o
+              nome parecido:
             </p>
           ) : null}
           {totalPaginas === 1 ? (

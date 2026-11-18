@@ -1,21 +1,30 @@
 "use client";
 
 import { Check, Search, UserPlus } from "lucide-react";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { sugerir } from "@/lib/db/busca";
 
 import {
   criarFiadoCliente,
-  searchFiadoClientes,
+  listarFiadoClientes,
   type FiadoCliente,
 } from "./fiado-actions";
+
+/** Quantos clientes a lista mostra de uma vez (ela rola). */
+const LIMITE_NA_LISTA = 50;
 
 function nomeCompleto(c: FiadoCliente): string {
   const base = c.sobrenome ? `${c.nome} ${c.sobrenome}` : c.nome;
   return c.referencia ? `${base} (${c.referencia})` : base;
+}
+
+/** Onde a busca procura: o apelido mora na referência. */
+function textoDoCliente(c: FiadoCliente): string {
+  return [c.nome, c.sobrenome, c.referencia].filter(Boolean).join(" ");
 }
 
 /**
@@ -33,7 +42,12 @@ export function FiadoClienteCombobox({
   disabled?: boolean;
 }) {
   const [query, setQuery] = useState("");
-  const [resultados, setResultados] = useState<FiadoCliente[]>([]);
+  // O caderno inteiro chega uma vez, na primeira abertura; daí em diante a
+  // busca filtra aqui mesmo, a cada tecla, sem ida ao servidor. Não fica
+  // velho: este bloco só existe com a forma "fiado" escolhida e some quando
+  // a venda fecha, então cliente cadastrado no FiadoApp, em outro aparelho,
+  // já aparece na venda a prazo seguinte.
+  const [clientes, setClientes] = useState<FiadoCliente[] | null>(null);
   const [aberto, setAberto] = useState(false);
   const [cadastrando, setCadastrando] = useState(false);
   const [buscando, startBusca] = useTransition();
@@ -46,21 +60,22 @@ export function FiadoClienteCombobox({
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, startSalvar] = useTransition();
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Busca com debounce enquanto o painel está aberto (sem cliente escolhido).
   useEffect(() => {
-    if (!aberto || value) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      startBusca(async () => {
-        setResultados(await searchFiadoClientes(query));
-      });
-    }, 200);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [query, aberto, value]);
+    if (!aberto || value || clientes !== null) return;
+    startBusca(async () => {
+      setClientes(await listarFiadoClientes());
+    });
+  }, [aberto, value, clientes]);
+
+  // Sem busca, a lista em ordem de nome; com busca, cada palavra no nome,
+  // sobrenome ou referência, sem acento — e, se faltar, os parecidos por erro
+  // de digitação ("maira" acha "Maria"). Ver `lib/db/busca.ts`.
+  const resultados = useMemo(() => {
+    const todos = clientes ?? [];
+    return query.trim() === ""
+      ? todos.slice(0, LIMITE_NA_LISTA)
+      : sugerir(todos, query, textoDoCliente, LIMITE_NA_LISTA);
+  }, [clientes, query]);
 
   function selecionar(c: FiadoCliente) {
     onChange(c);
@@ -86,7 +101,11 @@ export function FiadoClienteCombobox({
         setErro(result.error);
         return;
       }
-      // Cliente criado é selecionado automaticamente.
+      // Cliente criado é selecionado automaticamente — e entra na lista, que
+      // não é mais consultada a cada abertura.
+      setClientes((atuais) =>
+        atuais === null ? null : [...atuais, result.cliente],
+      );
       onChange(result.cliente);
       setCadastrando(false);
       setAberto(false);
@@ -226,8 +245,10 @@ export function FiadoClienteCombobox({
 
       {aberto ? (
         <div className="border-border max-h-60 overflow-y-auto rounded-lg border">
-          {buscando ? (
-            <p className="text-muted-foreground p-3 text-sm">Buscando…</p>
+          {buscando || clientes === null ? (
+            <p className="text-muted-foreground p-3 text-sm">
+              Carregando clientes…
+            </p>
           ) : resultados.length === 0 ? (
             <p className="text-muted-foreground p-3 text-sm">
               {query.trim()

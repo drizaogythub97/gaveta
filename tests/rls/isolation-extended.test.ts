@@ -962,3 +962,54 @@ describe("RLS — correção de nota de compra (editar_compra, H1)", () => {
     expect((itensDaAlice ?? []).length).toBe(1);
   });
 });
+
+/**
+ * Busca por semelhança (migration 0025): a RPC `produtos_parecidos` é
+ * SECURITY INVOKER, então quem a chama só enxerga o que a RLS de `products`
+ * deixa — e o anônimo nem executa (nasceu com revoke de public/anon).
+ */
+describe("RLS — produtos_parecidos (busca com erro de digitação)", () => {
+  it("acha o produto da própria conta pelo nome com erro de digitação", async () => {
+    const aliceApp = userClient(alice.accessToken);
+    const { error: insertError } = await aliceApp.from("products").insert({
+      user_id: alice.id,
+      name: "Biscoito Recheado Zebrafino",
+      price: 5,
+      track_stock: false,
+    });
+    expect(insertError).toBeNull();
+
+    const { data, error } = await aliceApp.rpc("produtos_parecidos", {
+      p_busca: "biscoto zebrafino",
+    });
+    expect(error).toBeNull();
+    expect((data ?? []).map((p: { name: string }) => p.name)).toContain(
+      "Biscoito Recheado Zebrafino",
+    );
+  });
+
+  it("Bob não enxerga os produtos de Alice pela busca parecida", async () => {
+    const bobApp = userClient(bob.accessToken);
+    const { data, error } = await bobApp.rpc("produtos_parecidos", {
+      p_busca: "biscoto zebrafino",
+    });
+    expect(error).toBeNull();
+    expect(data ?? []).toHaveLength(0);
+  });
+
+  it("sem sessão, a RPC não executa", async () => {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/produtos_parecidos`,
+      {
+        method: "POST",
+        headers: {
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ p_busca: "biscoto" }),
+      },
+    );
+    expect(res.status).toBe(401);
+  });
+});

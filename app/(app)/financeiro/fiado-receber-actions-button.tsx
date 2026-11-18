@@ -46,7 +46,7 @@ export function FiadoAReceberDeleteButton({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Excluir venda a prazo de ${cliente}`}
-        className="text-muted-foreground hover:text-destructive inline-flex size-8 items-center justify-center rounded-md"
+        className="text-muted-foreground hover:text-destructive relative inline-flex size-8 items-center justify-center rounded-md after:absolute after:-inset-1.5 after:content-['']"
       >
         <Trash2 aria-hidden="true" className="size-4" />
       </button>

@@ -75,7 +75,7 @@ export function FiadoAReceberBlock({ vendas }: { vendas: FiadoAReceber[] }) {
                   href={`${FIADOAPP_URL}/vendas/${v.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary inline-flex items-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
+                  className="text-primary -my-3 inline-flex items-center gap-1 py-3 text-sm font-medium underline-offset-4 hover:underline"
                 >
                   Ver no FiadoApp
                   <ArrowUpRight aria-hidden="true" className="size-4" />

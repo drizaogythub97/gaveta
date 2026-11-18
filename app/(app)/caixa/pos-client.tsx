@@ -635,7 +635,7 @@ export function PosClient({
                       onClick={() => addProductToCart(p)}
                       className="hover:bg-muted focus-visible:bg-muted flex w-full items-center justify-between gap-3 rounded-md px-3 py-3 text-left text-base outline-none"
                     >
-                      <span className="text-foreground font-medium">
+                      <span className="text-foreground min-w-0 font-medium wrap-anywhere">
                         {p.name}
                       </span>
                       <span className="text-foreground text-lg font-semibold">
@@ -827,8 +827,8 @@ export function PosClient({
                     key={it.key}
                     className="border-border flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
                   >
-                    <div className="flex flex-col">
-                      <span className="text-foreground text-lg font-medium">
+                    <div className="flex min-w-0 flex-col">
+                      <span className="text-foreground text-lg font-medium wrap-anywhere">
                         {it.name}
                         {it.product_id === null ? (
                           <span className="text-muted-foreground ml-2 text-sm font-normal">

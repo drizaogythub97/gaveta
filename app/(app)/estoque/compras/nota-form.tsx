@@ -784,7 +784,9 @@ export function NotaForm({
                   onClick={() => adicionarExistente(p)}
                   className="hover:bg-muted focus-visible:bg-muted flex w-full items-center justify-between gap-3 rounded-md px-3 py-3 text-left text-base outline-none"
                 >
-                  <span className="text-foreground font-medium">{p.name}</span>
+                  <span className="text-foreground min-w-0 font-medium wrap-anywhere">
+                    {p.name}
+                  </span>
                   <span className="text-muted-foreground text-sm">
                     {p.cost_price === null
                       ? "sem custo cadastrado"
@@ -959,7 +961,7 @@ export function NotaForm({
                         />
                       </div>
                     ) : (
-                      <span className="minimal:max-sm:text-base text-foreground text-lg font-semibold">
+                      <span className="minimal:max-sm:text-base text-foreground text-lg font-semibold wrap-anywhere">
                         {item.name}
                       </span>
                     )}

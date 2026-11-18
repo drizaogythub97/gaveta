@@ -65,7 +65,7 @@ export default async function CompraDetalhePage({
       <header className="flex flex-col gap-3">
         <Link
           href="/estoque/compras"
-          className="text-primary inline-flex w-fit items-center gap-2 text-base font-medium underline-offset-4 hover:underline"
+          className="text-primary -my-2.5 inline-flex w-fit items-center gap-2 py-2.5 text-base font-medium underline-offset-4 hover:underline"
         >
           <ArrowLeft aria-hidden="true" className="size-5" />
           Voltar às notas
@@ -103,7 +103,14 @@ export default async function CompraDetalhePage({
         >
           <Undo2 aria-hidden="true" />
           <AlertDescription className="text-destructive text-base">
-            Esta nota foi cancelada em {formatDate(compra.voided_at!)}. A
+            {/* Dígitos de largura fixa: com os proporcionais, o "1" estreito
+                fazia o aviso quebrar uma linha a mais ou a menos conforme a
+                data — e a foto de referência do teste variava com o dia. */}
+            Esta nota foi cancelada em{" "}
+            <span className="tabular-nums">
+              {formatDate(compra.voided_at!)}
+            </span>
+            . A
             mercadoria saiu do estoque e o gasto foi removido do financeiro. Ela
             continua aqui como histórico.
           </AlertDescription>

@@ -80,7 +80,7 @@ export default async function AppLayout({
         <div className="minimal:max-sm:h-12 mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-3 px-4">
           <Link
             href="/dashboard"
-            className="minimal:max-sm:text-lg text-foreground flex items-center gap-3 text-xl font-semibold tracking-tight"
+            className="minimal:max-sm:text-lg text-foreground -my-1 flex items-center gap-3 py-1 text-xl font-semibold tracking-tight"
           >
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
